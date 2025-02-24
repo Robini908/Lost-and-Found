@@ -1,0 +1,8 @@
+version: '3.4'
+
+services:
+  lostfound:
+    image: lostfound
+    build:
+      context: .
+      dockerfile: ./Dockerfile
