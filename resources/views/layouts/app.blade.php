@@ -21,6 +21,7 @@
 
     <!-- Styles -->
     @livewireStyles
+    @filepondScripts
 </head>
 
 <body class="font-sans antialiased">
@@ -73,7 +74,6 @@ $url .= '/' . $segment;
     </div>
 
     @stack('modals')
-    @filepondScripts
     @livewireScripts
 </body>
 

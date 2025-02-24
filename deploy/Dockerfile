@@ -1,9 +1,9 @@
 # deploy/Dockerfile
 
-# stage 1: build stage
+# Stage 1: Build stage
 FROM php:8.3-fpm-alpine as build
 
-# installing system dependencies and php extensions
+# Installing system dependencies and PHP extensions
 RUN apk add --no-cache \
     zip \
     libzip-dev \
@@ -21,18 +21,18 @@ RUN apk add --no-cache \
     && docker-php-ext-install -j$(nproc) gd \
     && docker-php-ext-enable gd
 
-# install composer
+# Install Composer
 COPY --from=composer:2.7.6 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# copy necessary files and change permissions
+# Copy necessary files and change permissions
 COPY . .
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage \
     && chmod -R 775 /var/www/html/bootstrap/cache
 
-# install php and node.js dependencies
+# Install PHP and Node.js dependencies
 RUN composer install --no-dev --prefer-dist \
     && npm install \
     && npm run build
@@ -40,10 +40,10 @@ RUN composer install --no-dev --prefer-dist \
 RUN chown -R www-data:www-data /var/www/html/vendor \
     && chmod -R 775 /var/www/html/vendor
 
-# stage 2: production stage
+# Stage 2: Production stage
 FROM php:8.3-fpm-alpine
 
-# install nginx
+# Install Nginx
 RUN apk add --no-cache \
     zip \
     libzip-dev \
@@ -72,14 +72,14 @@ RUN apk add --no-cache \
     && docker-php-ext-enable opcache \
     && rm -rf /var/cache/apk/*
 
-# copy files from the build stage
+# Copy files from the build stage
 COPY --from=build /var/www/html /var/www/html
 COPY ./deploy/nginx.conf /etc/nginx/http.d/default.conf
 COPY ./deploy/php.ini "$PHP_INI_DIR/conf.d/app.ini"
 
 WORKDIR /var/www/html
 
-# add all folders where files are being stored that require persistence. if needed, otherwise remove this line.
+# Add all folders where files are being stored that require persistence. If needed, otherwise remove this line.
 VOLUME ["/var/www/html/storage/app"]
 
 CMD ["sh", "-c", "nginx && php-fpm"]

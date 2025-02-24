@@ -32,6 +32,7 @@ class LostItem extends Model
         'is_verified',
         'expiry_date',
         'geolocation',
+        'matched_found_item_id', // Add this
     ];
 
     /**
@@ -71,7 +72,7 @@ class LostItem extends Model
      *
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function claimedBy()
+    public function claimedByUser()
     {
         return $this->belongsTo(User::class, 'claimed_by');
     }
@@ -94,5 +95,25 @@ class LostItem extends Model
     public function images()
     {
         return $this->hasMany(LostItemImage::class);
+    }
+
+    /**
+     * Relationship to the matched found item.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function matchedFoundItem()
+    {
+        return $this->belongsTo(LostItem::class, 'matched_found_item_id');
+    }
+
+    /**
+     * Relationship to the items that this item has matched.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function matchedItems()
+    {
+        return $this->hasMany(LostItem::class, 'matched_found_item_id');
     }
 }

@@ -97,7 +97,7 @@ class EditLostItem extends Component
                 // Save new images
                 foreach ($this->images as $image) {
                     // Store the image and get the path
-                    $path = $image->store('lost-item-images', 'public');
+                    $path = $image->store('lost-items', 'public');
 
                     // Create a new LostItemImage record
                     LostItemImage::create([

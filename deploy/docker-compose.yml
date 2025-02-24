@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   laravel:
     restart: unless-stopped
@@ -10,26 +8,27 @@ services:
     volumes:
       - ../storage/app:/var/www/html/storage/app
     environment:
-      - APP_NAME=${APP_NAME}
-      - APP_ENV=${APP_ENV}
-      - APP_DEBUG=${APP_DEBUG}
-      - APP_KEY=${APP_KEY}
-      - APP_VERSION=${APP_VERSION}
-      - APP_URL=${APP_URL}
+      - APP_NAME=LostFoundApp
+      - APP_ENV=local
+      - APP_DEBUG=true
+      - APP_KEY=base64:RfsWisbwKMmFQ+0SP/E8ZuiaAyoSNe7xm6JG4BZb328=
+      - APP_VERSION=1.0
+      - APP_URL=http://localhost
       - DB_CONNECTION=mysql
       - DB_HOST=database
       - DB_PORT=3306
-      - DB_DATABASE=${DB_DATABASE}
-      - DB_USERNAME=${DB_USERNAME}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - MAIL_MAILER=${MAIL_MAILER}
-      - MAIL_HOST=${MAIL_HOST}
-      - MAIL_PORT=${MAIL_PORT}
-      - MAIL_USERNAME=${MAIL_USERNAME}
-      - MAIL_PASSWORD=${MAIL_PASSWORD}
-      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
-      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
-      - MAIL_FROM_NAME=${MAIL_FROM_NAME}
+      - DB_DATABASE=lost_found_hub
+      - DB_USERNAME=laravel_user
+      - DB_PASSWORD=laravel_password
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=smtp.mailtrap.io
+      - MAIL_PORT=2525
+      - MAIL_USERNAME=null
+      - MAIL_PASSWORD=null
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS=null
+      - MAIL_FROM_NAME=LostFoundApp
+      - HUGGING_FACE_API_KEY=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 # Add Hugging Face API key
     ports:
       - "8080:80"
     networks:
@@ -43,21 +42,10 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: password
       MYSQL_DATABASE: lost_found_hub
-      MYSQL_USER: host
-      MYSQL_PASSWORD: password
-    volumes: 
-      - v-database:/var/lib/mysql
-    networks:
-      - laravel-network
-
-  tensorflow_serving:
-    image: tensorflow/serving
-    container_name: tensorflow_serving
-    command: ["tensorflow_model_server", "--rest_api_port=8501", "--model_name=resnet", "--model_base_path=/models/resnet"]
+      MYSQL_USER: laravel_user
+      MYSQL_PASSWORD: laravel_password
     volumes:
-      - C:/imagemodel:/models
-    ports:
-      - "8501:8501"
+      - v-database:/var/lib/mysql
     networks:
       - laravel-network
 

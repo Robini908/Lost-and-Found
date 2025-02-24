@@ -296,149 +296,163 @@
                     </x-dialog-modal>
                 @endif
                 <div>
-                    <!-- Header Section -->
+                    <div wire:poll.5s>
+                        <!-- Section for All Items -->
+                        <div wire:ignore class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
+                            @foreach ($lostItems as $item)
+                                <div class="rounded-xl shadow-lg overflow-hidden transition-all duration-500 ease-in-out transform hover:scale-105 hover:shadow-2xl relative"
+                                    style="background: linear-gradient(145deg, {{ $item->claimed_by ? '#f0f0f0' : ($item->user_id === Auth::id() ? '#e0f7fa' : '#ffffff') }}, {{ $item->claimed_by ? '#e0e0e0' : ($item->user_id === Auth::id() ? '#b2ebf2' : '#f5f5f5') }});">
 
-
-
-                    <!-- Section for All Items -->
-                    <div wire:ignore class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        @foreach ($lostItems as $item)
-                            <div class="rounded-lg shadow-lg overflow-hidden transition-all duration-500 ease-in-out transform hover:scale-105 hover:shadow-xl relative"
-                                style="background-color: {{ $item->claimed_by ? '#f0f0f0' : ($item->user_id === Auth::id() ? '#f0f8ff' : '#ffffff') }}">
-                                <!-- Header Section for Badges -->
-                                <div class="p-4 bg-white bg-opacity-90 flex justify-between items-start">
-                                    <!-- Item Type Badge -->
-                                    <div>
-                                        @php
-                                            $itemTypeColor =
-                                                [
-                                                    'reported' => 'bg-purple-500 text-white',
-                                                    'searched' => 'bg-yellow-500 text-white',
-                                                    'found' => 'bg-green-500 text-white',
-                                                ][$item->item_type] ?? 'bg-gray-500 text-white';
-                                        @endphp
-                                        <span
-                                            class="{{ $itemTypeColor }} px-3 py-1 rounded-full text-sm font-semibold shadow-md">
-                                            {{ ucfirst($item->item_type) }}
-                                        </span>
-                                    </div>
-
-                                    {{-- <!-- Status Badge -->
-                                    <div>
-                                        @php
-                                            $statusColor =
-                                                [
-                                                    'Found' => 'bg-green-500 text-white',
-                                                    'Lost' => 'bg-red-500 text-white',
-                                                    'Pending' => 'bg-blue-500 text-white',
-                                                ][$item->status] ?? 'bg-gray-500 text-white';
-                                        @endphp
-                                        <span
-                                            class="{{ $statusColor }} px-3 py-1 rounded-full text-sm font-semibold shadow-md animate-bounce">
-                                            {{ $item->status }}
-                                        </span>
-                                    </div> --}}
-                                </div>
-
-                                <!-- Image Section -->
-                                <div class="relative w-full aspect-square overflow-hidden">
-                                    @if ($item->images->isNotEmpty())
-                                        <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
-                                            alt="{{ $item->title }}"
-                                            class="w-full h-full object-cover transition-transform duration-500 ease-in-out hover:scale-110">
-                                    @else
-                                        <div class="w-full h-full bg-gray-100 flex items-center justify-center">
-                                            <span class="text-gray-500 text-sm">No Image Available</span>
-                                        </div>
-                                    @endif
-                                </div>
-
-                                <!-- Content Section -->
-                                <div class="p-5">
-                                    <!-- Title with Eye Icon -->
-                                    <div class="flex justify-between items-center mb-4">
-                                        <h3 class="text-xl font-bold text-gray-900">{{ $item->title }}</h3>
-                                        <button wire:click="showItemDetails({{ $item->id }})"
-                                            class="text-gray-500 hover:text-blue-600 transition-colors duration-500 ease-in-out">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                    </div>
-
-                                    <!-- Reported By -->
-                                    <div class="flex items-center space-x-2 text-sm text-gray-600 mb-4">
-                                        <i class="fas fa-user"></i>
-                                        <span class="text-gray-700">{{ $item->user->name }}</span>
-                                    </div>
-
-                                    <!-- Location Badge -->
-                                    <div class="flex items-center space-x-2 mb-4">
-                                        <i class="fas fa-map-marker-alt text-blue-500 animate-pulse"></i>
-                                        <span
-                                            class="text-sm text-gray-700 bg-blue-50 px-3 py-1 rounded-full">{{ $item->location }}</span>
-                                    </div>
-
-                                    <!-- Found By and Date Found (if applicable) -->
-                                    @if ($item->item_type === 'found')
-                                        <div class="space-y-2 text-sm text-gray-600 mb-4">
-                                            <div class="flex items-center space-x-2">
-                                                <i class="fas fa-user-check"></i>
-                                                <span>Found By: {{ $item->user->name ?? 'Unknown' }}</span>
-                                            </div>
-                                            <div class="flex items-center space-x-2">
-                                                <i class="fas fa-calendar-check"></i>
-                                                <span>Date Found:
-                                                    {{ $item->date_found ? $item->date_found->format('M d, Y') : 'N/A' }}</span>
-                                            </div>
-                                        </div>
-                                    @endif
-
-                                    <!-- Additional Details -->
-                                    @if ($item->item_type === 'reported' || $item->item_type === 'searched')
-                                    <div class="space-y-2 text-sm text-gray-600">
+                                    <!-- Header Section for Badges -->
+                                    <div class="p-4 bg-white bg-opacity-90 flex justify-between items-start">
+                                        <!-- Item Type Badge -->
                                         <div class="flex items-center space-x-2">
-                                            <i class="fas fa-calendar-alt"></i>
-                                            <span>Reported on: {{ $item->created_at->format('M d, Y') }}</span>
+                                            @php
+                                                $itemTypeColor =
+                                                    [
+                                                        'reported' => 'bg-purple-500 text-white',
+                                                        'searched' => 'bg-yellow-500 text-white',
+                                                        'found' => 'bg-green-500 text-white',
+                                                    ][$item->item_type] ?? 'bg-gray-500 text-white';
+                                            @endphp
+                                            <span class="{{ $itemTypeColor }} px-3 py-1 rounded-full text-xs font-semibold shadow-md">
+                                                {{ ucfirst($item->item_type) }}
+                                            </span>
+
+                                            <!-- Image Matching Percentage (Displayed only for "Found" items) -->
+                                            @if ($item->item_type === 'found' && Auth::check())
+                                                @php
+                                                    $userReportedItems = \App\Models\LostItem::where('user_id', Auth::id())
+                                                        ->whereIn('item_type', ['reported', 'searched'])
+                                                        ->with('images')
+                                                        ->get();
+
+                                                    if ($userReportedItems->isNotEmpty()) {
+                                                        $imageSimilarityScore = $this->itemMatchingService->calculateImageSimilarity(
+                                                            $userReportedItems->first()->images,
+                                                            $item->images,
+                                                        );
+                                                    } else {
+                                                        $imageSimilarityScore = null;
+                                                    }
+                                                @endphp
+                                                @if ($imageSimilarityScore !== null)
+                                                    <div class="relative group">
+                                                        <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-md">
+                                                            Match = {{ number_format($imageSimilarityScore * 100, 2) }}%
+                                                        </span>
+                                                        <!-- Tooltip on Hover -->
+                                                        <div class="absolute bottom-full mb-2 hidden group-hover:block bg-gray-800 text-white text-xs px-2 py-1 rounded-lg">
+                                                            Image match by {{ number_format($imageSimilarityScore * 100, 2) }}%
+                                                        </div>
+                                                    </div>
+                                                @endif
+                                            @endif
                                         </div>
                                     </div>
-                                    @endif
+
+                                    <!-- Image Section -->
+                                    <div class="relative w-full h-48 overflow-hidden">
+                                        @if ($item->images->isNotEmpty())
+                                            <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
+                                                alt="{{ $item->title }}"
+                                                class="w-full h-full object-cover transition-transform duration-500 ease-in-out hover:scale-110">
+                                        @else
+                                            <div class="w-full h-full bg-gray-100 flex items-center justify-center">
+                                                <span class="text-gray-500 text-xs">No Image Available</span>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    <!-- Content Section -->
+                                    <div class="p-4">
+                                        <!-- Title with Eye Icon -->
+                                        <div class="flex justify-between items-center mb-3">
+                                            <h3 class="text-xl font-bold text-gray-900">{{ $item->title }}</h3>
+                                            <button wire:click="showItemDetails({{ $item->id }})"
+                                                class="text-gray-500 hover:text-blue-600 transition-colors duration-500 ease-in-out">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </div>
+
+                                        <!-- Reported By -->
+                                        <div class="flex items-center space-x-2 text-sm text-gray-600 mb-3">
+                                            <i class="fas fa-user"></i>
+                                            <span class="text-gray-700">{{ $item->user->name }}</span>
+                                        </div>
+
+                                        <!-- Location Badge -->
+                                        <div class="flex items-center space-x-2 mb-3">
+                                            <i class="fas fa-map-marker-alt text-blue-500 animate-pulse"></i>
+                                            <span class="text-sm text-gray-700 bg-blue-50 px-3 py-1 rounded-full">{{ $item->location }}</span>
+                                        </div>
+
+                                        <!-- Matched Item Information (For Reported and Searched Items) -->
+                                        @if (in_array($item->item_type, ['reported', 'searched']) && $item->matchedFoundItem)
+                                            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                                                <h4 class="text-sm font-semibold text-gray-700 mb-2">Matched Found Item</h4>
+                                                <div class="space-y-2">
+                                                    <div class="flex items-center space-x-2">
+                                                        <i class="fas fa-check-circle text-green-500"></i>
+                                                        <span class="text-sm text-gray-700">
+                                                            Found by: {{ $item->matchedFoundItem->user->name }}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex items-center space-x-2">
+                                                        <i class="fas fa-map-marker-alt text-blue-500"></i>
+                                                        <span class="text-sm text-gray-700">
+                                                            Found at: {{ $item->matchedFoundItem->location }}
+                                                        </span>
+                                                    </div>
+                                                    @if ($item->matchedFoundItem->claimed_by)
+                                                        <div class="flex items-center space-x-2">
+                                                            <i class="fas fa-user-check text-purple-500"></i>
+                                                            <span class="text-sm text-gray-700">
+                                                                Claimed by: {{ $item->matchedFoundItem->claimedByUser->name }}
+                                                            </span>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        <!-- Claim Button (Centered at the Bottom) -->
+                                        @if ($item->item_type === 'found' && $item->user_id !== Auth::id() && !$item->claimed_by && $imageSimilarityScore > 0.5)
+                                            <div class="absolute bottom-0 left-0 right-0 flex justify-center p-3 bg-white bg-opacity-90">
+                                                <button wire:click="confirmClaim({{ $item->id }})"
+                                                    class="bg-green-500 text-white hover:bg-green-600 transition-colors duration-500 ease-in-out rounded-full px-6 py-2 text-sm shadow-sm hover:shadow-md flex items-center space-x-2"
+                                                    data-tippy-content="Claim Item">
+                                                    <i class="fas fa-hand-holding-heart"></i>
+                                                    <span>Claim</span>
+                                                </button>
+                                            </div>
+                                        @endif
+
+                                        <!-- Claimed Message -->
+                                        @if ($item->claimed_by)
+                                            <div class="absolute bottom-0 left-0 right-0 flex justify-center p-3 bg-gray-200 bg-opacity-90">
+                                                <span class="text-sm text-gray-700 font-semibold">
+                                                    Found and Claimed by {{ $item->claimedByUser->name }}
+                                                </span>
+                                            </div>
+                                        @endif
+
+                                        <!-- Reset Claim Button (For Admins/Superadmins) -->
+                                        @if (($item->claimed_by) && (auth()->user()->hasRole('admin') || auth()->user()->hasRole('superadmin')))
+                                            <div class="absolute bottom-0 left-0 right-0 flex justify-center p-3 bg-white bg-opacity-90">
+                                                <button wire:click="confirmResetClaim({{ $item->id }})"
+                                                    class="bg-red-500 text-white hover:bg-red-600 transition-colors duration-500 ease-in-out rounded-full px-6 py-2 text-sm shadow-sm hover:shadow-md flex items-center space-x-2"
+                                                    data-tippy-content="Reset Claim">
+                                                    <i class="fas fa-undo"></i>
+                                                    <span>Reset Claim</span>
+                                                </button>
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
-
-                                <!-- Claim Button (Centered at the Bottom) -->
-                                @if ($item->status === 'Found' && $item->user_id !== Auth::id() && !$item->claimed_by)
-                                    <div
-                                        class="absolute bottom-0 left-0 right-0 flex justify-center p-4 bg-white bg-opacity-90">
-                                        <button wire:click="confirmClaim({{ $item->id }})"
-                                            class="bg-green-500 text-white hover:bg-green-600 transition-colors duration-500 ease-in-out rounded-full px-6 py-2 shadow-sm hover:shadow-md flex items-center space-x-2"
-                                            data-tippy-content="Claim Item">
-                                            <i class="fas fa-hand-holding-heart"></i>
-                                            <span>Claim</span>
-                                        </button>
-                                    </div>
-                                @endif
-                                <!-- Delete and Edit Icons (Bottom Right) -->
-                                @if ($item->user_id === Auth::id())
-                                    <div class="absolute bottom-1 right-4 flex space-x-4">
-                                        <!-- Delete Icon -->
-                                        <button wire:click="confirmDelete({{ $item->id }})"
-                                            class="bg-white text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors duration-500 ease-in-out rounded-full p-2 shadow-sm hover:shadow-md"
-                                            data-tippy-content="Delete">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </button>
-                                    </div>
-                                @endif
-
-                                <!-- Claimed Message -->
-                                @if ($item->claimed_by)
-                                    <div
-                                        class="absolute bottom-0 left-0 right-0 flex justify-center p-4 bg-gray-200 bg-opacity-90">
-                                        <span class="text-gray-700 font-semibold">Claimed</span>
-                                    </div>
-                                @endif
-                            </div>
-                        @endforeach
+                            @endforeach
+                        </div>
                     </div>
-
-
                     <!-- Pagination -->
                     <div class="mt-6">
                         {{ $lostItems->links() }}
@@ -475,47 +489,99 @@
             </x-slot>
 
             <x-slot name="content">
-                <div class="space-y-4">
-                    <p class="text-gray-700">
-                        {{ __('Are you sure you want to claim this item? Please confirm the following checks:') }}
+                <div class="space-y-6">
+                    <!-- Confirmation Message -->
+                    <p class="text-gray-700 text-sm leading-relaxed">
+                        {{ __('Are you sure you want to claim this item? Please review the following checks to ensure it matches your lost item.') }}
                     </p>
 
-                    <!-- Similarity Score -->
-                    <div class="text-center">
-                        <span class="text-lg font-bold">Similarity Score:
-                            {{ number_format($similarityScore * 100, 2) }}%</span>
+                    <!-- Similarity Scores Section -->
+                    <div class="space-y-4">
+                        <!-- Text Similarity Score -->
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-700">Description Match:</span>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-semibold text-gray-700">
+                                    {{ number_format($textSimilarityScore * 100, 2) }}%
+                                </span>
+                                <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-blue-500 rounded-full"
+                                        style="width: {{ $textSimilarityScore * 100 }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Image Similarity Score -->
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-700">Image Match:</span>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-semibold text-gray-700">
+                                    {{ number_format($imageSimilarityScore * 100, 2) }}%
+                                </span>
+                                <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-green-500 rounded-full"
+                                        style="width: {{ $imageSimilarityScore * 100 }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Location Similarity Score -->
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-700">Location Match:</span>
+                            <div class="flex items-center space-x-2">
+                                <span class="text-sm font-semibold text-gray-700">
+                                    {{ number_format($locationSimilarityScore * 100, 2) }}%
+                                </span>
+                                <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full bg-purple-500 rounded-full"
+                                        style="width: {{ $locationSimilarityScore * 100 }}%;"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Checks List -->
-                    <div class="space-y-2">
+                    <div class="space-y-3">
                         <!-- Description Matches -->
-                        <div class="flex items-center space-x-2">
-                            @if ($checks['description_matches'] ?? false)
-                                <i class="fas fa-check-circle text-green-500"></i>
-                            @else
-                                <i class="fas fa-times-circle text-red-500"></i>
-                            @endif
-                            <span class="text-gray-700">Description matches the item you were looking for.</span>
+                        <div class="flex items-center space-x-3">
+                            <div class="flex-shrink-0">
+                                @if ($checks['description_matches'] ?? false)
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                @else
+                                    <i class="fas fa-times-circle text-red-500"></i>
+                                @endif
+                            </div>
+                            <span class="text-gray-700 text-sm">
+                                The description matches the item you were looking for.
+                            </span>
                         </div>
 
                         <!-- Images Match -->
-                        <div class="flex items-center space-x-2">
-                            @if ($checks['images_match'] ?? false)
-                                <i class="fas fa-check-circle text-green-500"></i>
-                            @else
-                                <i class="fas fa-times-circle text-red-500"></i>
-                            @endif
-                            <span class="text-gray-700">Images match the item you were looking for.</span>
+                        <div class="flex items-center space-x-3">
+                            <div class="flex-shrink-0">
+                                @if ($checks['images_match'] ?? false)
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                @else
+                                    <i class="fas fa-times-circle text-red-500"></i>
+                                @endif
+                            </div>
+                            <span class="text-gray-700 text-sm">
+                                The images match the item you were looking for.
+                            </span>
                         </div>
 
                         <!-- Location Matches -->
-                        <div class="flex items-center space-x-2">
-                            @if ($checks['location_matches'] ?? false)
-                                <i class="fas fa-check-circle text-green-500"></i>
-                            @else
-                                <i class="fas fa-times-circle text-red-500"></i>
-                            @endif
-                            <span class="text-gray-700">Location matches where you lost the item.</span>
+                        <div class="flex items-center space-x-3">
+                            <div class="flex-shrink-0">
+                                @if ($checks['location_matches'] ?? false)
+                                    <i class="fas fa-check-circle text-green-500"></i>
+                                @else
+                                    <i class="fas fa-times-circle text-red-500"></i>
+                                @endif
+                            </div>
+                            <span class="text-gray-700 text-sm">
+                                The location matches where you lost the item.
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -530,6 +596,30 @@
                     wire:loading.attr="disabled">
                     {{ __('Claim') }}
                 </x-button>
+            </x-slot>
+        </x-dialog-modal>
+
+        <!-- Reset Claim Modal -->
+        <x-dialog-modal wire:model.live="confirmingResetClaim">
+            <x-slot name="title">
+                {{ __('Reset Claim') }}
+            </x-slot>
+
+            <x-slot name="content">
+                <p class="text-gray-700">
+                    {{ __('Are you sure you want to reset the claim for this item?') }}
+                </p>
+            </x-slot>
+
+            <x-slot name="footer">
+                <div class="flex justify-end space-x-4">
+                    <x-secondary-button wire:click="closeResetClaimModal">
+                        {{ __('Cancel') }}
+                    </x-secondary-button>
+                    <x-button wire:click="resetClaim" class="bg-red-500 hover:bg-red-600">
+                        {{ __('Reset Claim') }}
+                    </x-button>
+                </div>
             </x-slot>
         </x-dialog-modal>
 

@@ -8,20 +8,13 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Collection;
-
+use Illuminate\Support\Facades\Bus;
+use App\Jobs\ProcessImageFeatures;
 
 class ItemMatchingService
 {
     protected $cacheKey = 'matched_items';
     protected $cacheDuration = 1440; // 24 hours in minutes
-    protected $messages = [
-        "Gathering requirements...",
-        "Calculating similarity scores...",
-        "Analyzing images...",
-        "Matching locations...",
-        "Finalizing results...",
-        "Hold on a moment, this will not take long..."
-    ];
 
     /**
      * Find matches for reported items.
@@ -84,9 +77,37 @@ class ItemMatchingService
     {
         $matches = [];
 
+        // Precompute text embeddings for all reported and found items
+        $reportedEmbeddings = $this->precomputeTextEmbeddings($reportedItems);
+        $foundEmbeddings = $this->precomputeTextEmbeddings($foundItems);
+
         foreach ($reportedItems as $reportedItem) {
             foreach ($foundItems as $foundItem) {
-                $similarityScore = $this->calculateSimilarity($reportedItem, $foundItem);
+                $textSimilarity = $this->cosineSimilarity(
+                    $reportedEmbeddings[$reportedItem->id],
+                    $foundEmbeddings[$foundItem->id]
+                );
+
+                $imageSimilarity = $this->calculateImageSimilarity(
+                    $reportedItem->images,
+                    $foundItem->images
+                );
+
+                $locationSimilarity = $this->calculateLocationSimilarity(
+                    $reportedItem->geolocation,
+                    $foundItem->geolocation
+                );
+
+                $timeSimilarity = $this->calculateTimeSimilarity(
+                    $reportedItem->date_lost,
+                    $foundItem->date_found
+                );
+
+                $similarityScore = ($textSimilarity * 0.5) +
+                    ($imageSimilarity * 0.3) +
+                    ($locationSimilarity * 0.1) +
+                    ($timeSimilarity * 0.1);
+
                 if ($similarityScore > 0.5) { // Adjust threshold as needed
                     $matches[] = [
                         'reported_item' => $reportedItem,
@@ -100,45 +121,23 @@ class ItemMatchingService
         return $matches;
     }
 
-
-
     /**
-     * Calculate the overall similarity score between two items.
+     * Precompute text embeddings for a collection of items.
      *
-     * @param LostItem $reportedItem
-     * @param LostItem $foundItem
-     * @return float
+     * @param Collection $items
+     * @return array
      */
-    public function calculateSimilarity($reportedItem, $foundItem)
+    protected function precomputeTextEmbeddings(Collection $items)
     {
-        // Text-based similarity
-        $textSimilarity = $this->calculateTextSimilarity(
-            $reportedItem->title . ' ' . $reportedItem->description,
-            $foundItem->title . ' ' . $foundItem->description
-        );
+        $embeddings = [];
 
-        // Image-based similarity
-        $imageSimilarity = $this->calculateImageSimilarity(
-            $reportedItem->images,
-            $foundItem->images
-        );
+        foreach ($items as $item) {
+            $embeddings[$item->id] = $this->getTextEmbedding(
+                $item->title . ' ' . $item->description
+            );
+        }
 
-        // Location-based similarity
-        $locationSimilarity = $this->calculateLocationSimilarity(
-            $reportedItem->geolocation,
-            $foundItem->geolocation
-        );
-
-        // Time-based similarity
-        $timeSimilarity = $this->calculateTimeSimilarity(
-            $reportedItem->date_lost,
-            $foundItem->date_found
-        );
-
-        return ($textSimilarity * 0.5) +
-            ($imageSimilarity * 0.3) +
-            ($locationSimilarity * 0.1) +
-            ($timeSimilarity * 0.1);
+        return $embeddings;
     }
 
     /**
@@ -148,13 +147,16 @@ class ItemMatchingService
      * @param string $text2
      * @return float
      */
-    protected function calculateTextSimilarity($text1, $text2)
+    public function calculateTextSimilarity($text1, $text2)
     {
         $embedding1 = $this->getTextEmbedding($text1);
         $embedding2 = $this->getTextEmbedding($text2);
 
-        Log::info("Text 1 Embedding: " . json_encode($embedding1));
-        Log::info("Text 2 Embedding: " . json_encode($embedding2));
+        // Check if embeddings are valid
+        if (empty($embedding1) || empty($embedding2)) {
+            Log::warning("Invalid embeddings for text similarity calculation.");
+            return 0; // Return 0 if embeddings are invalid
+        }
 
         return $this->cosineSimilarity($embedding1, $embedding2);
     }
@@ -167,6 +169,13 @@ class ItemMatchingService
      */
     protected function getTextEmbedding($text)
     {
+        $cacheKey = 'text_embedding_' . md5($text); // Unique cache key for each text
+
+        // Check if the embedding is already cached
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
         $apiUrl = 'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2';
         $apiKey = env('HUGGING_FACE_API_KEY');
 
@@ -176,9 +185,17 @@ class ItemMatchingService
             'inputs' => $text,
         ]);
 
-        Log::info("Hugging Face API Response: " . json_encode($response->json()));
+        if (!$response->successful() || !is_array($response->json())) {
+            Log::error("Invalid API response: " . $response->body());
+            return [];
+        }
 
-        return $response->json();
+        $embedding = $response->json();
+
+        // Cache the embedding for 24 hours
+        Cache::put($cacheKey, $embedding, $this->cacheDuration);
+
+        return $embedding;
     }
 
     /**
@@ -190,11 +207,22 @@ class ItemMatchingService
      */
     protected function cosineSimilarity($vector1, $vector2)
     {
+        // Check if vectors are valid
+        if (!is_array($vector1) || !is_array($vector2) || empty($vector1) || empty($vector2)) {
+            Log::warning("Invalid vectors for cosine similarity calculation.");
+            return 0; // Return 0 if vectors are invalid
+        }
+
+        // Pad the shorter vector with zeros
+        $maxLength = max(count($vector1), count($vector2));
+        $vector1 = array_pad($vector1, $maxLength, 0);
+        $vector2 = array_pad($vector2, $maxLength, 0);
+
         $dotProduct = 0;
         $magnitude1 = 0;
         $magnitude2 = 0;
 
-        for ($i = 0; $i < count($vector1); $i++) {
+        for ($i = 0; $i < $maxLength; $i++) {
             $dotProduct += $vector1[$i] * $vector2[$i];
             $magnitude1 += $vector1[$i] * $vector1[$i];
             $magnitude2 += $vector2[$i] * $vector2[$i];
@@ -202,6 +230,12 @@ class ItemMatchingService
 
         $magnitude1 = sqrt($magnitude1);
         $magnitude2 = sqrt($magnitude2);
+
+        // Avoid division by zero
+        if ($magnitude1 === 0 || $magnitude2 === 0) {
+            Log::warning("Magnitude is zero.");
+            return 0;
+        }
 
         return $dotProduct / ($magnitude1 * $magnitude2);
     }
@@ -213,7 +247,7 @@ class ItemMatchingService
      * @param \Illuminate\Database\Eloquent\Collection $images2
      * @return float
      */
-    protected function calculateImageSimilarity($images1, $images2)
+    public function calculateImageSimilarity($images1, $images2)
     {
         if ($images1->isEmpty() || $images2->isEmpty()) {
             Log::info("No images to compare.");
@@ -258,29 +292,35 @@ class ItemMatchingService
     protected function extractImageFeaturesWithCNN($images)
     {
         $features = [];
-        // Use the service name of the TensorFlow Serving container
-        $apiUrl = 'http://tensorflow_serving:8501/v1/models/resnet:predict';
+        $apiUrl = 'https://api-inference.huggingface.co/models/google/vit-base-patch16-224';
 
         foreach ($images as $image) {
             try {
                 $imagePath = 'lost-items/' . basename($image->image_path);
+                $cacheKey = 'image_features_' . md5($imagePath); // Unique cache key for each image
+
+                // Check if the features are already cached
+                if (Cache::has($cacheKey)) {
+                    $features[] = Cache::get($cacheKey);
+                    continue;
+                }
 
                 if (Storage::disk('public')->exists($imagePath)) {
                     $imageData = base64_encode(Storage::disk('public')->get($imagePath));
 
-                    Log::info("Sending request to TensorFlow Serving API: " . $apiUrl);
-                    Log::info("Image data length: " . strlen($imageData));
-
-                    $response = Http::timeout(60)->post($apiUrl, [
-                        'instances' => [['b64' => $imageData]],
+                    $response = Http::withHeaders([
+                        'Authorization' => 'Bearer ' . env('HUGGING_FACE_API_KEY'),
+                    ])->timeout(60)->post($apiUrl, [
+                        'inputs' => $imageData,
                     ]);
 
-                    Log::info("API Response Status: " . $response->status());
-                    Log::info("API Response Body: " . $response->body());
+                    if ($response->successful()) {
+                        $predictions = $response->json();
+                        $scores = array_column($predictions, 'score');
+                        $features[] = $scores;
 
-                    if ($response->successful() && isset($response->json()['predictions'][0])) {
-                        $features[] = $response->json()['predictions'][0];
-                        Log::info("Features extracted for image: " . $imagePath);
+                        // Cache the features for 24 hours
+                        Cache::put($cacheKey, $scores, $this->cacheDuration);
                     } else {
                         Log::warning("No predictions found in API response for image: " . $imagePath);
                     }
@@ -292,12 +332,9 @@ class ItemMatchingService
             }
         }
 
-        if (empty($features)) {
-            Log::warning("No features extracted from images.");
-        }
-
         return $features;
     }
+
     /**
      * Calculate location similarity.
      *
@@ -305,7 +342,7 @@ class ItemMatchingService
      * @param array $location2
      * @return float
      */
-    protected function calculateLocationSimilarity($location1, $location2)
+    public function calculateLocationSimilarity($location1, $location2)
     {
         if (!$location1 || !$location2) {
             return 0; // No location data

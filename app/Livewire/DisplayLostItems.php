@@ -10,6 +10,7 @@ use Livewire\WithPagination;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use App\Services\ItemMatchingService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Usernotnull\Toast\Concerns\WireToast;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -40,11 +41,18 @@ class DisplayLostItems extends Component
 
     public $checks = []; // Track the checks to display in the modal
 
+
     // Item Properties
     public $title, $description, $category_id, $value, $is_anonymous;
     public $itemToClaim = null; // Tracks the item being claimed
     public $confirmingClaim = false; // Tracks if the claim confirmation modal is open
     public $similarityScore = 0;
+    public $imageSimilarityScore = 0; // Tracks the image similarity score
+    public $textSimilarityScore = 0; // Tracks the text similarity score
+    public $locationSimilarityScore = 0;
+
+    public $itemToReset = null;
+    public $confirmingResetClaim = false;
 
 
     protected $queryString = [
@@ -78,23 +86,84 @@ class DisplayLostItems extends Component
         $user = Auth::user();
         $reportedItems = LostItem::where('user_id', $user->id)
             ->whereIn('item_type', ['reported', 'searched'])
-            ->with('images')
+            ->with(['images' => function ($query) {
+                $query->select('id', 'lost_item_id', 'image_path');
+            }])
+            ->select('id', 'title', 'description', 'geolocation', 'date_lost', 'updated_at')
             ->get();
 
-        // Calculate similarity score using the ItemMatchingService
-        $this->similarityScore = $this->itemMatchingService->calculateSimilarity($reportedItems->first(), $this->itemToClaim);
+        // Ensure the user has reported items
+        if ($reportedItems->isEmpty()) {
+            toast()->danger('No reported items found for comparison.')
+                ->push();
+            return;
+        }
 
-        // Perform checks based on similarity score
+        // Calculate similarity scores using the ItemMatchingService
+        $this->imageSimilarityScore = $this->itemMatchingService->calculateImageSimilarity(
+            $reportedItems->first()->images,
+            $this->itemToClaim->images
+        );
+
+        $this->textSimilarityScore = $this->itemMatchingService->calculateTextSimilarity(
+            $reportedItems->first()->title . ' ' . $reportedItems->first()->description,
+            $this->itemToClaim->title . ' ' . $this->itemToClaim->description
+        );
+
+        // Calculate location similarity score
+        $this->locationSimilarityScore = $this->itemMatchingService->calculateLocationSimilarity(
+            $reportedItems->first()->geolocation,
+            $this->itemToClaim->geolocation
+        );
+
+        // Perform checks based on similarity scores
         $this->checks = [
-            'description_matches' => $this->similarityScore > 0.1,
-            'images_match' => $this->similarityScore > 0,
-            'location_matches' => $this->similarityScore > 0.1,
+            'description_matches' => $this->textSimilarityScore > 0.5, // Adjust threshold as needed
+            'images_match' => $this->imageSimilarityScore > 0.5, // Image similarity above 50%
+            'location_matches' => $this->locationSimilarityScore > 0.1, // Location similarity above 10%
         ];
+
+        // Automatically set matched_found_item_id if image similarity > 70%
+        if ($this->imageSimilarityScore > 0.7) {
+            $reportedItems->first()->update(['matched_found_item_id' => $this->itemToClaim->id]);
+
+            // Invalidate the cache
+            Cache::forget('matched_items'); // Clear the cache for matched items
+
+            // Emit an event to refresh the UI
+            $this->dispatch('itemMatched');
+
+            toast()->success('Item matched successfully!')
+                ->push();
+        }
 
         // Open the confirmation modal
         $this->confirmingClaim = true;
     }
 
+    public function confirmResetClaim($itemId)
+    {
+        $this->itemToReset = LostItem::find($itemId);
+        $this->confirmingResetClaim = true; // Open the reset confirmation modal
+    }
+
+    public function resetClaim()
+    {
+        if ($this->itemToReset) {
+            $this->itemToReset->update(['claimed_by' => null]); // Reset the claim
+            toast()->success('Claim has been reset successfully.')
+            ->push();
+        }
+
+        $this->closeResetClaimModal(); // Close the modal
+        $this->render(); // Refresh the list
+    }
+
+    public function closeResetClaimModal()
+    {
+        $this->confirmingResetClaim = false;
+        $this->itemToReset = null;
+    }
     public function processClaim()
     {
         // Process the claim (e.g., update the item's claimed_by field)
