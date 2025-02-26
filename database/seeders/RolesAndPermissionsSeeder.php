@@ -64,7 +64,7 @@ class RolesAndPermissionsSeeder extends Seeder
             ['email' => 'superadmin@example.com'], // Unique identifier
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make(value: 'superadminpassword'), // Default password
+                'password' => Hash::make('superadminpassword'), // Default password
             ]
         );
 

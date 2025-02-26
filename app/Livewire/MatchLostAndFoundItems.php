@@ -70,6 +70,7 @@ class MatchLostAndFoundItems extends Component
         foreach ($this->messages as $index => $message) {
             $this->loadingMessage = $message;
             $this->progress = (int)(($index + 1) / count($this->messages) * 100);
+            $this->dispatch('progress-updated', ['progress' => $this->progress]); // Force UI update
             usleep(500000); // Simulate delay (0.5 seconds)
         }
 

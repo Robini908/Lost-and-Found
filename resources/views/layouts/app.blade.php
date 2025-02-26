@@ -1,3 +1,4 @@
+<!-- resources/views/layouts/app.blade.php -->
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
@@ -12,16 +13,17 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
     <script type="text/javascript" src="../node_modules/tw-elements/dist/js/tw-elements.umd.min.js"></script>
+    <!-- Include Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<!-- Include Leaflet JavaScript -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <link rel="stylesheet" href="app.css" />
-    <link href="https://unpkg.com/filepond/dist/filepond.css" rel="stylesheet">
-    <script src="https://unpkg.com/filepond/dist/filepond.js"></script>
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <!-- Styles -->
     @livewireStyles
-    @filepondScripts
 </head>
 
 <body class="font-sans antialiased">
@@ -43,10 +45,10 @@
                         @foreach ($segments as $segment)
                             @php
                                 // Hash the segment if it is numeric (assuming it's an ID)
-if (is_numeric($segment)) {
-    $segment = substr(md5($segment), 0, 8); // Short hash
-}
-$url .= '/' . $segment;
+                                if (is_numeric($segment)) {
+                                    $segment = substr(md5($segment), 0, 8); // Short hash
+                                }
+                                $url .= '/' . $segment;
                             @endphp
                             <a href="{{ url($url) }}" class="ml-4 text-gray-700 hover:text-gray-900">
                                 {{ ucfirst($segment) }}
@@ -72,7 +74,7 @@ $url .= '/' . $segment;
             {{ $slot }}
         </main>
     </div>
-
+    @filepondScripts
     @stack('modals')
     @livewireScripts
 </body>

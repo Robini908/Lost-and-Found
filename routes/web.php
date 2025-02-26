@@ -9,6 +9,7 @@ use App\Http\Controllers\BarcodeController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\LostItemController;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\ItemMatchingController;
 use App\Http\Controllers\TwilioWebhookController;
 use App\Http\Controllers\Auth\SocialiteController;
 use App\Http\Controllers\OpenAIAssistantController;
@@ -52,6 +53,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return view('products.my-lost-items');
     })->name('products.my-reported-items');
 });
+
+Route::get('/matched-item', function () {
+    return view('matched-items');
+})->name('matched-items');
 
 Route::get('/register', function () {
     $item_id = request('item_id');

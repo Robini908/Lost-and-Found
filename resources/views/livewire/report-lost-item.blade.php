@@ -38,7 +38,7 @@
         <div>
             <x-form-section submit="step1" class="space-y-6 p-6 rounded-lg">
                 <x-slot name="title">
-                    {{ $mode === 'reporting-lost' ? 'Reporting a Lost Item(that is not yours)' : ($mode === 'searching' ? 'Searching for your Lost Item' : 'Reporting a Found Item') }}
+                    {{ $mode === 'reporting-lost' ? 'Reporting a Lost Item (that is not yours)' : ($mode === 'searching' ? 'Searching for your Lost Item' : 'Reporting a Found Item') }}
                 </x-slot>
 
                 <x-slot name="description">
@@ -83,6 +83,15 @@
                         <x-input type="text" wire:model="location" id="location" class="mt-1 block w-full" />
                         <x-input-error for="location" class="mt-2" />
                     </div>
+
+                    <div class="col-span-6 sm:col-span-3">
+                        <label for="map" class="block text-sm font-medium text-gray-700">Select Location on
+                            Map</label>
+                        <div id="map" style="height: 400px;"></div>
+                        <input type="hidden" wire:model="latitude" id="latitude">
+                        <input type="hidden" wire:model="longitude" id="longitude">
+                    </div>
+
                     @if ($mode === 'reporting-lost' || $mode === 'searching')
                         <div class="col-span-6 sm:col-span-3">
                             <label for="date_lost" class="block text-sm font-medium text-gray-700">Date Lost</label>
@@ -105,8 +114,7 @@
                 </x-slot>
             </x-form-section>
         </div>
-    @endif
-
+@endif
     <!-- Add Category Modal -->
     <x-dialog-modal wire:model.live="showCategoryModal">
         <x-slot name="title">
@@ -352,7 +360,9 @@
 
                     <!-- Description -->
                     <p class="text-gray-600 mb-6">
-                        Thank you for {{ $mode === 'reporting-lost' ? 'reporting' : ($mode === 'searching' ? 'searching for' : 'reporting found') }} the item. Your
+                        Thank you for
+                        {{ $mode === 'reporting-lost' ? 'reporting' : ($mode === 'searching' ? 'searching for' : 'reporting found') }}
+                        the item. Your
                         contribution helps us maintain a safe and organized community.
                         We will notify you as soon as your item is found.
                     </p>
@@ -374,3 +384,27 @@
     @endif
     <x-section-border />
 </div>
+@script
+<script>
+    document.addEventListener('livewire:load', () => {
+        var map = L.map('map').setView([51.505, -0.09], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        var marker = L.marker([51.5, -0.09]).addTo(map);
+
+        map.on('click', function(e) {
+            var coordinates = e.latlng;
+            document.getElementById('latitude').value = coordinates.lat;
+            document.getElementById('longitude').value = coordinates.lng;
+            marker.setLatLng(coordinates);
+        });
+
+        Livewire.on('morph.updated', () => {
+            map.invalidateSize();
+        });
+    });
+</script>
+@endscript

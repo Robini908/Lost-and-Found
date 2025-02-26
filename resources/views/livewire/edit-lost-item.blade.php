@@ -29,7 +29,7 @@
                     </thead>
                     <tbody class="bg-gray-100 divide-y divide-gray-200">
                         @foreach ($userItems as $item)
-                            <tr>
+                            <tr class="{{ $item->user_id === Auth::id() ? 'bg-blue-100' : '' }}">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {{ $item->title }}
                                 </td>
@@ -38,16 +38,22 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     <div class="text-sm text-gray-600 mb-1">
-
                                         <span class="font-semibold">
                                             {{ $item->date_lost ? $item->date_lost->format('F j, Y') : 'Not provided' }}
                                         </span>
-                                    </div>                                </td>
+                                    </div>
+                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                     <button wire:click="loadItem({{ $item->id }})"
                                         class="text-blue-500 hover:text-blue-700" data-tippy-content="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
+                                    @if (auth()->user()->hasRole('admin') || auth()->user()->hasRole('superadmin') || $item->user_id === Auth::id())
+                                        <button wire:click="confirmDelete({{ $item->id }})"
+                                            class="text-red-500 hover:text-red-700" data-tippy-content="Delete">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
@@ -230,6 +236,31 @@
             </form>
         </div>
     @endif
+
+    <x-dialog-modal wire:model.live="confirmingDelete">
+        <x-slot name="title">
+            {{ __('Delete Item') }}
+        </x-slot>
+
+        <x-slot name="content">
+            <div class="space-y-6">
+                <p class="text-gray-700 text-sm leading-relaxed">
+                    {{ __('Are you sure you want to delete this item? This action cannot be undone.') }}
+                </p>
+            </div>
+        </x-slot>
+
+        <x-slot name="footer">
+            <x-secondary-button wire:click="cancelDelete" wire:loading.attr="disabled">
+                {{ __('Cancel') }}
+            </x-secondary-button>
+
+            <x-button class="ms-3 bg-red-600 hover:bg-red-700" wire:click="deleteItem"
+                wire:loading.attr="disabled">
+                {{ __('Delete') }}
+            </x-button>
+        </x-slot>
+    </x-dialog-modal>
 </div>
 
 @script

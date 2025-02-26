@@ -66,13 +66,6 @@ class ItemMatchingService
         return $latestReportedTimestamp > $cachedReportedTimestamp || $latestFoundTimestamp > $cachedFoundTimestamp;
     }
 
-    /**
-     * Calculate matches between reported and found items.
-     *
-     * @param Collection $reportedItems
-     * @param Collection $foundItems
-     * @return array
-     */
     protected function calculateMatches(Collection $reportedItems, Collection $foundItems)
     {
         $matches = [];
@@ -103,12 +96,18 @@ class ItemMatchingService
                     $foundItem->date_found
                 );
 
-                $similarityScore = ($textSimilarity * 0.5) +
-                    ($imageSimilarity * 0.3) +
-                    ($locationSimilarity * 0.1) +
-                    ($timeSimilarity * 0.1);
+                // Normalize the weights so that they add up to 1
+                $textWeight = 0.3;
+                $imageWeight = 0.4;
+                $locationWeight = 0.2;
+                $timeWeight = 0.1;
 
-                if ($similarityScore > 0.5) { // Adjust threshold as needed
+                $similarityScore = ($textSimilarity * $textWeight) +
+                    ($imageSimilarity * $imageWeight) +
+                    ($locationSimilarity * $locationWeight) +
+                    ($timeSimilarity * $timeWeight);
+
+                if ($similarityScore > 0.6) {
                     $matches[] = [
                         'reported_item' => $reportedItem,
                         'found_item' => $foundItem,
@@ -336,7 +335,7 @@ class ItemMatchingService
     }
 
     /**
-     * Calculate location similarity.
+     * Calculate location similarity using the Haversine formula.
      *
      * @param array $location1
      * @param array $location2
@@ -348,28 +347,44 @@ class ItemMatchingService
             return 0; // No location data
         }
 
-        $distance = sqrt(
-            pow($location1['lat'] - $location2['lat'], 2) +
-                pow($location1['lng'] - $location2['lng'], 2)
-        );
+        $earthRadius = 6371; // Earth's radius in kilometers
 
+        $lat1 = deg2rad($location1['lat']);
+        $lng1 = deg2rad($location1['lng']);
+        $lat2 = deg2rad($location2['lat']);
+        $lng2 = deg2rad($location2['lng']);
+
+        $dlat = $lat2 - $lat1;
+        $dlng = $lng2 - $lng1;
+
+        $a = sin($dlat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($dlng / 2) ** 2;
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        $distance = $earthRadius * $c; // Distance in kilometers
+
+        // Normalize the distance to a similarity score
         return 1 / (1 + $distance);
     }
 
     /**
-     * Calculate time similarity.
+     * Calculate time similarity using an exponential decay function.
      *
      * @param \Carbon\Carbon $dateLost
      * @param \Carbon\Carbon $dateFound
      * @return float
      */
-    protected function calculateTimeSimilarity($dateLost, $dateFound)
+    public function calculateTimeSimilarity($dateLost, $dateFound)
     {
         if (!$dateLost || !$dateFound) {
             return 0; // No date data
         }
 
         $diff = abs($dateLost->diffInDays($dateFound));
-        return 1 / (1 + $diff);
+
+        // Use an exponential decay function to calculate similarity
+        // The similarity decreases exponentially as the difference increases
+        $timeSimilarity = exp(-0.1 * $diff);
+
+        return $timeSimilarity;
     }
 }

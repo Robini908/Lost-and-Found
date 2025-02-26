@@ -27,14 +27,17 @@ class EditLostItem extends Component
     // Image Upload
     public $images = []; // For new image uploads
     public $existingImages = []; // For existing images
-
-    // Fetch items reported by the authenticated user
     public $userItems;
+    public $confirmingDelete = false;
+    public $itemIdToDelete;
 
+   
     public function mount()
     {
-        // Fetch items reported by the authenticated user
         $this->userItems = LostItem::where('user_id', Auth::id())->get();
+        if (auth()->user()->hasRole('admin') || auth()->user()->hasRole('superadmin')) {
+            $this->userItems = LostItem::all();
+        }
     }
 
     public function updatedImages($value)
@@ -128,6 +131,33 @@ class EditLostItem extends Component
                 ->push();
         }
     }
+
+    public function confirmDelete($itemId)
+    {
+        $this->itemIdToDelete = $itemId;
+        $this->confirmingDelete = true;
+    }
+
+    public function cancelDelete()
+    {
+        $this->confirmingDelete = false;
+        $this->itemIdToDelete = null;
+    }
+
+    public function deleteItem()
+    {
+        $item = LostItem::find($this->itemIdToDelete);
+        if ($item) {
+            foreach ($item->images as $image) {
+                Storage::disk('public')->delete($image->image_path);
+                $image->delete();
+            }
+            $item->delete();
+            $this->cancelDelete();
+            toast()->success('Item deleted successfully.')->push();
+        }
+    }
+
 
     public function deleteImage($imageId)
     {

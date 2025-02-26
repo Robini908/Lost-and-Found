@@ -59,3 +59,5 @@ Livewire.hook('morphed', (el, component) => {
     initializeTooltips();
     initializeDataTables();
 });
+
+

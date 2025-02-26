@@ -8,6 +8,8 @@ use Illuminate\Support\ServiceProvider;
 use App\Observers\LostItemImageObserver;
 use OpenAI\Client;
 use OpenAI;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Session;
 
 
 
@@ -32,5 +34,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         LostItemImage::observe(LostItemImageObserver::class);
+        if (Session::has('locale')) {
+            App::setLocale(Session::get('locale'));
+        }
+    
     }
 }
