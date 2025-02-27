@@ -20,6 +20,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'phone',
+        'reward_points',
     ];
 
     protected $hidden = [
@@ -70,5 +72,16 @@ class User extends Authenticatable
     public function isImpersonating()
     {
         return session()->has('impersonator_id');
+    }
+
+    /**
+     * Add reward points to the user
+     *
+     * @param int $points
+     * @return void
+     */
+    public function addRewardPoints(int $points)
+    {
+        $this->increment('reward_points', $points);
     }
 }

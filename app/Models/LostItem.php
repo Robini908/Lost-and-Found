@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
 
 class LostItem extends Model
 {
@@ -48,9 +49,7 @@ class LostItem extends Model
     ];
 
     /**
-     * Relationship to the user who reported the item.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     * Get the user that owns the lost item.
      */
     public function user()
     {
@@ -115,5 +114,29 @@ class LostItem extends Model
     public function matchedItems()
     {
         return $this->hasMany(LostItem::class, 'matched_found_item_id');
+    }
+
+    /**
+     * Get potential matches where this item is the lost item
+     */
+    public function potentialMatches()
+    {
+        return $this->hasMany(PotentialMatch::class, 'lost_item_id');
+    }
+
+    /**
+     * Get potential matches where this item is the found item
+     */
+    public function foundMatches()
+    {
+        return $this->hasMany(PotentialMatch::class, 'found_item_id');
+    }
+
+    /**
+     * Get all potential matches (both as lost and found item)
+     */
+    public function allMatches()
+    {
+        return $this->potentialMatches->merge($this->foundMatches);
     }
 }

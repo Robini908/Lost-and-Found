@@ -112,7 +112,7 @@ class DisplayLostItems extends Component
                 $this->itemToClaim->images
             );
 
-            $this->textSimilarityScore = $this->itemMatchingService->calculateTextSimilarity(
+            $this->textSimilarityScore = $this->itemMatchingService->calculateTextSimilarityWithContext(
                 $reportedItems->first()->title . ' ' . $reportedItems->first()->description,
                 $this->itemToClaim->title . ' ' . $this->itemToClaim->description
             );
@@ -181,13 +181,22 @@ class DisplayLostItems extends Component
     public function resetClaim()
     {
         if ($this->itemToReset) {
-            $this->itemToReset->update(['claimed_by' => null]); // Reset the claim
-            toast()->success('Claim has been reset successfully.')
-                ->push();
-        }
+            // Reset the claim by clearing the claimed_by field
+            $this->itemToReset->update(['claimed_by' => null]);
 
-        $this->closeResetClaimModal(); // Close the modal
-        $this->render(); // Refresh the list
+            // Clear any cached data related to this item
+            Cache::forget("similarity_scores_{$this->itemToReset->id}");
+
+            // Reset any other fields or relationships associated with the claim
+            $this->itemToReset->matched_found_item_id = null;
+            $this->itemToReset->save();
+
+            // Close the modal
+            $this->closeResetClaimModal();
+            toast()->success('Claim has been reset successfully.')->push();
+
+            return redirect()->route('products.view-items');
+        }
     }
 
     public function closeResetClaimModal()
@@ -197,18 +206,13 @@ class DisplayLostItems extends Component
     }
     public function processClaim()
     {
-        // Process the claim (e.g., update the item's claimed_by field)
-        $this->itemToClaim->update(['claimed_by' => Auth::id()]);
-
-        // Close the modal
-        $this->closeClaimModal();
-
-        toast()
-            ->success("Item claimed.")
-            ->push();
-
-        // Refresh the list of items
-        return redirect()->to(route('products.view-items'));
+        if ($this->itemToClaim) {
+            $this->itemToClaim->update(['claimed_by' => Auth::id()]);
+            Cache::forget("similarity_scores_{$this->itemToClaim->id}");
+            $this->closeClaimModal();
+            toast()->success('Item claimed successfully!')->push();
+            return redirect()->route('matched-items');
+        }
     }
 
 

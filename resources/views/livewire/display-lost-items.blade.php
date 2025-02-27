@@ -296,7 +296,7 @@
                     </x-dialog-modal>
                 @endif
                 <div>
-                    <div wire:poll.5s>
+                   <div wire:poll.5s>
                         <!-- Section for All Items -->
                         <div wire:ignore class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
                             @foreach ($lostItems as $item)
@@ -467,6 +467,7 @@
                             @endforeach
                         </div>
                     </div>
+
 
                     <!-- Pagination -->
                     <div class="mt-6">

@@ -15,186 +15,242 @@ class ItemMatchingService
 {
     protected $cacheKey = 'matched_items';
     protected $cacheDuration = 1440; // 24 hours in minutes
+    protected $batchSize = 50; // Process items in batches of 50
+    protected $similarityThreshold = 0.6; // Minimum similarity score to consider a match (60%)
+    protected $maxImagesPerItem = 5; // Maximum number of images to process per item
+    protected $weights = [
+        'text' => 0.35,      // Title and description similarity
+        'category' => 0.15,  // Category matching
+        'image' => 0.25,     // Image similarity
+        'location' => 0.15,  // Location proximity
+        'time' => 0.10       // Time difference between lost and found
+    ];
 
     /**
-     * Find matches for reported items.
-     *
-     * @param Collection $reportedItems
-     * @param Collection $foundItems
-     * @return array
+     * Find matches for reported/searched items against found items.
      */
     public function findMatches(Collection $reportedItems, Collection $foundItems)
     {
-        // Check if cached matches exist
-        if (Cache::has($this->cacheKey)) {
-            $cachedMatches = Cache::get($this->cacheKey);
-
-            // Check if there are any new or updated items
-            if (!$this->hasNewOrUpdatedItems($reportedItems, $foundItems, $cachedMatches)) {
-                return $cachedMatches; // Return cached matches if no changes
-            }
-        }
-
-        // Perform the matching logic
-        $matches = $this->calculateMatches($reportedItems, $foundItems);
-
-        // Cache the matches for 24 hours
-        Cache::put($this->cacheKey, $matches, $this->cacheDuration);
-
-        return $matches;
-    }
-
-    /**
-     * Check if there are new or updated items.
-     *
-     * @param Collection $reportedItems
-     * @param Collection $foundItems
-     * @param array $cachedMatches
-     * @return bool
-     */
-    protected function hasNewOrUpdatedItems(Collection $reportedItems, Collection $foundItems, array $cachedMatches)
-    {
-        // Get the latest timestamps for reported and found items
-        $latestReportedTimestamp = $reportedItems->max('updated_at');
-        $latestFoundTimestamp = $foundItems->max('updated_at');
-
-        // Get the cached timestamps
-        $cachedReportedTimestamp = collect($cachedMatches)->pluck('reported_item.updated_at')->max();
-        $cachedFoundTimestamp = collect($cachedMatches)->pluck('found_item.updated_at')->max();
-
-        // Check if there are new or updated items
-        return $latestReportedTimestamp > $cachedReportedTimestamp || $latestFoundTimestamp > $cachedFoundTimestamp;
-    }
-
-    protected function calculateMatches(Collection $reportedItems, Collection $foundItems)
-    {
-        $matches = [];
-
-        // Precompute text embeddings for all reported and found items
-        $reportedEmbeddings = $this->precomputeTextEmbeddings($reportedItems);
-        $foundEmbeddings = $this->precomputeTextEmbeddings($foundItems);
-
-        foreach ($reportedItems as $reportedItem) {
-            foreach ($foundItems as $foundItem) {
-                $textSimilarity = $this->cosineSimilarity(
-                    $reportedEmbeddings[$reportedItem->id],
-                    $foundEmbeddings[$foundItem->id]
-                );
-
-                $imageSimilarity = $this->calculateImageSimilarity(
-                    $reportedItem->images,
-                    $foundItem->images
-                );
-
-                $locationSimilarity = $this->calculateLocationSimilarity(
-                    $reportedItem->geolocation,
-                    $foundItem->geolocation
-                );
-
-                $timeSimilarity = $this->calculateTimeSimilarity(
-                    $reportedItem->date_lost,
-                    $foundItem->date_found
-                );
-
-                // Normalize the weights so that they add up to 1
-                $textWeight = 0.3;
-                $imageWeight = 0.4;
-                $locationWeight = 0.2;
-                $timeWeight = 0.1;
-
-                $similarityScore = ($textSimilarity * $textWeight) +
-                    ($imageSimilarity * $imageWeight) +
-                    ($locationSimilarity * $locationWeight) +
-                    ($timeSimilarity * $timeWeight);
-
-                if ($similarityScore > 0.6) {
-                    $matches[] = [
-                        'reported_item' => $reportedItem,
-                        'found_item' => $foundItem,
-                        'similarity_score' => $similarityScore,
-                    ];
-                }
-            }
-        }
-
-        return $matches;
-    }
-
-    /**
-     * Precompute text embeddings for a collection of items.
-     *
-     * @param Collection $items
-     * @return array
-     */
-    protected function precomputeTextEmbeddings(Collection $items)
-    {
-        $embeddings = [];
-
-        foreach ($items as $item) {
-            $embeddings[$item->id] = $this->getTextEmbedding(
-                $item->title . ' ' . $item->description
-            );
-        }
-
-        return $embeddings;
-    }
-
-    /**
-     * Calculate text similarity using Hugging Face API.
-     *
-     * @param string $text1
-     * @param string $text2
-     * @return float
-     */
-    public function calculateTextSimilarity($text1, $text2)
-    {
-        $embedding1 = $this->getTextEmbedding($text1);
-        $embedding2 = $this->getTextEmbedding($text2);
-
-        // Check if embeddings are valid
-        if (empty($embedding1) || empty($embedding2)) {
-            Log::warning("Invalid embeddings for text similarity calculation.");
-            return 0; // Return 0 if embeddings are invalid
-        }
-
-        return $this->cosineSimilarity($embedding1, $embedding2);
-    }
-
-    /**
-     * Get text embeddings from Hugging Face API.
-     *
-     * @param string $text
-     * @return array
-     */
-    protected function getTextEmbedding($text)
-    {
-        $cacheKey = 'text_embedding_' . md5($text); // Unique cache key for each text
-
-        // Check if the embedding is already cached
+        // Check cache first
+        $cacheKey = $this->generateCacheKey($reportedItems, $foundItems);
         if (Cache::has($cacheKey)) {
             return Cache::get($cacheKey);
         }
 
-        $apiUrl = 'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2';
-        $apiKey = env('HUGGING_FACE_API_KEY');
+        $matches = collect();
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $apiKey,
-        ])->post($apiUrl, [
-            'inputs' => $text,
-        ]);
-
-        if (!$response->successful() || !is_array($response->json())) {
-            Log::error("Invalid API response: " . $response->body());
-            return [];
+        // Process each reported item
+        foreach ($reportedItems as $reportedItem) {
+            $itemMatches = $this->findMatchesForItem($reportedItem, $foundItems);
+            $matches = $matches->concat($itemMatches);
         }
 
-        $embedding = $response->json();
+        // Sort by similarity score and filter out low-quality matches
+        $matches = $matches->filter(function ($match) {
+            return $match['similarity_score'] >= $this->similarityThreshold;
+        })->sortByDesc('similarity_score')->values();
 
-        // Cache the embedding for 24 hours
-        Cache::put($cacheKey, $embedding, $this->cacheDuration);
+        // Cache the results
+        Cache::put($cacheKey, $matches->all(), $this->cacheDuration);
 
-        return $embedding;
+        return $matches->all();
+    }
+
+    /**
+     * Find matches for a single reported item
+     */
+    protected function findMatchesForItem($reportedItem, Collection $foundItems)
+    {
+        $matches = collect();
+        $reportedItemEmbedding = $this->getTextEmbedding($reportedItem);
+        $reportedItemFeatures = $this->extractImageFeatures($reportedItem->images);
+
+        foreach ($foundItems as $foundItem) {
+            // Skip if the found item is from the same user
+            if ($foundItem->user_id === $reportedItem->user_id) {
+                continue;
+            }
+
+            // Calculate comprehensive similarity score
+            $similarityScore = $this->calculateComprehensiveSimilarity(
+                $reportedItem,
+                $foundItem,
+                $reportedItemEmbedding,
+                $reportedItemFeatures
+            );
+
+            // Only add matches that meet the minimum similarity threshold
+            if ($similarityScore >= $this->similarityThreshold) {
+                $matches->push([
+                        'reported_item' => $reportedItem,
+                        'found_item' => $foundItem,
+                        'similarity_score' => $similarityScore,
+                    'match_details' => $this->generateMatchDetails($reportedItem, $foundItem)
+                ]);
+            }
+        }
+
+        return $matches;
+    }
+
+    /**
+     * Calculate comprehensive similarity between two items
+     */
+    protected function calculateComprehensiveSimilarity($reportedItem, $foundItem, $reportedEmbedding, $reportedFeatures)
+    {
+        // Get text embedding for found item
+        $foundEmbedding = $this->getTextEmbedding($foundItem);
+
+        // Get image features for found item
+        $foundFeatures = $this->extractImageFeatures($foundItem->images);
+
+        // Calculate individual similarity scores
+        $similarities = [
+            'text' => $this->calculateTextSimilarity($reportedEmbedding, $foundEmbedding),
+            'category' => $this->calculateCategorySimilarity($reportedItem, $foundItem),
+            'image' => $this->calculateBestImageSimilarity($reportedFeatures, $foundFeatures),
+            'location' => $this->calculateLocationSimilarity($reportedItem->geolocation, $foundItem->geolocation),
+            'time' => $this->calculateTimeSimilarity($reportedItem->date_lost, $foundItem->date_found)
+        ];
+
+        // Calculate weighted average
+        return array_sum(array_map(
+            fn($key) => $similarities[$key] * $this->weights[$key],
+            array_keys($this->weights)
+        ));
+    }
+
+    /**
+     * Calculate similarity between categories
+     */
+    protected function calculateCategorySimilarity($item1, $item2)
+    {
+        if (!$item1->category_id || !$item2->category_id) {
+            return 0;
+        }
+
+        return $item1->category_id === $item2->category_id ? 1 : 0;
+    }
+
+    /**
+     * Calculate best image similarity across all image combinations
+     */
+    protected function calculateBestImageSimilarity($features1, $features2)
+    {
+        if (empty($features1) || empty($features2)) {
+            return 0;
+        }
+
+        $maxSimilarity = 0;
+
+        // Compare each image from item1 with each image from item2
+        foreach ($features1 as $feature1) {
+            foreach ($features2 as $feature2) {
+                $similarity = $this->cosineSimilarity($feature1, $feature2);
+                $maxSimilarity = max($maxSimilarity, $similarity);
+            }
+        }
+
+        return $maxSimilarity;
+    }
+
+    /**
+     * Extract features from multiple images
+     */
+    protected function extractImageFeatures($images)
+    {
+        $features = [];
+        $processedCount = 0;
+
+        foreach ($images as $image) {
+            if ($processedCount >= $this->maxImagesPerItem) {
+                break;
+            }
+
+            $cacheKey = 'image_features_' . md5($image->image_path);
+            $cached = Cache::get($cacheKey);
+
+            if ($cached) {
+                $features[] = $cached;
+            } else {
+                try {
+                    $imagePath = 'lost-items/' . basename($image->image_path);
+                    if (Storage::disk('public')->exists($imagePath)) {
+                        $imageData = base64_encode(Storage::disk('public')->get($imagePath));
+
+                        $response = Http::withHeaders([
+                            'Authorization' => 'Bearer ' . env('HUGGING_FACE_API_KEY'),
+                        ])->timeout(30)->post(
+                            'https://api-inference.huggingface.co/models/google/vit-base-patch16-224',
+                            ['inputs' => $imageData]
+                        );
+
+                        if ($response->successful()) {
+                            $prediction = $response->json();
+                            $features[] = array_column($prediction, 'score');
+                            Cache::put($cacheKey, end($features), $this->cacheDuration);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error("Error processing image: " . $e->getMessage());
+                }
+            }
+
+            $processedCount++;
+        }
+
+        return $features;
+    }
+
+    /**
+     * Get text embedding for item description
+     */
+    protected function getTextEmbedding($item)
+    {
+        $text = $item->title . ' ' . $item->description;
+        $cacheKey = 'text_embedding_' . md5($text);
+
+        return Cache::remember($cacheKey, $this->cacheDuration, function () use ($text) {
+            try {
+        $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . env('HUGGING_FACE_API_KEY'),
+                ])->timeout(30)->post(
+                    'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2',
+                    ['inputs' => $text]
+                );
+
+                if ($response->successful()) {
+                    return $response->json();
+                }
+            } catch (\Exception $e) {
+                Log::error("Error getting text embedding: " . $e->getMessage());
+            }
+
+            return [];
+        });
+    }
+
+    /**
+     * Generate detailed match information
+     */
+    protected function generateMatchDetails($reportedItem, $foundItem)
+    {
+        return [
+            'category_match' => $reportedItem->category_id === $foundItem->category_id,
+            'location_distance' => $this->calculateDistance(
+                $reportedItem->geolocation['lat'] ?? 0,
+                $reportedItem->geolocation['lng'] ?? 0,
+                $foundItem->geolocation['lat'] ?? 0,
+                $foundItem->geolocation['lng'] ?? 0
+            ),
+            'time_difference' => $reportedItem->date_lost && $foundItem->date_found
+                ? $reportedItem->date_lost->diffInDays($foundItem->date_found)
+                : null,
+            'image_count' => [
+                'reported' => $reportedItem->images->count(),
+                'found' => $foundItem->images->count()
+            ]
+        ];
     }
 
     /**
@@ -204,7 +260,7 @@ class ItemMatchingService
      * @param array $vector2
      * @return float
      */
-    protected function cosineSimilarity($vector1, $vector2)
+    protected function cosineSimilarity($vector1, $vector2): float
     {
         // Check if vectors are valid
         if (!is_array($vector1) || !is_array($vector2) || empty($vector1) || empty($vector2)) {
@@ -237,101 +293,6 @@ class ItemMatchingService
         }
 
         return $dotProduct / ($magnitude1 * $magnitude2);
-    }
-
-    /**
-     * Calculate image similarity using CNN features.
-     *
-     * @param \Illuminate\Database\Eloquent\Collection $images1
-     * @param \Illuminate\Database\Eloquent\Collection $images2
-     * @return float
-     */
-    public function calculateImageSimilarity($images1, $images2)
-    {
-        if ($images1->isEmpty() || $images2->isEmpty()) {
-            Log::info("No images to compare.");
-            return 0;
-        }
-
-        try {
-            $features1 = $this->extractImageFeaturesWithCNN($images1);
-            $features2 = $this->extractImageFeaturesWithCNN($images2);
-
-            if (empty($features1) || empty($features2)) {
-                Log::warning("No features extracted from images.");
-                return 0;
-            }
-
-            $totalSimilarity = 0;
-            $count = 0;
-
-            foreach ($features1 as $feature1) {
-                foreach ($features2 as $feature2) {
-                    $similarity = $this->cosineSimilarity($feature1, $feature2);
-                    if (!is_nan($similarity)) {
-                        $totalSimilarity += $similarity;
-                        $count++;
-                    }
-                }
-            }
-
-            return $count === 0 ? 0 : $totalSimilarity / $count;
-        } catch (\Exception $e) {
-            Log::error("Image similarity calculation failed: " . $e->getMessage());
-            return 0; // Fallback to 0 if there's an error
-        }
-    }
-
-    /**
-     * Extract image features using TensorFlow Serving API.
-     *
-     * @param \Illuminate\Database\Eloquent\Collection $images
-     * @return array
-     */
-    protected function extractImageFeaturesWithCNN($images)
-    {
-        $features = [];
-        $apiUrl = 'https://api-inference.huggingface.co/models/google/vit-base-patch16-224';
-
-        foreach ($images as $image) {
-            try {
-                $imagePath = 'lost-items/' . basename($image->image_path);
-                $cacheKey = 'image_features_' . md5($imagePath); // Unique cache key for each image
-
-                // Check if the features are already cached
-                if (Cache::has($cacheKey)) {
-                    $features[] = Cache::get($cacheKey);
-                    continue;
-                }
-
-                if (Storage::disk('public')->exists($imagePath)) {
-                    $imageData = base64_encode(Storage::disk('public')->get($imagePath));
-
-                    $response = Http::withHeaders([
-                        'Authorization' => 'Bearer ' . env('HUGGING_FACE_API_KEY'),
-                    ])->timeout(60)->post($apiUrl, [
-                        'inputs' => $imageData,
-                    ]);
-
-                    if ($response->successful()) {
-                        $predictions = $response->json();
-                        $scores = array_column($predictions, 'score');
-                        $features[] = $scores;
-
-                        // Cache the features for 24 hours
-                        Cache::put($cacheKey, $scores, $this->cacheDuration);
-                    } else {
-                        Log::warning("No predictions found in API response for image: " . $imagePath);
-                    }
-                } else {
-                    Log::warning("Image file not found in public disk: " . $imagePath);
-                }
-            } catch (\Exception $e) {
-                Log::error("Error processing image: " . $e->getMessage());
-            }
-        }
-
-        return $features;
     }
 
     /**
@@ -386,5 +347,43 @@ class ItemMatchingService
         $timeSimilarity = exp(-0.1 * $diff);
 
         return $timeSimilarity;
+    }
+
+    /**
+     * Calculate text similarity between two embeddings
+     */
+    protected function calculateTextSimilarity($embedding1, $embedding2)
+    {
+        if (empty($embedding1) || empty($embedding2)) {
+            return 0;
+        }
+        return $this->cosineSimilarity($embedding1, $embedding2);
+    }
+
+    /**
+     * Calculate distance between two points
+     */
+    protected function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    {
+        if (!$lat1 || !$lon1 || !$lat2 || !$lon2) {
+            return PHP_FLOAT_MAX;
+        }
+
+        $theta = $lon1 - $lon2;
+        $dist = sin(deg2rad($lat1)) * sin(deg2rad($lat2)) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * cos(deg2rad($theta));
+        $dist = acos($dist);
+        $dist = rad2deg($dist);
+        $miles = $dist * 60 * 1.1515;
+        return $miles * 1.609344; // Convert to kilometers
+    }
+
+    /**
+     * Generate a unique cache key based on the items' timestamps
+     */
+    protected function generateCacheKey(Collection $reportedItems, Collection $foundItems): string
+    {
+        $reportedHash = md5($reportedItems->pluck('updated_at')->max() . $reportedItems->count());
+        $foundHash = md5($foundItems->pluck('updated_at')->max() . $foundItems->count());
+        return "matched_items_{$reportedHash}_{$foundHash}";
     }
 }

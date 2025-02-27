@@ -29,6 +29,7 @@
         "php-ai/php-ml": "^0.10.0",
         "simplesoftwareio/simple-qrcode": "^4.2",
         "spatie/image-optimizer": "^1.8",
+        "spatie/laravel-csp": "^2.10",
         "spatie/laravel-permission": "^6.15",
         "spatie/livewire-filepond": "^1.4",
         "symfony/translation": "^7.2",

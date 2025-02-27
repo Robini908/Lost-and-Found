@@ -24,6 +24,10 @@
 
     <!-- Styles -->
     @livewireStyles
+
+    <!-- FilePond -->
+    <link href="https://unpkg.com/filepond/dist/filepond.css" rel="stylesheet">
+    <link href="https://unpkg.com/filepond-plugin-image-preview/dist/filepond-plugin-image-preview.css" rel="stylesheet">
 </head>
 
 <body class="font-sans antialiased">
@@ -74,9 +78,12 @@
             {{ $slot }}
         </main>
     </div>
-    @filepondScripts
+
     @stack('modals')
     @livewireScripts
+    @stack('scripts')
+    @filepondScripts
+
 </body>
 
 </html>

@@ -88,8 +88,9 @@ class ProcessChatMessage implements ShouldQueue
             ]);
 
             if (!$runResponse->successful()) {
-                Log::error('Failed to run the assistant', ['response' => $runResponse->json()]);
-                throw new \Exception('Failed to run the assistant.');
+                $errorDetails = $runResponse->json();
+                Log::error('Failed to run the assistant', ['response' => $errorDetails]);
+                throw new \Exception("Failed to run the assistant. Error: " . json_encode($errorDetails));
             }
 
             $runId = $runResponse->json()['id'];

@@ -63,4 +63,12 @@ class Kernel extends HttpKernel
         'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         'bypass.verified' => \App\Http\Middleware\BypassEmailVerification::class,
     ];
+
+    public function __construct(\Illuminate\Contracts\Foundation\Application $app, \Illuminate\Routing\Router $router)
+    {
+        parent::__construct($app, $router);
+
+        // Increase PHP execution time limit for long-running processes
+        set_time_limit(300); // 5 minutes
+    }
 }

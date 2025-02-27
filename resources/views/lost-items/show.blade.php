@@ -87,10 +87,16 @@
             <p>{{ $item->location }}</p>
         </div>
 
-        <!-- Date Lost -->
+        <!-- Date Information -->
         <div class="section">
-            <h2>Date Lost</h2>
-            <p>{{ $item->date_lost->format('F j, Y') }}</p>
+            <h2>{{ $item->item_type === 'found' ? 'Date Found' : 'Date Lost' }}</h2>
+            <p>
+                @if($item->item_type === 'found')
+                    {{ $item->date_found ? $item->date_found->format('F j, Y') : 'Not specified' }}
+                @else
+                    {{ $item->date_lost ? $item->date_lost->format('F j, Y') : 'Not specified' }}
+                @endif
+            </p>
         </div>
 
         <!-- Condition -->

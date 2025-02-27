@@ -11,16 +11,20 @@ use Livewire\WithPagination;
 use App\Models\LostItemImage;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Spatie\LivewireFilepond\WithFilePond;
 use Usernotnull\Toast\Concerns\WireToast;
+use Illuminate\Support\Facades\Storage;
+use App\Models\RewardHistory;
 
 class ReportLostItem extends Component
 {
     use WithFileUploads, WithPagination, WireToast, WithFilePond;
 
-    public $currentStep = 1; // Current step in the form
+    public $currentStep = 1;
     public $title, $description, $category, $location, $date_lost, $date_found;
-    public $condition, $value, $images = [];
+    public $condition, $value;
     public $category_id;
     public $category_name;
     public $type = 'reported';
@@ -32,7 +36,12 @@ class ReportLostItem extends Component
     public $showCategoryModal = false;
     public $newCategoryName;
 
-    protected $listeners = ['categoryAdded' => 'refreshCategories'];
+    // FilePond
+    public $images = [];
+
+    protected $listeners = [
+        'categoryAdded' => 'refreshCategories'
+    ];
 
     protected $messages = [
         'title.required' => 'Please provide a title for the item.',
@@ -77,9 +86,13 @@ class ReportLostItem extends Component
         return $rules;
     }
 
-    public function mount()
+    public function mount($mode = null)
     {
         $this->categories = Category::all();
+        if ($mode) {
+            $this->mode = $mode;
+        }
+        Log::info('ReportLostItem mounted with mode: ' . $this->mode);
     }
 
     public function openCategoryModal()
@@ -154,51 +167,108 @@ class ReportLostItem extends Component
         $this->currentStep = 4;
     }
 
+    public function updatedImages()
+    {
+        Log::info('Images updated', ['images' => $this->images]);
+    }
+
     public function submit()
     {
         $this->validate();
 
-        $itemType = $this->mode === 'reporting-lost' ? 'reported' : ($this->mode === 'searching' ? 'searched' : 'found');
+        $itemType = match($this->mode) {
+            'reporting-found' => 'found',
+            'searching' => 'searched',
+            default => 'reported'
+        };
 
-        $lostItem = LostItem::create([
-            'user_id' => Auth::id(),
-            'title' => $this->title,
-            'description' => $this->description,
-            'category_id' => $this->category_id,
-            'item_type' => $itemType,
-            'location' => $this->location,
-            'date_lost' => $this->mode === 'searching' ? $this->date_lost : null,
-            'date_found' => $this->mode === 'reporting-found' ? $this->date_found : null,
-            'condition' => $this->condition,
-            'value' => $this->value,
-            'is_anonymous' => $this->mode === 'reporting-lost' ? $this->is_anonymous : false,
-        ]);
+        try {
+            DB::beginTransaction();
 
-        if ($this->images) {
-            foreach ($this->images as $image) {
-                $imagePath = $image->store('lost-items', 'public');
-                LostItemImage::create([
-                    'lost_item_id' => $lostItem->id,
-                    'image_path' => $imagePath,
-                ]);
+            $lostItem = LostItem::create([
+                'user_id' => Auth::id(),
+                'title' => $this->title,
+                'description' => $this->description,
+                'category_id' => $this->category_id,
+                'item_type' => $itemType,
+                'location' => $this->location,
+                'date_lost' => $this->mode === 'searching' ? $this->date_lost : null,
+                'date_found' => $this->mode === 'reporting-found' ? $this->date_found : null,
+                'condition' => $this->condition,
+                'value' => $this->value,
+                'is_anonymous' => $this->mode === 'reporting-lost' ? $this->is_anonymous : false,
+            ]);
+
+            if ($this->images) {
+                foreach ($this->images as $image) {
+                    if (is_string($image)) {
+                        // Handle temporary FilePond file
+                        $path = str_replace('livewire-tmp/', '', $image);
+                        $finalPath = 'lost-items/' . $path;
+
+                        // Move the file from temporary to final location
+                        if (Storage::disk('public')->exists('livewire-tmp/' . $path)) {
+                            Storage::disk('public')->move('livewire-tmp/' . $path, $finalPath);
+                        }
+
+                        LostItemImage::create([
+                            'lost_item_id' => $lostItem->id,
+                            'image_path' => $finalPath,
+                        ]);
+                    } else {
+                        // Handle regular file upload
+                        $imagePath = $image->store('lost-items', 'public');
+                        LostItemImage::create([
+                            'lost_item_id' => $lostItem->id,
+                            'image_path' => $imagePath,
+                        ]);
+                    }
+                }
             }
+
+            // Handle reward points for found items
+            if ($this->mode === 'reporting-found') {
+                $pointsPerFoundItem = 100;
+                $userId = Auth::id();
+
+                // Add points to user
+                DB::table('users')
+                    ->where('id', $userId)
+                    ->increment('reward_points', $pointsPerFoundItem);
+
+                // Create reward history
+                RewardHistory::create([
+                    'user_id' => $userId,
+                    'type' => 'earned',
+                    'points' => $pointsPerFoundItem,
+                    'description' => 'Reported found item: ' . $lostItem->title,
+                    'lost_item_id' => $lostItem->id,
+                ]);
+
+                // Dispatch event to update rewards component
+                $this->dispatch('foundItemReported')->to('rewards');
+            }
+
+            DB::commit();
+
+            $this->resetForm();
+            $this->currentStep = 1;
+
+            if ($this->mode === 'reporting-found') {
+                toast()->success('Found item reported successfully! You earned 100 points!')->push();
+            } else {
+                toast()->success($this->mode === 'reporting-lost' ? 'Lost item reported successfully!' : 'Search request submitted successfully!')->push();
+            }
+
+            $this->redirect(route('products.view-items'));
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error saving lost item: ' . $e->getMessage(), [
+                'exception' => $e,
+                'images' => $this->images
+            ]);
+            toast()->danger('An error occurred while saving the item.')->push();
         }
-
-        $this->resetForm();
-        $this->currentStep = 1;
-
-        if ($this->mode === 'reporting-lost') {
-            $this->successMessage = 'Lost item reported successfully!';
-            toast()->success('Lost item reported successfully!')->push();
-        } elseif ($this->mode === 'searching') {
-            $this->successMessage = 'Search request submitted successfully!';
-            toast()->success('Search request submitted successfully!')->push();
-        } else {
-            $this->successMessage = 'Found item reported successfully!';
-            toast()->success('Found item reported successfully!')->push();
-        }
-
-        $this->redirect(route('products.view-items'));
     }
 
     public function resetForm()

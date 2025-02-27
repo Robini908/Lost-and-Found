@@ -18,4 +18,10 @@ class LostItemController extends Controller
         $item = LostItem::with('images', 'user')->findOrFail($id);
         return view('lost-items.show', compact('item'));
     }
+
+    public function details($id)
+    {
+        $item = LostItem::with(['images', 'user'])->findOrFail($id);
+        return view('lost-items.details', compact('item'));
+    }
 }

@@ -13,14 +13,20 @@ class PrecomputeSimilarityScores extends Command
     protected $signature = 'items:precompute-similarity-scores';
     protected $description = 'Precompute and cache similarity scores for items';
 
-    public function __construct(private ItemMatchingService $itemMatchingService)
+    private $itemMatchingService;
+
+    public function __construct(ItemMatchingService $itemMatchingService)
     {
         parent::__construct();
+        $this->itemMatchingService = $itemMatchingService;
     }
 
     public function handle()
     {
-        $users = Auth::all(); // Assuming you have a way to get all users
+        $users = \App\Models\User::all(); // Get all users from User model
+
+        $this->info('Starting similarity score computation...');
+        $bar = $this->output->createProgressBar(count($users));
 
         foreach ($users as $user) {
             $reportedItems = LostItem::where('user_id', $user->id)
@@ -34,30 +40,56 @@ class PrecomputeSimilarityScores extends Command
 
             foreach ($reportedItems as $reportedItem) {
                 foreach ($foundItems as $foundItem) {
-                    $imageSimilarityScore = $this->itemMatchingService->calculateImageSimilarity(
-                        $reportedItem->images,
-                        $foundItem->images
-                    );
+                    try {
+                        $scores = $this->calculateAndCacheScores($reportedItem, $foundItem);
 
-                    $textSimilarityScore = $this->itemMatchingService->calculateTextSimilarity(
-                        $reportedItem->title . ' ' . $reportedItem->description,
-                        $foundItem->title . ' ' . $foundItem->description
-                    );
-
-                    $locationSimilarityScore = $this->itemMatchingService->calculateLocationSimilarity(
-                        $reportedItem->geolocation,
-                        $foundItem->geolocation
-                    );
-
-                    Cache::put("similarity_scores_{$reportedItem->id}_{$foundItem->id}", [
-                        'image' => $imageSimilarityScore,
-                        'text' => $textSimilarityScore,
-                        'location' => $locationSimilarityScore,
-                    ], now()->addMinutes(60)); // Cache for 1 hour
+                        Cache::put(
+                            "similarity_scores_{$reportedItem->id}_{$foundItem->id}",
+                            $scores,
+                            now()->addHours(24)
+                        );
+                    } catch (\Exception $e) {
+                        $this->error("Error processing items {$reportedItem->id} and {$foundItem->id}: {$e->getMessage()}");
+                        continue;
+                    }
                 }
             }
+
+            $bar->advance();
         }
 
+        $bar->finish();
+        $this->newLine();
         $this->info('Similarity scores precomputed and cached successfully.');
+    }
+
+    private function calculateAndCacheScores($reportedItem, $foundItem): array
+    {
+        $imageSimilarityScore = $this->itemMatchingService->calculateImageSimilarity(
+            $reportedItem->images,
+            $foundItem->images
+        );
+
+        $textSimilarityScore = $this->itemMatchingService->calculateTextSimilarityWithContext(
+            $reportedItem->title . ' ' . $reportedItem->description,
+            $foundItem->title . ' ' . $foundItem->description
+        );
+
+        $locationSimilarityScore = $this->itemMatchingService->calculateLocationSimilarity(
+            [
+                'lat' => $reportedItem->latitude,
+                'lng' => $reportedItem->longitude
+            ],
+            [
+                'lat' => $foundItem->latitude,
+                'lng' => $foundItem->longitude
+            ]
+        );
+
+        return [
+            'image' => $imageSimilarityScore,
+            'text' => $textSimilarityScore,
+            'location' => $locationSimilarityScore,
+        ];
     }
 }

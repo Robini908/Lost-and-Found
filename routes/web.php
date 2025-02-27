@@ -46,15 +46,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return view('products.report-item');
     })->name('products.report-item');
 
+    Route::get('/products/report-found-item', function () {
+        return view('products.report-found-item');
+    })->name('products.report-found-item');
+
     Route::get('/products/view-items', function () {
         return view('products.view-items');
     })->name('products.view-items');
+
     Route::get('/products/my-lost-items', function () {
         return view('products.my-lost-items');
     })->name('products.my-reported-items');
+
+    Route::get('/match-items', function () {
+        return view('match-items');
+    })->name('match-items');
+
+    Route::get('/report-lost-item', function () {
+        return view('products.report-item');
+    })->name('report-lost-item');
+
+    Route::get('/lost-items/{id}/details', [LostItemController::class, 'details'])
+        ->name('lost-items.details');
 });
 
-Route::get('/matched-item', function () {
+Route::get('/matched-items', function () {
     return view('matched-items');
 })->name('matched-items');
 
@@ -76,4 +92,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/users/general-settings', function () {
         return view('users.general-settings');
     })->name('users.general-settings');
+});
+
+Route::middleware([
+    'auth:sanctum',
+    config('jetstream.auth_session'),
+    'verified',
+])->group(function () {
+    Route::get('/rewards', function () {
+        return view('rewards');
+    })->name('rewards.index');
 });
