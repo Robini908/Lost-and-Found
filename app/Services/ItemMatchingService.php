@@ -105,19 +105,18 @@ class ItemMatchingService
         $foundFeatures = $this->extractImageFeatures($foundItem->images);
 
         // Calculate individual similarity scores
-        $similarities = [
-            'text' => $this->calculateTextSimilarity($reportedEmbedding, $foundEmbedding),
-            'category' => $this->calculateCategorySimilarity($reportedItem, $foundItem),
-            'image' => $this->calculateBestImageSimilarity($reportedFeatures, $foundFeatures),
-            'location' => $this->calculateLocationSimilarity($reportedItem->geolocation, $foundItem->geolocation),
-            'time' => $this->calculateTimeSimilarity($reportedItem->date_lost, $foundItem->date_found)
-        ];
+        $textSimilarity = $this->calculateTextSimilarity($reportedEmbedding, $foundEmbedding);
+        $categorySimilarity = $this->calculateCategorySimilarity($reportedItem, $foundItem);
+        $imageSimilarity = $this->calculateBestImageSimilarity($reportedFeatures, $foundFeatures);
+        $locationSimilarity = $this->calculateLocationSimilarity($reportedItem->geolocation, $foundItem->geolocation);
+        $timeSimilarity = $this->calculateTimeSimilarity($reportedItem->date_lost, $foundItem->date_found);
 
         // Calculate weighted average
-        return array_sum(array_map(
-            fn($key) => $similarities[$key] * $this->weights[$key],
-            array_keys($this->weights)
-        ));
+        return ($textSimilarity * $this->weights['text']) +
+               ($categorySimilarity * $this->weights['category']) +
+               ($imageSimilarity * $this->weights['image']) +
+               ($locationSimilarity * $this->weights['location']) +
+               ($timeSimilarity * $this->weights['time']);
     }
 
     /**
@@ -135,7 +134,7 @@ class ItemMatchingService
     /**
      * Calculate best image similarity across all image combinations
      */
-    protected function calculateBestImageSimilarity($features1, $features2)
+    public function calculateBestImageSimilarity($features1, $features2)
     {
         if (empty($features1) || empty($features2)) {
             return 0;
@@ -157,7 +156,7 @@ class ItemMatchingService
     /**
      * Extract features from multiple images
      */
-    protected function extractImageFeatures($images)
+    public function extractImageFeatures($images)
     {
         $features = [];
         $processedCount = 0;
@@ -205,14 +204,14 @@ class ItemMatchingService
     /**
      * Get text embedding for item description
      */
-    protected function getTextEmbedding($item)
+    public function getTextEmbedding($item)
     {
         $text = $item->title . ' ' . $item->description;
         $cacheKey = 'text_embedding_' . md5($text);
 
         return Cache::remember($cacheKey, $this->cacheDuration, function () use ($text) {
             try {
-        $response = Http::withHeaders([
+                $response = Http::withHeaders([
                     'Authorization' => 'Bearer ' . env('HUGGING_FACE_API_KEY'),
                 ])->timeout(30)->post(
                     'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2',
@@ -352,11 +351,12 @@ class ItemMatchingService
     /**
      * Calculate text similarity between two embeddings
      */
-    protected function calculateTextSimilarity($embedding1, $embedding2)
+    public function calculateTextSimilarity($embedding1, $embedding2)
     {
         if (empty($embedding1) || empty($embedding2)) {
             return 0;
         }
+
         return $this->cosineSimilarity($embedding1, $embedding2);
     }
 
@@ -385,5 +385,16 @@ class ItemMatchingService
         $reportedHash = md5($reportedItems->pluck('updated_at')->max() . $reportedItems->count());
         $foundHash = md5($foundItems->pluck('updated_at')->max() . $foundItems->count());
         return "matched_items_{$reportedHash}_{$foundHash}";
+    }
+
+    /**
+     * Calculate text similarity with context between two texts
+     */
+    public function calculateTextSimilarityWithContext($text1, $text2)
+    {
+        $embedding1 = $this->getTextEmbedding(['title' => '', 'description' => $text1]);
+        $embedding2 = $this->getTextEmbedding(['title' => '', 'description' => $text2]);
+
+        return $this->calculateTextSimilarity($embedding1, $embedding2);
     }
 }

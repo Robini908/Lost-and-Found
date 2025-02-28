@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use App\Services\ItemMatchingService;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Storage;
 use Usernotnull\Toast\Concerns\WireToast;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Milon\Barcode\Facades\DNS1DFacade as DNS1D;
@@ -51,6 +51,7 @@ class DisplayLostItems extends Component
     public $textSimilarityScore = 0; // Tracks the text similarity score
     public $locationSimilarityScore = 0;
     public $timeSimilarityScore = 0;
+    public $categorySimilarityScore = 0;
     public $totalSimilarityScore = 0;
 
     public $itemToReset = null;
@@ -67,17 +68,33 @@ class DisplayLostItems extends Component
     ];
     protected $itemMatchingService;
 
-    public function __construct()
-    {
-        $this->itemMatchingService = new ItemMatchingService();
-    }
-
-
     protected $listeners = ['itemDeleted' => 'refreshList']; // Define listeners here
 
     public function mount()
     {
-        // No encryption/decryption needed for date_lost
+        $this->itemMatchingService = app(ItemMatchingService::class);
+    }
+
+    public function calculateImageSimilarity($userReportedItem, $foundItem)
+    {
+        if (!$this->itemMatchingService) {
+            $this->itemMatchingService = app(ItemMatchingService::class);
+        }
+
+        if (!$userReportedItem || !$foundItem ||
+            $userReportedItem->images->isEmpty() ||
+            $foundItem->images->isEmpty()) {
+            return 0;
+        }
+
+        $reportedFeatures = $this->itemMatchingService->extractImageFeatures($userReportedItem->images);
+        $foundFeatures = $this->itemMatchingService->extractImageFeatures($foundItem->images);
+
+        if (empty($reportedFeatures) || empty($foundFeatures)) {
+            return 0;
+        }
+
+        return $this->itemMatchingService->calculateBestImageSimilarity($reportedFeatures, $foundFeatures);
     }
 
     public function confirmClaim($itemId)
@@ -85,116 +102,148 @@ class DisplayLostItems extends Component
         $this->itemToClaim = LostItem::find($itemId);
 
         // Get the authenticated user's reported items
-        $user = Auth::user();
-        $reportedItems = LostItem::where('user_id', $user->id)
-            ->whereIn('item_type', ['reported', 'searched'])
-            ->with('images')
-            ->get();
+        $reportedItems = Cache::remember("user_reported_items_" . Auth::id(), now()->addMinutes(5), function () {
+            return LostItem::where('user_id', Auth::id())
+                ->whereIn('item_type', ['reported', 'searched'])
+                ->with('images')
+                ->get();
+        });
 
-        // Ensure the user has reported items
         if ($reportedItems->isEmpty()) {
             toast()->danger('No reported items found for comparison.')->push();
             return;
         }
 
-        // Fetch cached similarity scores
-        $cachedScores = Cache::get("similarity_scores_{$reportedItems->first()->id}_{$this->itemToClaim->id}");
+        // Calculate similarity scores
+        $this->calculateSimilarityScores($reportedItems->first(), $this->itemToClaim);
 
-        if ($cachedScores) {
-            $this->imageSimilarityScore = $cachedScores['image'];
-            $this->textSimilarityScore = $cachedScores['text'];
-            $this->locationSimilarityScore = $cachedScores['location'];
-            $this->timeSimilarityScore = $cachedScores['time'];
-        } else {
-            // Calculate similarity scores using the ItemMatchingService
-            $this->imageSimilarityScore = $this->itemMatchingService->calculateImageSimilarity(
-                $reportedItems->first()->images,
-                $this->itemToClaim->images
-            );
-
-            $this->textSimilarityScore = $this->itemMatchingService->calculateTextSimilarityWithContext(
-                $reportedItems->first()->title . ' ' . $reportedItems->first()->description,
-                $this->itemToClaim->title . ' ' . $this->itemToClaim->description
-            );
-
-            $this->locationSimilarityScore = $this->itemMatchingService->calculateLocationSimilarity(
-                $reportedItems->first()->geolocation,
-                $this->itemToClaim->geolocation
-            );
-
-            $this->timeSimilarityScore = $this->itemMatchingService->calculateTimeSimilarity(
-                $reportedItems->first()->date_lost,
-                $this->itemToClaim->date_found
-            );
-
-            // Cache the scores
-            Cache::put("similarity_scores_{$reportedItems->first()->id}_{$this->itemToClaim->id}", [
-                'image' => $this->imageSimilarityScore,
-                'text' => $this->textSimilarityScore,
-                'location' => $this->locationSimilarityScore,
-                'time' => $this->timeSimilarityScore,
-            ], now()->addMinutes(60)); // Cache for 1 hour
-        }
-
-        // Calculate total similarity score
-        $this->totalSimilarityScore = ($this->textSimilarityScore * 0.3) +
-                                      ($this->imageSimilarityScore * 0.4) +
-                                      ($this->locationSimilarityScore * 0.2) +
-                                      ($this->timeSimilarityScore * 0.1);
-
-        // Ensure the total similarity score does not exceed 100%
-        if ($this->totalSimilarityScore > 1) {
-            $this->totalSimilarityScore = 1;
-        }
-
-        // Perform checks based on total similarity score
-        $this->checks = [
-            'description_matches' => $this->textSimilarityScore > 0.5,
-            'images_match' => $this->imageSimilarityScore > 0.5,
-            'location_matches' => $this->locationSimilarityScore > 0.1,
-            'time_matches' => $this->timeSimilarityScore > 0.1,
-        ];
-
-        // Automatically set matched_found_item_id if total similarity score > 80%
-        if ($this->totalSimilarityScore > 0.6) {
-            $reportedItems->first()->update(['matched_found_item_id' => $this->itemToClaim->id]);
-
-            // Invalidate the cache
-            Cache::forget('matched_items'); // Clear the cache for matched items
-
-            // Emit an event to refresh the UI
-            $this->dispatch('itemMatched');
-
-            toast()->success('Item matched successfully!')->push();
-        }
-
-        // Open the confirmation modal
         $this->confirmingClaim = true;
+    }
+
+    protected function calculateSimilarityScores($reportedItem, $foundItem)
+    {
+        // Initialize all scores to 0
+        $this->textSimilarityScore = 0;
+        $this->imageSimilarityScore = 0;
+        $this->locationSimilarityScore = 0;
+        $this->timeSimilarityScore = 0;
+        $this->categorySimilarityScore = 0;
+        $this->totalSimilarityScore = 0;
+
+        if (!$reportedItem || !$foundItem || !$this->itemMatchingService) {
+            return;
+        }
+
+        try {
+            // Calculate text similarity
+            $this->textSimilarityScore = $this->itemMatchingService->calculateTextSimilarityWithContext(
+                $reportedItem->title . ' ' . $reportedItem->description,
+                $foundItem->title . ' ' . $foundItem->description
+            );
+
+            // Calculate location similarity
+            $this->locationSimilarityScore = $this->itemMatchingService->calculateLocationSimilarity(
+                $reportedItem->geolocation,
+                $foundItem->geolocation
+            );
+
+            // Calculate time similarity
+            $this->timeSimilarityScore = $this->itemMatchingService->calculateTimeSimilarity(
+                $reportedItem->date_lost,
+                $foundItem->date_found
+            );
+
+            // Calculate category similarity
+            $this->categorySimilarityScore = $reportedItem->category_id === $foundItem->category_id ? 1.0 : 0.0;
+
+            // Calculate image similarity
+            $this->imageSimilarityScore = $this->calculateImageSimilarity($reportedItem, $foundItem);
+
+            // Calculate total similarity score with weighted average
+            $weights = [
+                'text' => 0.35,
+                'image' => 0.25,
+                'category' => 0.15,
+                'location' => 0.15,
+                'time' => 0.10
+            ];
+
+            $this->totalSimilarityScore = min(1.0,
+                ($this->textSimilarityScore * $weights['text']) +
+                ($this->imageSimilarityScore * $weights['image']) +
+                ($this->categorySimilarityScore * $weights['category']) +
+                ($this->locationSimilarityScore * $weights['location']) +
+                ($this->timeSimilarityScore * $weights['time'])
+            );
+
+            // Update checks based on scores
+            $this->checks = [
+                'description_matches' => $this->textSimilarityScore > 0.5,
+                'images_match' => $this->imageSimilarityScore > 0.5,
+                'category_matches' => $this->categorySimilarityScore > 0.9,
+                'location_matches' => $this->locationSimilarityScore > 0.1,
+                'time_matches' => $this->timeSimilarityScore > 0.1,
+            ];
+
+            // Auto-match if similarity is high
+            if ($this->totalSimilarityScore > 0.6) {
+                $reportedItem->update(['matched_found_item_id' => $foundItem->id]);
+                Cache::tags(['matched_items'])->flush();
+                $this->dispatch('itemMatched');
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error calculating similarity scores: ' . $e->getMessage());
+            toast()->danger('Error calculating similarity scores.')->push();
+        }
+    }
+
+    public function processClaim()
+    {
+        if ($this->itemToClaim) {
+            $this->itemToClaim->update(['claimed_by' => Auth::id()]);
+            Cache::forget("item_{$this->itemToClaim->id}");
+            $this->closeClaimModal();
+            toast()->success('Item claimed successfully!')->push();
+            return redirect()->route('matched-items');
+        }
+    }
+
+    public function closeClaimModal()
+    {
+        $this->confirmingClaim = false;
+        $this->itemToClaim = null;
+        $this->resetSimilarityScores();
+    }
+
+    protected function resetSimilarityScores()
+    {
+        $this->imageSimilarityScore = 0;
+        $this->textSimilarityScore = 0;
+        $this->locationSimilarityScore = 0;
+        $this->timeSimilarityScore = 0;
+        $this->totalSimilarityScore = 0;
+        $this->checks = [];
     }
 
     public function confirmResetClaim($itemId)
     {
         $this->itemToReset = LostItem::find($itemId);
-        $this->confirmingResetClaim = true; // Open the reset confirmation modal
+        $this->confirmingResetClaim = true;
     }
 
     public function resetClaim()
     {
         if ($this->itemToReset) {
-            // Reset the claim by clearing the claimed_by field
-            $this->itemToReset->update(['claimed_by' => null]);
+            $this->itemToReset->update([
+                'claimed_by' => null,
+                'matched_found_item_id' => null
+            ]);
 
-            // Clear any cached data related to this item
-            Cache::forget("similarity_scores_{$this->itemToReset->id}");
+            Cache::forget("item_{$this->itemToReset->id}");
+            Cache::tags(['matched_items'])->flush();
 
-            // Reset any other fields or relationships associated with the claim
-            $this->itemToReset->matched_found_item_id = null;
-            $this->itemToReset->save();
-
-            // Close the modal
             $this->closeResetClaimModal();
             toast()->success('Claim has been reset successfully.')->push();
-
             return redirect()->route('products.view-items');
         }
     }
@@ -203,25 +252,6 @@ class DisplayLostItems extends Component
     {
         $this->confirmingResetClaim = false;
         $this->itemToReset = null;
-    }
-    public function processClaim()
-    {
-        if ($this->itemToClaim) {
-            $this->itemToClaim->update(['claimed_by' => Auth::id()]);
-            Cache::forget("similarity_scores_{$this->itemToClaim->id}");
-            $this->closeClaimModal();
-            toast()->success('Item claimed successfully!')->push();
-            return redirect()->route('matched-items');
-        }
-    }
-
-
-    public function closeClaimModal()
-    {
-        $this->confirmingClaim = false;
-        $this->itemToClaim = null;
-        $this->checks = [];
-        $this->similarityScore = 0;
     }
 
     public function editItem($itemId)
@@ -307,7 +337,9 @@ class DisplayLostItems extends Component
 
     public function showItemDetails($itemId)
     {
-        $this->selectedItem = LostItem::with('images', 'user')->find($itemId);
+        $this->selectedItem = Cache::remember("item_{$itemId}", now()->addMinutes(5), function () use ($itemId) {
+            return LostItem::with(['images', 'user', 'category'])->find($itemId);
+        });
     }
 
     public function closeItemDetails()
@@ -401,19 +433,19 @@ class DisplayLostItems extends Component
         if ($this->itemToDelete) {
             $item = LostItem::find($this->itemToDelete);
             if ($item && $item->user_id === Auth::id()) {
+                // Delete associated images
+                foreach ($item->images as $image) {
+                    Storage::delete($image->image_path);
+                }
+
                 $item->delete();
+                Cache::forget("item_{$this->itemToDelete}");
 
-                // Show a success toast message
-                toast()
-                    ->success("Item deleted successfully.")
-                    ->push();
-
-                // Refresh the list of items
-                return redirect()->to(route('products.view-items'));
+                toast()->success('Item deleted successfully.')->push();
+                return redirect()->route('products.view-items');
             }
         }
 
-        // Reset the delete confirmation modal
         $this->confirmingDelete = false;
         $this->itemToDelete = null;
     }
@@ -428,13 +460,17 @@ class DisplayLostItems extends Component
 
     public function render()
     {
-        $categories = Category::all();
+        $categories = Cache::remember('categories', now()->addDay(), function () {
+            return Category::all();
+        });
 
-        // Fetch all items based on search criteria
-        $lostItems = LostItem::query()
+        $query = LostItem::query()
+            ->with(['images', 'category', 'user'])
             ->when($this->search, function ($query) {
-                $query->where('title', 'like', '%' . $this->search . '%')
-                    ->orWhere('description', 'like', '%' . $this->search . '%');
+                $query->where(function ($q) {
+                    $q->where('title', 'like', '%' . $this->search . '%')
+                      ->orWhere('description', 'like', '%' . $this->search . '%');
+                });
             })
             ->when($this->category, function ($query) {
                 $query->where('category_id', $this->category);
@@ -453,9 +489,9 @@ class DisplayLostItems extends Component
             })
             ->when($this->filter === 'others', function ($query) {
                 $query->where('user_id', '!=', Auth::id());
-            })
-            ->orderBy('created_at', 'desc')
-            ->paginate(8);
+            });
+
+        $lostItems = $query->latest()->paginate(12);
 
         return view('livewire.display-lost-items', [
             'lostItems' => $lostItems,

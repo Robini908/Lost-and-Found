@@ -13,97 +13,94 @@
     <div class="container mx-auto px-4 py-6 flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6">
         <!-- Filters Section (Left) -->
         <div class="w-full md:w-64 lg:w-80" :class="{ 'hidden md:block': !isFilterOpen }">
-            <!-- Sticky Card with No Background -->
-            <div class="sticky top-6 max-h-[80vh] overflow-y-auto">
-                <!-- Filters Content -->
-                <div class="p-6">
-                    <h2 class="text-lg font-semibold mb-4">Filters</h2>
+            <div class="bg-white rounded-lg shadow-lg p-6 sticky top-6">
+                <h2 class="text-xl font-semibold mb-6 text-gray-800">Filters</h2>
 
-                    <!-- Search Input -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                        <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search lost items..."
-                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <!-- Search Input -->
+                <div class="space-y-4">
+                    <div class="relative">
+                        <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                        <div class="relative rounded-md shadow-sm">
+                            <input type="text"
+                                id="search"
+                                wire:model.debounce.300ms="search"
+                                class="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                                placeholder="Search items...">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Category Dropdown -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                        <select wire:model.live.debounce.300ms="category"
-                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <!-- Category Filter -->
+                    <div>
+                        <label for="category" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <select id="category"
+                            wire:model="category"
+                            class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                             <option value="">All Categories</option>
-                            @foreach ($categories as $cat)
+                            @foreach($categories as $cat)
                                 <option value="{{ $cat->id }}">{{ $cat->name }}</option>
                             @endforeach
                         </select>
                     </div>
 
-                    <!-- Location Input -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location</label>
-                        <input type="text" wire:model.live.debounce.300ms="location" placeholder="Location"
-                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <!-- Date Filter -->
+                    <div>
+                        <label for="date" class="block text-sm font-medium text-gray-700 mb-1">Date Lost</label>
+                        <input type="date"
+                            id="date"
+                            wire:model="date_lost"
+                            class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                     </div>
 
-                    <!-- Date Lost Input -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Date Lost</label>
-                        <input type="date" wire:model.live.debounce.300ms="date_lost"
-                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <!-- View Filter -->
+                    <div>
+                        <label for="filter" class="block text-sm font-medium text-gray-700 mb-1">View</label>
+                        <select id="filter"
+                            wire:model="filter"
+                            class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <option value="all">All Items</option>
+                            <option value="mine">My Items</option>
+                            <option value="others">Others' Items</option>
+                        </select>
                     </div>
-
-                    <!-- Condition Input -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Condition</label>
-                        <input type="text" wire:model.live.debounce.300ms="condition" placeholder="Condition"
-                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-
-                    <!-- Clear Filters Button -->
-                    <button wire:click="clearAllFilters"
-                        class="w-full py-2 px-4 bg-red-500 text-white rounded-lg hover:bg-red-600 transition duration-200">
-                        Clear All Filters
-                    </button>
                 </div>
+
+                <!-- Active Filters -->
+                @if($search || $category || $location || $date_lost || $condition)
+                    <div class="mt-6 pt-4 border-t border-gray-200">
+                        <h3 class="text-sm font-medium text-gray-700 mb-3">Active Filters</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <button wire:click="clearAllFilters"
+                                class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-full hover:bg-red-200 transition duration-150 ease-in-out">
+                                Clear All Filters
+                                <svg class="ml-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                            @if($search)
+                                <span class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
+                                    Search: {{ $search }}
+                                    <button wire:click="clearFilter('search')" class="ml-1 text-blue-500 hover:text-blue-700">×</button>
+                                </span>
+                            @endif
+                            @if($category)
+                                <span class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
+                                    Category: {{ $categories->find($category)->name }}
+                                    <button wire:click="clearFilter('category')" class="ml-1 text-green-500 hover:text-green-700">×</button>
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
 
         <!-- Lost Items Section (Right) -->
         <div class="flex-1">
-            <!-- Active Filters -->
-            <div class="mb-4 flex flex-wrap gap-2">
-                @if ($search)
-                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        Search: "{{ $search }}"
-                        <i class="fas fa-times cursor-pointer ml-1" wire:click="clearFilter('search')"></i>
-                    </span>
-                @endif
-                @if ($category)
-                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        Category: "{{ $categories->find($category)->name }}"
-                        <i class="fas fa-times cursor-pointer ml-1" wire:click="clearFilter('category')"></i>
-                    </span>
-                @endif
-                @if ($location)
-                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        Location: "{{ $location }}"
-                        <i class="fas fa-times cursor-pointer ml-1" wire:click="clearFilter('location')"></i>
-                    </span>
-                @endif
-                @if ($date_lost)
-                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        Date Lost: "{{ $date_lost }}"
-                        <i class="fas fa-times cursor-pointer ml-1" wire:click="clearFilter('date_lost')"></i>
-                    </span>
-                @endif
-                @if ($condition)
-                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                        Condition: "{{ $condition }}"
-                        <i class="fas fa-times cursor-pointer ml-1" wire:click="clearFilter('condition')"></i>
-                    </span>
-                @endif
-            </div>
-
             <!-- Lost Items Grid -->
             @if ($lostItems->isEmpty())
                 <div class="text-center text-gray-600 py-8">
@@ -323,27 +320,22 @@
                                             <!-- Image Matching Percentage (Displayed only for "Found" items) -->
                                             @if ($item->item_type === 'found' && Auth::check())
                                                 @php
-                                                    $userReportedItems = \App\Models\LostItem::where(
-                                                        'user_id',
-                                                        Auth::id(),
-                                                    )
+                                                    $userReportedItems = \App\Models\LostItem::where('user_id', Auth::id())
                                                         ->whereIn('item_type', ['reported', 'searched'])
                                                         ->with('images')
                                                         ->get();
 
                                                     $imageSimilarityScore = null;
                                                     if ($userReportedItems->isNotEmpty()) {
-                                                        $imageSimilarityScore = $this->itemMatchingService->calculateImageSimilarity(
-                                                            $userReportedItems->first()->images,
-                                                            $item->images,
+                                                        $imageSimilarityScore = $this->calculateImageSimilarity(
+                                                            $userReportedItems->first(),
+                                                            $item
                                                         );
                                                     }
                                                 @endphp
                                                 @if ($imageSimilarityScore !== null)
                                                     <div class="relative group">
-                                                        <span
-                                                            class="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-md"
-                                                            data-tippy-content="Image match similarity is {{ number_format($imageSimilarityScore * 100, 2) }}%">
+                                                        <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-md">
                                                             {{ number_format($imageSimilarityScore * 100, 2) }}%
                                                         </span>
                                                     </div>

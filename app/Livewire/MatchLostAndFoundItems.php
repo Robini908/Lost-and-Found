@@ -217,7 +217,7 @@ class MatchLostAndFoundItems extends Component
             'found_item' => $foundItem,
             'similarity_score' => $match->similarity_score,
             'text_similarity' => $this->calculateTextSimilarity($reportedItem, $foundItem),
-            'image_similarity' => $this->calculateImageSimilarity($reportedItem, $foundItem),
+            'image_similarity' => $this->calculateBestImageSimilarity($reportedItem, $foundItem),
             'location_similarity' => $this->calculateLocationSimilarity($reportedItem, $foundItem),
             'time_similarity' => $this->calculateTimeSimilarity($reportedItem, $foundItem)
         ];
@@ -235,7 +235,7 @@ class MatchLostAndFoundItems extends Component
         return $percent / 100;
     }
 
-    protected function calculateImageSimilarity($item1, $item2)
+    protected function calculateBestImageSimilarity($item1, $item2)
     {
         // Simplified image similarity for display
         return 0.75; // Placeholder value

@@ -36,9 +36,9 @@
             <div class="flex items-center justify-between p-4 border-b border-gray-200/50">
                 <a href="{{ route('dashboard') }}" class="flex items-center space-x-3">
                     <x-application-mark class="block h-9 w-auto" />
-                    <span class="text-xl font-bold text-gray-700">Lost & Found</span>
+                    <span class="text-xl font-bold text-gray-900">Lost & Found</span>
                 </a>
-                <button @click="open = false" class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
+                <button @click="open = false" class="text-gray-500 hover:text-gray-900 transition-colors duration-200">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -56,7 +56,7 @@
                         </div>
                     @endif
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-700">{{ Auth::user()->name }}</h3>
+                        <h3 class="text-sm font-semibold text-gray-900">{{ Auth::user()->name }}</h3>
                         <p class="text-xs text-gray-500">{{ Auth::user()->email }}</p>
                     </div>
                 </div>
@@ -68,7 +68,7 @@
             <!-- Main Navigation -->
             <div class="space-y-2">
                 <x-nav-link href="{{ route('dashboard') }}" :active="request()->routeIs('dashboard')"
-                    class="flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors duration-200 {{ request()->routeIs('dashboard') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                    class="flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors duration-200 {{ request()->routeIs('dashboard') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                     <i class="fas fa-home text-lg text-blue-200"></i>
                     <span>Dashboard</span>
                 </x-nav-link>
@@ -76,7 +76,7 @@
                 <!-- Report Items Section -->
                 <div class="space-y-1">
                     <button @click="activeMenu = (activeMenu === 'report') ? null : 'report'"
-                        class="w-full flex items-center justify-between px-4 py-3 text-gray-600 hover:bg-white/60 hover:text-gray-700 rounded-lg transition-colors duration-200">
+                        class="w-full flex items-center justify-between px-4 py-3 text-gray-600 hover:bg-white/60 hover:text-gray-900 rounded-lg transition-colors duration-200">
                         <div class="flex items-center space-x-3">
                             <i class="fas fa-plus-circle text-lg text-green-200"></i>
                             <span>Report Items</span>
@@ -89,12 +89,12 @@
                         x-transition:enter-end="transform opacity-100 scale-100"
                         class="pl-11 space-y-1">
                         <x-nav-link href="{{ route('products.report-item') }}" :active="request()->routeIs('products.report-item')"
-                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('products.report-item') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('products.report-item') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                             <i class="fas fa-exclamation-circle text-red-200"></i>
                             <span>Report Lost</span>
                         </x-nav-link>
                         <x-nav-link href="{{ route('products.report-found-item') }}" :active="request()->routeIs('products.report-found-item')"
-                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('products.report-found-item') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('products.report-found-item') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                             <i class="fas fa-search text-green-200"></i>
                             <span>Report Found</span>
                         </x-nav-link>
@@ -104,7 +104,7 @@
                 <!-- View Items Section -->
                 <div class="space-y-1">
                     <button @click="activeMenu = (activeMenu === 'view') ? null : 'view'"
-                        class="w-full flex items-center justify-between px-4 py-3 text-gray-600 hover:bg-white/60 hover:text-gray-700 rounded-lg transition-colors duration-200">
+                        class="w-full flex items-center justify-between px-4 py-3 text-gray-600 hover:bg-white/60 hover:text-gray-900 rounded-lg transition-colors duration-200">
                         <div class="flex items-center space-x-3">
                             <i class="fas fa-list text-lg text-purple-200"></i>
                             <span>View Items</span>
@@ -118,22 +118,22 @@
                         x-transition:enter-end="transform opacity-100 scale-100"
                         class="pl-11 space-y-1">
                         <x-nav-link href="{{ route('products.view-items') }}" :active="request()->routeIs('products.view-items')"
-                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('products.view-items') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('products.view-items') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                             <i class="fas fa-eye text-blue-200"></i>
                             <span>All Items</span>
                         </x-nav-link>
                         <x-nav-link href="{{ route('products.my-reported-items') }}" :active="request()->routeIs('products.my-reported-items')"
-                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('products.my-reported-items') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('products.my-reported-items') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                             <i class="fas fa-user-tag text-yellow-200"></i>
                             <span>My Items</span>
                         </x-nav-link>
                         <x-nav-link href="{{ route('match-items') }}" :active="request()->routeIs('match-items')"
-                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('match-items') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('match-items') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                             <i class="fas fa-exchange-alt text-green-200"></i>
                             <span>Match Items</span>
                         </x-nav-link>
                         <x-nav-link href="{{ route('matched-items') }}" :active="request()->routeIs('matched-items')"
-                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('matched-items') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('matched-items') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                             <i class="fas fa-check-circle text-green-200"></i>
                             <span>Matched Items</span>
                         </x-nav-link>
@@ -142,7 +142,7 @@
 
                 <!-- Rewards Section -->
                 <x-nav-link href="{{ route('rewards.index') }}" :active="request()->routeIs('rewards.index')"
-                    class="flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 {{ request()->routeIs('rewards.index') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                    class="flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 {{ request()->routeIs('rewards.index') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                     <div class="flex items-center space-x-3">
                         <i class="fas fa-gift text-lg text-yellow-200"></i>
                         <span>Rewards</span>
@@ -157,7 +157,7 @@
             <div class="p-4 space-y-1">
                 <!-- Settings Button -->
                 <button @click="activeMenu = (activeMenu === 'settings') ? null : 'settings'"
-                    class="w-full flex items-center justify-between px-4 py-3 text-gray-600 hover:bg-white/60 hover:text-gray-700 rounded-lg transition-colors duration-200">
+                    class="w-full flex items-center justify-between px-4 py-3 text-gray-600 hover:bg-white/60 hover:text-gray-900 rounded-lg transition-colors duration-200">
                     <div class="flex items-center space-x-3">
                         <i class="fas fa-cog text-lg text-blue-200"></i>
                         <span>Settings</span>
@@ -171,33 +171,33 @@
                     x-transition:enter-end="transform opacity-100 scale-100"
                     class="pl-11 space-y-1">
                     <x-nav-link href="{{ route('users.general-settings') }}" :active="request()->routeIs('users.general-settings')"
-                        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('users.general-settings') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('users.general-settings') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                         <i class="fas fa-user-cog text-blue-200"></i>
                         <span>Account Settings</span>
                     </x-nav-link>
                     <x-nav-link href="{{ route('profile.show') }}" :active="request()->routeIs('profile.show')"
-                        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('profile.show') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('profile.show') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                         <i class="fas fa-user-circle text-blue-200"></i>
                         <span>Profile</span>
                     </x-nav-link>
                     <x-nav-link href="{{ route('users.general-settings') }}#notifications" :active="request()->is('*/notifications')"
-                        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->is('*/notifications') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->is('*/notifications') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                         <i class="fas fa-bell text-blue-200"></i>
                         <span>Notifications</span>
                     </x-nav-link>
                     <x-nav-link href="{{ route('users.general-settings') }}#security" :active="request()->is('*/security')"
-                        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->is('*/security') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                        class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->is('*/security') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                         <i class="fas fa-shield-alt text-blue-200"></i>
                         <span>Security</span>
                     </x-nav-link>
                     @if(Auth::user()->hasRole('admin'))
                         <x-nav-link href="{{ route('admin.manage-usertypes') }}" :active="request()->routeIs('admin.manage-usertypes')"
-                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.manage-usertypes') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->routeIs('admin.manage-usertypes') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                             <i class="fas fa-users-cog text-purple-200"></i>
                             <span>User Management</span>
                         </x-nav-link>
                         <x-nav-link href="{{ route('users.general-settings') }}#system" :active="request()->is('*/system')"
-                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->is('*/system') ? 'bg-white/60 text-gray-700' : 'text-gray-600 hover:bg-white/60 hover:text-gray-700' }}">
+                            class="flex items-center space-x-3 px-4 py-2 rounded-lg transition-colors duration-200 {{ request()->is('*/system') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                             <i class="fas fa-server text-purple-200"></i>
                             <span>System Settings</span>
                         </x-nav-link>

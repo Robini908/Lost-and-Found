@@ -65,7 +65,7 @@ class PrecomputeSimilarityScores extends Command
 
     private function calculateAndCacheScores($reportedItem, $foundItem): array
     {
-        $imageSimilarityScore = $this->itemMatchingService->calculateImageSimilarity(
+        $imageSimilarityScore = $this->itemMatchingService->calculateBestImageSimilarity(
             $reportedItem->images,
             $foundItem->images
         );

@@ -2,89 +2,68 @@
     <x-slot name="header">
         <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div>
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                    {{ __('Welcome back') }}, {{ Auth::user()->name }}!
-        </h2>
-                <p class="text-sm text-gray-600 mt-1">Here's what's happening with your lost and found items</p>
+                <h2 class="text-2xl font-semibold text-gray-800">
+                    {{ __('Welcome back') }}, {{ Auth::user()->name }}
+                </h2>
+                <p class="mt-1 text-sm text-gray-600">Here's an overview of your lost and found items</p>
             </div>
             <div class="flex flex-col sm:flex-row gap-3">
-                <x-button href="{{ route('products.report-item') }}" class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200">
-                    <i class="fas fa-exclamation-circle mr-2"></i>
+                <a href="{{ route('products.report-item') }}"
+                   class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition-all duration-200">
+                    <i class="fas fa-exclamation-circle text-blue-500 mr-2"></i>
                     {{ __('Report Lost Item') }}
-                </x-button>
-                <x-button href="{{ route('products.report-found-item') }}" class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-200">
-                    <i class="fas fa-search mr-2"></i>
+                </a>
+                <a href="{{ route('products.report-found-item') }}"
+                   class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 shadow-sm transition-all duration-200">
+                    <i class="fas fa-search text-green-500 mr-2"></i>
                     {{ __('Report Found Item') }}
-                </x-button>
+                </a>
             </div>
         </div>
     </x-slot>
 
     <div class="py-6">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <!-- Stats Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <!-- Total Lost Items -->
-                <div class="transform hover:scale-105 transition-transform duration-200">
-                    <x-stats-card
-                        title="Lost Items"
-                        :value="$stats['totalLostItems'] ?? 0"
-                        icon="fa-search"
-                        gradient-from="from-pink-500"
-                        gradient-to="to-rose-600"
-                        :subtitle="'Last 30 days: ' . ($stats['lastMonthLostItems'] ?? 0)" />
+            <!-- Stats Section -->
+            <div class="mb-6">
+                <livewire:dashboard-stats />
+            </div>
+
+            <!-- Charts Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Distribution Chart -->
+                <div>
+                    <livewire:charts.items-distribution-chart />
                 </div>
 
-                <!-- Total Found Items -->
-                <div class="transform hover:scale-105 transition-transform duration-200">
-                    <x-stats-card
-                        title="Found Items"
-                        :value="$stats['totalFoundItems'] ?? 0"
-                        icon="fa-box"
-                        gradient-from="from-emerald-500"
-                        gradient-to="to-teal-600"
-                        :subtitle="'Last 30 days: ' . ($stats['lastMonthFoundItems'] ?? 0)" />
+                <!-- Timeline Chart -->
+                <div>
+                    <livewire:charts.items-timeline-chart />
                 </div>
+            </div>
 
-                <!-- Successful Matches -->
-                <div class="transform hover:scale-105 transition-transform duration-200">
-                    <x-stats-card
-                        title="Successful Matches"
-                        :value="$stats['successfulMatches'] ?? 0"
-                        icon="fa-check-circle"
-                        gradient-from="from-blue-500"
-                        gradient-to="to-indigo-600"
-                        :subtitle="'Success rate: ' . ($stats['matchRate'] ?? '0%')" />
-                </div>
-
-                <!-- Recovery Rate -->
-                <div class="transform hover:scale-105 transition-transform duration-200">
-                    <x-stats-card
-                        title="Recovery Rate"
-                        :value="$stats['recoveryRate'] ?? '0%'"
-                        icon="fa-chart-line"
-                        gradient-from="from-violet-500"
-                        gradient-to="to-purple-600"
-                        :subtitle="'Trend: ' . ($stats['recoveryTrend'] ?? 'Stable')" />
-                </div>
+            <!-- Category Distribution Chart - Full Width -->
+            <div class="mb-6">
+                <livewire:charts.category-distribution-chart />
             </div>
 
             <!-- Main Content Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Quick Actions Section -->
                 <div class="lg:col-span-2">
-                    <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
+                    <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-100">
                         <div class="p-6">
                             <div class="flex justify-between items-center mb-6">
-                                <h3 class="text-lg font-medium text-gray-900">Quick Actions</h3>
-                                <a href="{{ route('products.view-items') }}" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                    View All <i class="fas fa-arrow-right ml-1"></i>
+                                <h3 class="text-lg font-medium text-gray-900">Recent Items</h3>
+                                <a href="{{ route('products.view-items') }}" class="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center">
+                                    View All
+                                    <i class="fas fa-arrow-right ml-2 text-xs"></i>
                                 </a>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                @foreach($recentItems ?? [] as $item)
-                                    <div class="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors duration-200">
-                                        <div class="flex items-center">
+                                @forelse($recentItems ?? [] as $item)
+                                    <div class="group bg-gray-50 rounded-lg p-4 hover:bg-white hover:shadow-md transition-all duration-200 border border-gray-100">
+                                        <div class="flex items-center space-x-4">
                                             @if($item->images->isNotEmpty())
                                                 <img src="{{ Storage::url($item->images->first()->image_path) }}"
                                                      alt="{{ $item->title }}"
@@ -94,18 +73,33 @@
                                                     <i class="fas fa-image text-gray-400 text-2xl"></i>
                                                 </div>
                                             @endif
-                                            <div class="ml-4 flex-1">
-                                                <h4 class="text-sm font-medium text-gray-900">{{ $item->title }}</h4>
-                                                <p class="text-sm text-gray-500 truncate">{{ $item->description }}</p>
-                                                <div class="mt-2">
-                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $item->item_type === 'lost' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800' }}">
+                                            <div class="flex-1 min-w-0">
+                                                <h4 class="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+                                                    {{ $item->title }}
+                                                </h4>
+                                                <p class="mt-1 text-sm text-gray-500 truncate">{{ $item->description }}</p>
+                                                <div class="mt-2 flex items-center">
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $item->item_type === 'lost' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700' }}">
                                                         {{ ucfirst($item->item_type) }}
+                                                    </span>
+                                                    <span class="mx-2 text-gray-300">•</span>
+                                                    <span class="text-xs text-gray-500">
+                                                        <i class="fas fa-clock mr-1"></i>
+                                                        {{ $item->created_at->diffForHumans() }}
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                @endforeach
+                                @empty
+                                    <div class="col-span-2 text-center py-12 bg-gray-50 rounded-lg">
+                                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                                            <i class="fas fa-box-open text-gray-400 text-2xl"></i>
+                                        </div>
+                                        <h3 class="text-sm font-medium text-gray-900">No items yet</h3>
+                                        <p class="mt-2 text-sm text-gray-500">Start by reporting a lost or found item</p>
+                                    </div>
+                                @endforelse
                             </div>
                         </div>
                     </div>
@@ -113,7 +107,7 @@
 
                 <!-- Recent Activity Section -->
                 <div class="lg:col-span-1">
-                    <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
+                    <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-100">
                         <div class="p-6">
                             <div class="flex justify-between items-center mb-6">
                                 <h3 class="text-lg font-medium text-gray-900">Recent Activity</h3>
@@ -124,8 +118,8 @@
                                     <div class="flex items-start space-x-3">
                                         <div class="flex-shrink-0">
                                             <span class="inline-flex items-center justify-center h-8 w-8 rounded-full {{
-                                                $activity->type === 'lost' ? 'bg-red-100 text-red-600' :
-                                                ($activity->type === 'found' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600')
+                                                $activity->type === 'lost' ? 'bg-red-50 text-red-600' :
+                                                ($activity->type === 'found' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600')
                                             }}">
                                                 <i class="fas {{
                                                     $activity->type === 'lost' ? 'fa-search' :
@@ -134,8 +128,8 @@
                                             </span>
                                         </div>
                                         <div class="min-w-0 flex-1">
-                                            <p class="text-sm font-medium text-gray-900">{{ $activity->description }}</p>
-                                            <div class="mt-1 flex items-center text-sm text-gray-500">
+                                            <p class="text-sm text-gray-900">{{ $activity->description }}</p>
+                                            <div class="mt-1 flex items-center text-xs text-gray-500">
                                                 <i class="fas fa-clock mr-1.5"></i>
                                                 {{ $activity->created_at->diffForHumans() }}
                                             </div>
@@ -147,15 +141,11 @@
                                         @endif
                                     </div>
                                 @empty
-                                    <div class="text-center py-4">
-                                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-                                            <i class="fas fa-inbox text-gray-400 text-2xl"></i>
+                                    <div class="text-center py-8">
+                                        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-4">
+                                            <i class="fas fa-clock text-gray-400"></i>
                                         </div>
-                                        <p class="text-gray-500 text-sm">No recent activity</p>
-                                        <a href="{{ route('products.report-item') }}" class="mt-2 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800">
-                                            Report an item
-                                            <i class="fas fa-arrow-right ml-1"></i>
-                                        </a>
+                                        <p class="text-sm text-gray-500">No recent activity</p>
                                     </div>
                                 @endforelse
                             </div>

@@ -93,6 +93,13 @@
                 </div>
             </div>
 
+            <!-- Global Search -->
+            <div class="flex-1 px-4 flex justify-center lg:justify-end">
+                <div class="w-full lg:max-w-xs">
+                    <livewire:global-search />
+                </div>
+            </div>
+
             <div class="hidden sm:flex sm:items-center sm:ml-6">
                 <!-- Teams Dropdown -->
                 @if (Laravel\Jetstream\Jetstream::hasTeamFeatures())
