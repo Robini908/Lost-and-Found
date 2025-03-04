@@ -82,10 +82,10 @@
                                     {!! $result['highlight'] !!}
                                 </p>
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{
-                                    $result['item_type'] === LostItem::TYPE_FOUND ? 'bg-green-100 text-green-800' :
-                                    ($result['item_type'] === LostItem::TYPE_SEARCHED ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')
+                                    $result['type'] === LostItem::TYPE_FOUND ? 'bg-green-100 text-green-800' :
+                                    ($result['type'] === LostItem::TYPE_SEARCHED ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')
                                 }}">
-                                    {{ ucfirst($result['item_type']) }}
+                                    {{ ucfirst($result['type']) }}
                                 </span>
                             </div>
                             <div class="mt-1 flex items-center text-xs text-gray-500 space-x-2">

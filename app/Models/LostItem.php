@@ -93,6 +93,38 @@ class LostItem extends Model
     ];
 
     /**
+     * Get the hashed ID for the lost item.
+     *
+     * @return string
+     */
+    public function getHashedIdAttribute()
+    {
+        return \Illuminate\Support\Facades\Hash::make($this->id);
+    }
+
+    /**
+     * Get the route key for the model.
+     *
+     * @return string
+     */
+    public function getRouteKeyName()
+    {
+        return 'hashed_id';
+    }
+
+    /**
+     * Retrieve the model for a bound value.
+     *
+     * @param  mixed  $value
+     * @param  string|null  $field
+     * @return \Illuminate\Database\Eloquent\Model|null
+     */
+    public function resolveRouteBinding($value, $field = null)
+    {
+        return $this->where('id', $value)->firstOrFail();
+    }
+
+    /**
      * Get the user that owns the lost item.
      */
     public function user()

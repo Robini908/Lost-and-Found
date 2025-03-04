@@ -15,7 +15,7 @@
             <p class="text-sm font-medium text-gray-900">{{ $description }}</p>
             <p class="text-xs text-gray-500">{{ $date }}</p>
             @if($item)
-                <a href="{{ route('lost-items.show', $item->id) }}"
+                <a href="{{ route('lost-items.show', $item->hashed_id) }}"
                    class="text-xs text-indigo-600 hover:text-indigo-800 mt-1 inline-block">
                     View Item Details
                 </a>

@@ -25,6 +25,7 @@ use App\Http\Middleware\SqlInjectionProtection;
 use App\Http\Middleware\CustomRateLimiter;
 use App\Http\Middleware\DataEncryption;
 use App\Livewire\MyReportedItems;
+use App\Services\HashIdService;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -62,6 +63,10 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton('encrypt.data', function ($app) {
             return new DataEncryption();
+        });
+
+        $this->app->singleton(HashIdService::class, function ($app) {
+            return new HashIdService();
         });
     }
 

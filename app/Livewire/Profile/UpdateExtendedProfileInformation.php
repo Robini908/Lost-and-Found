@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Profile;
 
+use App\Models\User;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,7 @@ class UpdateExtendedProfileInformation extends Component
 
     public $state = [];
     public $social = [];
+    public $location_type = 'map'; // Default to map type
 
     public function mount()
     {
@@ -19,7 +21,12 @@ class UpdateExtendedProfileInformation extends Component
         $this->state = [
             'phone_number' => $user->phone_number,
             'country_code' => $user->country_code,
-            'address' => $user->address,
+            'location_type' => $user->location_type ?? 'map',
+            'location_address' => $user->location_address,
+            'area' => $user->area,
+            'landmarks' => $user->landmarks,
+            'latitude' => $user->latitude,
+            'longitude' => $user->longitude,
             'city' => $user->city,
             'state' => $user->state,
             'country' => $user->country,
@@ -43,6 +50,8 @@ class UpdateExtendedProfileInformation extends Component
             'linkedin' => '',
             'instagram' => '',
         ];
+
+        $this->location_type = $user->location_type ?? 'map';
     }
 
     public function updateProfileInformation()
@@ -50,7 +59,12 @@ class UpdateExtendedProfileInformation extends Component
         $this->validate([
             'state.phone_number' => ['nullable', 'string', 'max:20'],
             'state.country_code' => ['nullable', 'string', 'max:5'],
-            'state.address' => ['nullable', 'string', 'max:255'],
+            'state.location_type' => ['required', 'string', 'in:map,area'],
+            'state.location_address' => ['required_if:state.location_type,map', 'nullable', 'string', 'max:255'],
+            'state.area' => ['required_if:state.location_type,area', 'nullable', 'string', 'max:255'],
+            'state.landmarks' => ['nullable', 'string', 'max:255'],
+            'state.latitude' => ['required_if:state.location_type,map', 'nullable', 'numeric'],
+            'state.longitude' => ['required_if:state.location_type,map', 'nullable', 'numeric'],
             'state.city' => ['nullable', 'string', 'max:100'],
             'state.state' => ['nullable', 'string', 'max:100'],
             'state.country' => ['nullable', 'string', 'max:100'],
@@ -72,10 +86,22 @@ class UpdateExtendedProfileInformation extends Component
             'social.instagram' => ['nullable', 'url'],
         ]);
 
+        /** @var User $user */
         $user = Auth::user();
 
         // Update user with state data
         foreach ($this->state as $key => $value) {
+            if ($key === 'location_type') {
+                // If location type is area, clear map-related fields
+                if ($value === 'area') {
+                    $user->location_address = null;
+                    $user->latitude = null;
+                    $user->longitude = null;
+                } else {
+                    // If location type is map, clear area-related fields
+                    $user->area = null;
+                }
+            }
             $user->$key = $value;
         }
 

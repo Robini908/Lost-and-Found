@@ -29,7 +29,11 @@ class GlobalSearch extends Component
         $this->searchResults = LostItem::where(function ($query) {
                 $query->where('title', 'like', '%' . $this->query . '%')
                     ->orWhere('description', 'like', '%' . $this->query . '%')
-                    ->orWhere('location', 'like', '%' . $this->query . '%');
+                    ->orWhere('location_address', 'like', '%' . $this->query . '%')
+                    ->orWhere('area', 'like', '%' . $this->query . '%')
+                    ->orWhere('landmarks', 'like', '%' . $this->query . '%')
+                    ->orWhere('location_lost', 'like', '%' . $this->query . '%')
+                    ->orWhere('location_found', 'like', '%' . $this->query . '%');
             })
             ->with(['category', 'images'])
             ->orderByDesc('created_at')
@@ -39,13 +43,20 @@ class GlobalSearch extends Component
                 return [
                     'id' => $item->id,
                     'title' => $item->title,
-                    'type' => $item->item_type,
-                    'category' => $item->category->name,
-                    'location' => $item->location,
+                    'description' => $item->description,
+                    'type' => 'Lost Item',
+                    'category' => $item->category ? $item->category->name : 'Uncategorized',
+                    'location' => $item->location_type === 'map' ? $item->location_address : $item->area,
+                    'location_address' => $item->location_address,
+                    'area' => $item->area,
                     'date' => $item->created_at->format('M d, Y'),
                     'image' => $item->images->first() ? $item->images->first()->image_path : null,
-                    'url' => route('lost-items.show', $item->id),
-                    'highlight' => $this->highlightMatch($item->title, $this->query)
+                    'url' => route('lost-items.show', $item->hashed_id),
+                    'highlight' => $this->highlightMatch($item->title, $this->query),
+                    'created_at' => $item->created_at,
+                    'is_verified' => $item->is_verified ?? false,
+                    'value' => $item->estimated_value,
+                    'currency' => $item->currency
                 ];
             });
 

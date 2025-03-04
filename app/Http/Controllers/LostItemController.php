@@ -10,12 +10,12 @@ class LostItemController extends Controller
     /**
      * Display the specified lost item.
      *
-     * @param  int  $id
+     * @param  string  $hashedId
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    public function show($hashedId)
     {
-        $item = LostItem::findOrFail($id);
+        $item = LostItem::findOrFail($hashedId);
 
         if (!app('role-permission')->canViewItemDetails(auth()->user(), $item)) {
             abort(403, 'Unauthorized action.');

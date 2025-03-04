@@ -49,13 +49,18 @@ class EditLostItem extends Component
         'date' => 'required|date|before_or_equal:today',
         'notes' => 'nullable|string',
         'is_anonymous' => 'boolean',
-        'images.*' => 'nullable|image|max:5120', // 5MB max
+        'images.*' => 'mimetypes:image/jpeg,image/jpg,image/png,image/gif,image/webp,image/bmp,image/tiff,image/svg+xml|max:5120',
         'locationType' => 'required|in:specific,area',
         'location_address' => 'required_if:locationType,specific',
         'location_lat' => 'required_if:locationType,specific|nullable|numeric',
         'location_lng' => 'required_if:locationType,specific|nullable|numeric',
         'area' => 'required_if:locationType,area|nullable|string',
         'landmarks' => 'nullable|string',
+    ];
+
+    protected $messages = [
+        'images.*.mimetypes' => 'Each file must be an image in one of the supported formats.',
+        'images.*.max' => 'Each image must not be larger than 5MB.',
     ];
 
     public function mount($itemId)
@@ -103,12 +108,23 @@ class EditLostItem extends Component
         }
     }
 
+    public function removeImage($index)
+    {
+        if (isset($this->images[$index])) {
+            unset($this->images[$index]);
+            $this->images = array_values($this->images);
+            $this->validateOnly('images.*');
+        }
+    }
+
     protected function handleImageUploads()
     {
         if (!empty($this->images)) {
+            Log::info('Processing image uploads', ['count' => count($this->images)]);
             foreach ($this->images as $image) {
                 $path = $image->store('lost-items', 'public');
 
+                // Create image record using LostItemImage model
                 LostItemImage::create([
                     'lost_item_id' => $this->item->id,
                     'image_path' => $path
@@ -157,6 +173,10 @@ class EditLostItem extends Component
 
         try {
             DB::beginTransaction();
+            Log::info('Starting item update', [
+                'item_id' => $this->item->id,
+                'user_id' => Auth::id()
+            ]);
 
             // Update the item with the new values
             $this->item->update([
@@ -178,11 +198,13 @@ class EditLostItem extends Component
             ]);
 
             // Handle image uploads
-            if ($this->images) {
+            if (!empty($this->images)) {
+                Log::info('Processing new image uploads', ['count' => count($this->images)]);
                 $this->handleImageUploads();
             }
 
             DB::commit();
+            Log::info('Item updated successfully', ['item_id' => $this->item->id]);
 
             toast()->success('Item updated successfully')->push();
             $this->dispatch('itemUpdated')->to('my-reported-items');
@@ -191,7 +213,9 @@ class EditLostItem extends Component
             DB::rollBack();
             Log::error('Error updating item', [
                 'error' => $e->getMessage(),
-                'user_id' => Auth::id()
+                'trace' => $e->getTraceAsString(),
+                'user_id' => Auth::id(),
+                'item_id' => $this->item->id
             ]);
             toast()->danger('Failed to update item: ' . $e->getMessage())->push();
         }

@@ -243,11 +243,11 @@
                                                     <div class="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center">
                                                         <i class="fas fa-star text-yellow-600 text-xl"></i>
                                                     </div>
-                                                @else
+                                @else
                                                     <div class="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
                                                         <i class="fas fa-search text-blue-600 text-xl"></i>
-                                                    </div>
-                                                @endif
+                                    </div>
+                                @endif
                                             </div>
                                             <div>
                                                 <h4 class="text-lg font-medium text-gray-900">
@@ -299,9 +299,9 @@
                                                 <div>
                                                     <dt class="text-gray-500">Date</dt>
                                                     <dd class="font-medium text-gray-900">{{ $match['match_details']['date_match']['reported'] ?? 'N/A' }}</dd>
-                                                </div>
+                                </div>
                                             </dl>
-                                        </div>
+                            </div>
 
                                         <!-- Found Item -->
                                         <div class="bg-gray-50 rounded-lg p-4">
@@ -318,13 +318,13 @@
                                                 <div>
                                                     <dt class="text-gray-500">Location</dt>
                                                     <dd class="font-medium text-gray-900">{{ $match['match_details']['location_match']['found'] ?? 'N/A' }}</dd>
-                                                </div>
+                                    </div>
                                                 <div>
                                                     <dt class="text-gray-500">Date</dt>
                                                     <dd class="font-medium text-gray-900">{{ $match['match_details']['date_match']['found'] ?? 'N/A' }}</dd>
-                                                </div>
+                                    </div>
                                             </dl>
-                                        </div>
+                                </div>
                                     </div>
 
                                     <!-- Matching Attributes -->
@@ -339,12 +339,12 @@
                                                     </span>
                                                 @endif
                                             @endforeach
-                                        </div>
                                     </div>
+                                </div>
                                 </div>
                             </div>
                         @endforeach
-                    </div>
+                </div>
                 @endif
             </div>
         @endif

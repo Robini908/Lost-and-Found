@@ -263,44 +263,81 @@
                 </div>
             @else
                 <!-- Grid View -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
                     @foreach($items as $item)
-                    <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 border border-gray-100 overflow-hidden">
-                        <!-- Fixed height image container -->
-                        <div class="relative w-full h-48 bg-gray-100">
-                            @if($item->images->first())
-                            <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
-                                 alt="{{ $item->title }}"
-                                 class="absolute inset-0 w-full h-full object-cover">
-                            @else
-                            <div class="flex items-center justify-center h-full bg-gray-50">
-                                <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                            </div>
-                            @endif
-                        </div>
-                        <!-- Item Details -->
-                        <div class="p-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="px-2.5 py-0.5 text-xs font-medium rounded-full
-                                    @if($item->status === 'found') bg-green-100 text-green-800
-                                    @elseif($item->status === 'claimed') bg-blue-100 text-blue-800
-                                    @else bg-yellow-100 text-yellow-800 @endif">
-                                    {{ ucfirst($item->status) }}
-                                </span>
-                                <span class="text-sm text-gray-500">{{ $item->created_at->diffForHumans() }}</span>
-                            </div>
-                            <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ $item->title }}</h3>
-                            <p class="text-sm text-gray-600 line-clamp-2 mb-3">{{ $item->description }}</p>
-                            <div class="flex items-center justify-between">
-                                <button wire:click="viewDetails({{ $item->id }})"
-                                        class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
-                                    View Details
-                                </button>
-                                @if($item->category)
-                                <span class="text-sm text-gray-500">{{ $item->category->name }}</span>
+                    <div class="group bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 overflow-hidden">
+                        <!-- Image Container -->
+                        <div class="relative aspect-[4/3] bg-gray-100 overflow-hidden">
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                @if($item->images->first())
+                                    <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
+                                         alt="{{ $item->title }}"
+                                         class="w-full h-full object-contain">
+                                    @if($item->images->count() > 1)
+                                        <div class="absolute top-3 right-3">
+                                            <span class="px-2.5 py-1.5 text-xs font-medium text-white bg-black/50 rounded-full backdrop-blur-sm">
+                                                <i class="fas fa-images mr-1.5"></i>
+                                                {{ $item->images->count() }} photos
+                                            </span>
+                                        </div>
+                                    @endif
+                                @else
+                                    <div class="text-center">
+                                        <i class="fas fa-image text-gray-400 text-4xl mb-2"></i>
+                                        <p class="text-sm text-gray-400">No image available</p>
+                                    </div>
                                 @endif
+                            </div>
+                            <!-- Hover Overlay -->
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                <div class="absolute bottom-0 left-0 right-0 p-4">
+                                    <button wire:click="viewDetails({{ $item->id }})"
+                                            class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-white/90 backdrop-blur-sm text-sm font-medium rounded-lg text-gray-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
+                                        <i class="fas fa-search mr-2"></i>
+                                        View Details
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Content -->
+                        <div class="p-5">
+                            <div class="flex items-start justify-between mb-3">
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-1.5 line-clamp-1 group-hover:text-blue-600 transition-colors duration-200">
+                                        {{ $item->title }}
+                                    </h3>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                            {{ $item->status === 'found' ? 'bg-green-100 text-green-800' : '' }}
+                                            {{ $item->status === 'lost' ? 'bg-red-100 text-red-800' : '' }}
+                                            {{ $item->status === 'claimed' ? 'bg-blue-100 text-blue-800' : '' }}">
+                                            <i class="fas fa-circle text-[8px] mr-1.5"></i>
+                                            {{ ucfirst($item->status) }}
+                                        </span>
+                                        @if($item->category)
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                <i class="fas fa-folder text-[8px] mr-1.5"></i>
+                                                {{ $item->category->name }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="text-sm text-gray-600 line-clamp-2 mb-4">
+                                {{ $item->description }}
+                            </p>
+
+                            <div class="flex items-center justify-between text-sm border-t border-gray-100 pt-4 mt-4">
+                                <div class="flex items-center text-gray-500">
+                                    <i class="fas fa-calendar-alt mr-1.5 text-gray-400"></i>
+                                    {{ $item->created_at->diffForHumans() }}
+                                </div>
+                                <div class="flex items-center text-gray-500">
+                                    <i class="fas fa-map-marker-alt mr-1.5 text-gray-400"></i>
+                                    {{ Str::limit($item->location_type === 'map' ? $item->location_address : $item->area, 20) }}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -321,113 +358,162 @@
     <x-item-details-modal wire:model.live="showModal">
         @if($selectedItem)
             <x-slot:gallery>
-                <div class="h-full flex items-center justify-center p-4">
+                <div class="h-full flex items-center justify-center">
                     @if($selectedItem->images->count() > 0)
-                    <div class="grid grid-cols-2 gap-2 h-full w-full">
+                    <div class="relative w-full h-full flex items-center justify-center">
                         @foreach($selectedItem->images as $index => $image)
-                        <div class="relative group {{ $index === 0 ? 'col-span-2 row-span-2' : '' }} rounded-lg overflow-hidden">
+                        <div x-show="activeImage === {{ $index }}"
+                             x-transition:enter="transition ease-out duration-300"
+                             x-transition:enter-start="opacity-0 transform scale-95"
+                             x-transition:enter-end="opacity-100 transform scale-100"
+                             x-transition:leave="transition ease-in duration-200"
+                             x-transition:leave-start="opacity-100 transform scale-100"
+                             x-transition:leave-end="opacity-0 transform scale-95"
+                             class="absolute inset-0 flex items-center justify-center p-4">
                             <img src="{{ asset('storage/' . $image->image_path) }}"
                                  alt="Item image {{ $index + 1 }}"
-                                 class="w-full h-full object-cover">
-                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-200"></div>
+                                 class="gallery-image max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                                 @click="isFullscreen = true">
                         </div>
                         @endforeach
                     </div>
                     @else
-                    <div class="flex items-center justify-center h-full w-full bg-gray-800">
-                        <svg class="w-24 h-24 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                    <div class="text-center p-8">
+                        <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-800 mb-4">
+                            <i class="fas fa-image text-gray-400 text-3xl"></i>
+                        </div>
+                        <p class="text-gray-400 text-sm">No images available</p>
                     </div>
                     @endif
                 </div>
             </x-slot:gallery>
 
             <x-slot:header>
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center space-x-4">
-                        <span class="px-3 py-1 text-sm font-medium rounded-full
-                            @if($selectedItem->status === 'found') bg-green-100 text-green-800
-                            @elseif($selectedItem->status === 'claimed') bg-blue-100 text-blue-800
-                            @else bg-yellow-100 text-yellow-800 @endif">
-                            {{ ucfirst($selectedItem->status) }}
-                        </span>
-                        @if($selectedItem->category)
-                        <span class="text-sm text-gray-600">{{ $selectedItem->category->name }}</span>
-                        @endif
+                <div class="relative">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                @if($selectedItem->status === 'found') bg-green-100 text-green-800
+                                @elseif($selectedItem->status === 'claimed') bg-blue-100 text-blue-800
+                                @else bg-yellow-100 text-yellow-800 @endif">
+                                <i class="fas fa-circle text-[8px] mr-1.5"></i>
+                                {{ ucfirst($selectedItem->status) }}
+                            </span>
+                            @if($selectedItem->category)
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+                                <i class="fas fa-folder text-[8px] mr-1.5"></i>
+                                {{ $selectedItem->category->name }}
+                            </span>
+                            @endif
+                        </div>
+                        <button wire:click="closeModal" class="text-gray-400 hover:text-gray-500 transition-colors duration-200">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
                     </div>
-                    <button wire:click="closeModal" class="text-gray-400 hover:text-gray-500">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <h2 class="text-2xl font-bold text-gray-900">{{ $selectedItem->title }}</h2>
+                    <div class="flex items-center mt-2 text-sm text-gray-500">
+                        <i class="fas fa-clock mr-1.5"></i>
+                        {{ $selectedItem->created_at->diffForHumans() }}
+                    </div>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-900 mt-4">{{ $selectedItem->title }}</h2>
             </x-slot:header>
 
             <x-slot:content>
-                <div class="space-y-6">
+                <div class="space-y-8">
+                    <!-- Description -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                            <i class="fas fa-align-left text-blue-600 mr-2"></i>
+                            Description
+                        </h3>
+                        <p class="text-gray-600 leading-relaxed">{{ $selectedItem->description }}</p>
+                    </div>
+
                     <!-- Basic Info -->
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
-                        <dl class="grid grid-cols-2 gap-4">
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                            Item Details
+                        </h3>
+                        <div class="grid grid-cols-2 gap-6">
                             @if($selectedItem->brand)
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Brand</dt>
-                                <dd class="text-sm text-gray-900">{{ $selectedItem->brand }}</dd>
+                                <dt class="text-sm font-medium text-gray-500 mb-1">Brand</dt>
+                                <dd class="text-sm text-gray-900 bg-white rounded-lg p-3 border border-gray-100">
+                                    {{ $selectedItem->brand }}
+                                </dd>
                             </div>
                             @endif
                             @if($selectedItem->color)
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Color</dt>
-                                <dd class="text-sm text-gray-900">{{ $selectedItem->color }}</dd>
+                                <dt class="text-sm font-medium text-gray-500 mb-1">Color</dt>
+                                <dd class="text-sm text-gray-900 bg-white rounded-lg p-3 border border-gray-100">
+                                    {{ $selectedItem->color }}
+                                </dd>
                             </div>
                             @endif
                             @if($selectedItem->condition)
                             <div>
-                                <dt class="text-sm font-medium text-gray-500">Condition</dt>
-                                <dd class="text-sm text-gray-900">{{ ucfirst($selectedItem->condition) }}</dd>
+                                <dt class="text-sm font-medium text-gray-500 mb-1">Condition</dt>
+                                <dd class="text-sm text-gray-900 bg-white rounded-lg p-3 border border-gray-100">
+                                    {{ ucfirst($selectedItem->condition) }}
+                                </dd>
                             </div>
                             @endif
-                        </dl>
-                    </div>
-
-                    <!-- Description -->
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Description</h3>
-                        <p class="text-gray-600">{{ $selectedItem->description }}</p>
+                        </div>
                     </div>
 
                     <!-- Location Info -->
                     @if($selectedItem->location_address || $selectedItem->area)
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Location Information</h3>
-                        @if($selectedItem->location_address)
-                        <p class="text-sm text-gray-600">{{ $selectedItem->location_address }}</p>
-                        @endif
-                        @if($selectedItem->area)
-                        <p class="text-sm text-gray-600 mt-2">Area: {{ $selectedItem->area }}</p>
-                        @endif
-                        @if($selectedItem->landmarks)
-                        <p class="text-sm text-gray-600 mt-2">Landmarks: {{ $selectedItem->landmarks }}</p>
-                        @endif
+                    <div class="bg-gray-50 rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                            <i class="fas fa-map-marker-alt text-blue-600 mr-2"></i>
+                            Location Information
+                        </h3>
+                        <div class="space-y-4">
+                            @if($selectedItem->location_address)
+                            <div class="bg-white rounded-lg p-4 border border-gray-100">
+                                <p class="text-sm text-gray-900">{{ $selectedItem->location_address }}</p>
+                            </div>
+                            @endif
+                            @if($selectedItem->area)
+                            <div class="flex items-start space-x-2">
+                                <i class="fas fa-map text-gray-400 mt-0.5"></i>
+                                <p class="text-sm text-gray-600">Area: {{ $selectedItem->area }}</p>
+                            </div>
+                            @endif
+                            @if($selectedItem->landmarks)
+                            <div class="flex items-start space-x-2">
+                                <i class="fas fa-landmark text-gray-400 mt-0.5"></i>
+                                <p class="text-sm text-gray-600">Landmarks: {{ $selectedItem->landmarks }}</p>
+                            </div>
+                            @endif
+                        </div>
                     </div>
                     @endif
                 </div>
             </x-slot:content>
 
             <x-slot:footer>
-                <div class="flex justify-end space-x-3">
-                    @if($selectedItem->status === 'lost')
-                    <button wire:click="reportMatch({{ $selectedItem->id }})"
-                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition-all duration-200">
-                        Report Match
-                    </button>
-                    @endif
-                    <button wire:click="closeModal"
-                        class="inline-flex items-center px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition-all duration-200">
-                        Close
-                    </button>
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center space-x-2 text-sm text-gray-500">
+                        <i class="fas fa-user"></i>
+                        <span>Posted by {{ $selectedItem->user->name }}</span>
+                    </div>
+                    <div class="flex space-x-3">
+                        @if($selectedItem->status === 'lost')
+                        <button wire:click="reportMatch({{ $selectedItem->id }})"
+                            class="inline-flex items-center px-4 py-2 border border-transparent rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition-all duration-200">
+                            <i class="fas fa-handshake mr-2"></i>
+                            Report Match
+                        </button>
+                        @endif
+                        <button wire:click="closeModal"
+                            class="inline-flex items-center px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition-all duration-200">
+                            <i class="fas fa-times mr-2"></i>
+                            Close
+                        </button>
+                    </div>
                 </div>
             </x-slot:footer>
         @endif

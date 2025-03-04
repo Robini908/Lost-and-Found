@@ -290,7 +290,8 @@ class RolePermissionService
      */
     public function canViewItemDetails($user, $item): bool
     {
-        return $this->isAtLeastModerator($user) || $item->user_id === $user->id;
+        // Allow all authenticated users to view items
+        return true;
     }
 
     public function canEditItem($user, $item): bool

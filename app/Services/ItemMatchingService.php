@@ -80,7 +80,7 @@ class ItemMatchingService
             ]);
 
             if ($itemMatches->isNotEmpty()) {
-                $matches = $matches->concat($itemMatches);
+            $matches = $matches->concat($itemMatches);
             }
         }
 

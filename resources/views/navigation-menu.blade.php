@@ -43,7 +43,7 @@
                                     <i class="fas fa-eye mr-2"></i>
                                     {{ __('View All Items') }}
                                 </x-dropdown-link>
-                                <x-dropdown-link href="{{ route('products.my-lost-items') }}">
+                                <x-dropdown-link href="{{ route('products.my-reported-items') }}">
                                     <i class="fas fa-list mr-2"></i>
                                     {{ __('My Reported Items') }}
                                 </x-dropdown-link>

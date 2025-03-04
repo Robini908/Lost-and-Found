@@ -16,7 +16,7 @@ $tokenTypes = [
 
         <form wire:submit.prevent="createApiToken" class="px-6 py-4">
             <div class="space-y-6">
-                <!-- Token Name -->
+            <!-- Token Name -->
                 <div>
                     <label for="name" class="block text-sm font-medium text-gray-700">{{ __('Token Name') }}</label>
                     <div class="mt-1 relative rounded-full shadow-sm">
@@ -27,8 +27,8 @@ $tokenTypes = [
                                class="block w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm"
                                placeholder="Enter a descriptive name for your token">
                     </div>
-                    <x-input-error for="name" class="mt-2" />
-                </div>
+                <x-input-error for="name" class="mt-2" />
+            </div>
 
                 <!-- Token Type Selection -->
                 <div>
@@ -54,13 +54,13 @@ $tokenTypes = [
                     </div>
                 </div>
 
-                <!-- Token Permissions -->
-                @if (Laravel\Jetstream\Jetstream::hasPermissions())
+            <!-- Token Permissions -->
+            @if (Laravel\Jetstream\Jetstream::hasPermissions())
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-3">{{ __('Permissions') }}</label>
                         <div class="bg-gray-50 rounded-2xl p-4">
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                @foreach (Laravel\Jetstream\Jetstream::$permissions as $permission)
+                        @foreach (Laravel\Jetstream\Jetstream::$permissions as $permission)
                                     <label class="inline-flex items-center">
                                         <div class="relative flex items-start">
                                             <div class="flex items-center h-5">
@@ -96,9 +96,9 @@ $tokenTypes = [
             </div>
 
             <div class="mt-6 flex justify-end">
-                <x-action-message class="me-3" on="created">
-                    {{ __('Created.') }}
-                </x-action-message>
+            <x-action-message class="me-3" on="created">
+                {{ __('Created.') }}
+            </x-action-message>
 
                 <button type="submit"
                         class="inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-full shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
@@ -119,7 +119,7 @@ $tokenTypes = [
 
             <div class="px-6 py-4">
                 <div class="divide-y divide-gray-100">
-                    @foreach ($this->user->tokens->sortBy('name') as $token)
+                        @foreach ($this->user->tokens->sortBy('name') as $token)
                         <div class="py-4 flex items-center justify-between">
                             <div class="flex items-center min-w-0">
                                 <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
@@ -131,16 +131,16 @@ $tokenTypes = [
                                         @if($token->last_used_at)
                                             <span class="text-xs text-gray-500">
                                                 <i class="fas fa-clock mr-1"></i>
-                                                {{ __('Last used') }} {{ $token->last_used_at->diffForHumans() }}
+                                            {{ __('Last used') }} {{ $token->last_used_at->diffForHumans() }}
                                             </span>
-                                        @endif
-                                        @if (Laravel\Jetstream\Jetstream::hasPermissions())
+                                    @endif
+                                    @if (Laravel\Jetstream\Jetstream::hasPermissions())
                                             <span class="ml-4 text-xs text-blue-600 cursor-pointer hover:text-blue-800"
                                                   wire:click="manageApiTokenPermissions({{ $token->id }})">
                                                 <i class="fas fa-cog mr-1"></i>
-                                                {{ __('Permissions') }}
+                                            {{ __('Permissions') }}
                                             </span>
-                                        @endif
+                                    @endif
                                     </div>
                                 </div>
                             </div>
@@ -153,10 +153,10 @@ $tokenTypes = [
                                         wire:click="confirmApiTokenDeletion({{ $token->id }})">
                                     <i class="fas fa-trash"></i>
                                 </button>
+                                </div>
                             </div>
-                        </div>
-                    @endforeach
-                </div>
+                        @endforeach
+                    </div>
             </div>
         </div>
     @endif
@@ -173,13 +173,13 @@ $tokenTypes = [
         <x-slot name="content">
             <div class="space-y-4">
                 <div class="bg-blue-50 text-blue-700 p-4 rounded-2xl text-sm">
-                    {{ __('Please copy your new API token. For your security, it won\'t be shown again.') }}
-                </div>
+                {{ __('Please copy your new API token. For your security, it won\'t be shown again.') }}
+            </div>
 
                 <div class="relative">
-                    <x-input x-ref="plaintextToken" type="text" readonly :value="$plainTextToken"
+            <x-input x-ref="plaintextToken" type="text" readonly :value="$plainTextToken"
                             class="font-mono text-sm pr-24 bg-gray-50"
-                            autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                             @showing-token-modal.window="setTimeout(() => $refs.plaintextToken.select(), 250)" />
 
                     <button class="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 text-sm text-blue-600 hover:text-blue-800"
@@ -213,14 +213,14 @@ $tokenTypes = [
         <x-slot name="title">
             <div class="flex items-center">
                 <i class="fas fa-shield-alt text-blue-500 mr-2"></i>
-                {{ __('API Token Permissions') }}
+            {{ __('API Token Permissions') }}
             </div>
         </x-slot>
 
         <x-slot name="content">
             <div class="bg-gray-50 rounded-2xl p-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    @foreach (Laravel\Jetstream\Jetstream::$permissions as $permission)
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                @foreach (Laravel\Jetstream\Jetstream::$permissions as $permission)
                         <label class="inline-flex items-center">
                             <div class="relative flex items-start">
                                 <div class="flex items-center h-5">
@@ -231,8 +231,8 @@ $tokenTypes = [
                                     <span class="text-sm text-gray-700">{{ $permission }}</span>
                                 </div>
                             </div>
-                        </label>
-                    @endforeach
+                    </label>
+                @endforeach
                 </div>
             </div>
         </x-slot>
@@ -241,7 +241,7 @@ $tokenTypes = [
             <div class="flex justify-end space-x-3">
                 <button wire:click="$set('managingApiTokenPermissions', false)"
                         class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-full text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    {{ __('Cancel') }}
+                {{ __('Cancel') }}
                 </button>
 
                 <button wire:click="updateApiToken"
@@ -257,7 +257,7 @@ $tokenTypes = [
         <x-slot name="title">
             <div class="flex items-center">
                 <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
-                {{ __('Delete API Token') }}
+            {{ __('Delete API Token') }}
             </div>
         </x-slot>
 
@@ -271,7 +271,7 @@ $tokenTypes = [
             <div class="flex justify-end space-x-3">
                 <button wire:click="$toggle('confirmingApiTokenDeletion')"
                         class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-full text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    {{ __('Cancel') }}
+                {{ __('Cancel') }}
                 </button>
 
                 <button wire:click="deleteApiToken"

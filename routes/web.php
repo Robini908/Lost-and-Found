@@ -26,7 +26,7 @@ use App\Http\Controllers\DashboardController;
 
 Route::post('/chatbot', [ChatbotController::class, 'handle']);
 Route::get('/create-assistant', [OpenAIAssistantController::class, 'createAssistant']);
-Route::get('/lost-items/{id}', [LostItemController::class, 'show'])->name('lost-items.show');
+Route::get('/lost-items/{hashedId}', [LostItemController::class, 'show'])->name('lost-items.show');
 Route::post('/send-sms', [TwilioController::class, 'sendSMS']);
 Route::post('/send-whatsapp', [TwilioController::class, 'sendWhatsAppMessage']);
 Route::post('/twilio/webhook', [TwilioWebhookController::class, 'handleIncomingMessage']);
@@ -80,6 +80,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return view('products.report-item');
     })->name('report-lost-item');
 
+    Route::get('/lost-items/{id}', [LostItemController::class, 'show'])
+        ->name('lost-items.show');
     Route::get('/lost-items/{id}/details', [LostItemController::class, 'details'])
         ->name('lost-items.details');
 });

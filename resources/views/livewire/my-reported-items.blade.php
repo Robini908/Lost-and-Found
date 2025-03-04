@@ -45,67 +45,101 @@
             <!-- Items Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @forelse($items as $item)
-                    <div class="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
-                        <div class="aspect-w-16 aspect-h-9 rounded-t-lg overflow-hidden">
-                            @if($item->images->count() > 0)
-                                <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
-                                     alt="{{ $item->title }}"
-                                     class="w-full h-full object-cover">
-                            @else
-                                <div class="w-full h-full bg-gray-100 flex items-center justify-center">
-                                    <i class="fas fa-image text-gray-400 text-4xl"></i>
-                                </div>
-                            @endif
-                        </div>
-                        <div class="p-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-lg font-medium text-gray-900">{{ $item->title }}</h3>
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    {{ $item->status === 'lost' ? 'bg-red-100 text-red-800' : '' }}
-                                    {{ $item->status === 'found' ? 'bg-green-100 text-green-800' : '' }}
-                                    {{ $item->status === 'claimed' ? 'bg-yellow-100 text-yellow-800' : '' }}
-                                    {{ $item->status === 'returned' ? 'bg-blue-100 text-blue-800' : '' }}">
-                                    {{ ucfirst($item->status) }}
-                                </span>
+                    <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden group">
+                        <!-- Image Container -->
+                        <div class="relative aspect-[4/3] bg-gray-100 overflow-hidden">
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                @if($item->images->count() > 0)
+                                    <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
+                                         alt="{{ $item->title }}"
+                                         class="w-full h-full object-contain">
+                                    @if($item->images->count() > 1)
+                                        <div class="absolute top-2 right-2">
+                                            <span class="px-2 py-1 text-xs font-medium text-white bg-black/50 rounded-full backdrop-blur-sm">
+                                                <i class="fas fa-images mr-1"></i>
+                                                {{ $item->images->count() }}
+                                            </span>
+                                        </div>
+                                    @endif
+                                @else
+                                    <div class="text-center">
+                                        <i class="fas fa-image text-gray-400 text-4xl mb-2"></i>
+                                        <p class="text-sm text-gray-400">No image available</p>
+                                    </div>
+                                @endif
                             </div>
-                            <p class="text-sm text-gray-500 mb-4">{{ Str::limit($item->description, 100) }}</p>
-                            <div class="flex items-center justify-between">
-                                <div class="text-sm text-gray-500">
+                            <!-- Hover Overlay -->
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                <div class="absolute bottom-0 left-0 right-0 p-4">
+                                    <div class="flex items-center space-x-2">
+                                        <button type="button"
+                                            wire:click="editItem({{ $item->id }})"
+                                            class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-white/90 backdrop-blur-sm text-sm font-medium rounded-lg text-gray-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
+                                            <i class="fas fa-edit mr-2"></i>
+                                            Edit
+                                        </button>
+                                        @if($item->status === 'lost')
+                                            <button type="button"
+                                                    wire:click="$dispatch('openModal', { component: 'mark-as-found', arguments: { itemId: {{ $item->id }} }})"
+                                                    class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-green-500/90 backdrop-blur-sm text-sm font-medium rounded-lg text-white hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200">
+                                                <i class="fas fa-check-circle mr-2"></i>
+                                                Found
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Content -->
+                        <div class="p-5">
+                            <div class="flex items-start justify-between mb-3">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-1 line-clamp-1">
+                                        {{ $item->title }}
+                                    </h3>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                        {{ $item->status === 'lost' ? 'bg-red-100 text-red-800' : '' }}
+                                        {{ $item->status === 'found' ? 'bg-green-100 text-green-800' : '' }}
+                                        {{ $item->status === 'claimed' ? 'bg-yellow-100 text-yellow-800' : '' }}
+                                        {{ $item->status === 'returned' ? 'bg-blue-100 text-blue-800' : '' }}">
+                                        <i class="fas fa-circle text-[8px] mr-1.5"></i>
+                                        {{ ucfirst($item->status) }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <p class="text-sm text-gray-600 line-clamp-2 mb-4">
+                                {{ $item->description }}
+                            </p>
+
+                            <div class="flex items-center justify-between text-sm">
+                                <div class="flex items-center text-gray-500">
+                                    <i class="fas fa-calendar-alt mr-1.5 text-gray-400"></i>
                                     {{ $item->created_at->format('M d, Y') }}
                                 </div>
-                                <div class="space-x-2">
-                                    <button type="button"
-                                        wire:click="editItem({{ $item->id }})"
-                                        class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                        <i class="fas fa-edit mr-1.5"></i>
-                                        Edit
-                                    </button>
-                                    @if($item->status === 'lost')
-                                        <button type="button"
-                                                wire:click="$dispatch('openModal', { component: 'mark-as-found', arguments: { itemId: {{ $item->id }} }})"
-                                                class="inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                                            <i class="fas fa-check-circle mr-1.5"></i>
-                                            Found
-                                        </button>
-                                    @endif
+                                <div class="flex items-center text-gray-500">
+                                    <i class="fas fa-map-marker-alt mr-1.5 text-gray-400"></i>
+                                    {{ Str::limit($item->location_type === 'map' ? $item->location_address : $item->area, 20) }}
                                 </div>
                             </div>
                         </div>
                     </div>
                 @empty
                     <div class="col-span-full">
-                        <div class="text-center py-12 bg-white rounded-lg shadow">
-                            <i class="fas fa-box-open text-gray-400 text-5xl mb-4"></i>
-                            <h3 class="text-lg font-medium text-gray-900">No items found</h3>
-                            <p class="mt-1 text-sm text-gray-500">
+                        <div class="flex flex-col items-center justify-center py-12 bg-white rounded-xl shadow-sm text-center">
+                            <div class="w-20 h-20 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+                                <i class="fas fa-box-open text-blue-500 text-3xl"></i>
+                            </div>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No items found</h3>
+                            <p class="text-sm text-gray-500 mb-6">
                                 You haven't reported any items yet.
                             </p>
-                            <div class="mt-6">
-                                <a href="{{ route('products.report-item') }}" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                                    <i class="fas fa-plus mr-2"></i>
-                                    Report an Item
-                                </a>
-                            </div>
+                            <a href="{{ route('products.report-item') }}"
+                               class="inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-full text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
+                                <i class="fas fa-plus mr-2"></i>
+                                Report an Item
+                            </a>
                         </div>
                     </div>
                 @endforelse

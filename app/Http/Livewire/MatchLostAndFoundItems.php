@@ -7,35 +7,21 @@ use App\Services\ItemMatchingService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
-use WireUi\Traits\Actions;
 
 class MatchLostAndFoundItems extends Component
 {
-    use Actions;
-
     public $isLoading = false;
     public $showAnalysisModal = false;
     public $progress = 0;
     public $loadingMessage = '';
     public $matches = [];
     public $showMatches = false;
-    public $unmatchedItems;
 
     protected $itemMatchingService;
 
-    public function mount()
+    public function __construct(ItemMatchingService $itemMatchingService)
     {
-        $this->unmatchedItems = collect();
-        $this->fetchUnmatchedItems();
-    }
-
-    public function fetchUnmatchedItems()
-    {
-        $user = Auth::user();
-        $this->unmatchedItems = LostItem::where('user_id', $user->id)
-            ->whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])
-            ->with(['images', 'category'])
-            ->get();
+        $this->itemMatchingService = $itemMatchingService;
     }
 
     public function findMatches()
@@ -49,13 +35,15 @@ class MatchLostAndFoundItems extends Component
             Log::info('Starting match finding process in Livewire component');
             $user = Auth::user();
 
-            if ($this->unmatchedItems->isEmpty()) {
-                $this->notification()->error(
-                    'No Items Found',
-                    'You don\'t have any reported or searched items to match.'
-                );
-                return;
-            }
+            // Get reported/searched items for the current user
+            $reportedItems = LostItem::where('user_id', $user->id)
+                ->whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])
+                ->with(['images', 'category'])
+                ->get();
+
+            Log::info('Found reported items', ['count' => $reportedItems->count()]);
+            $this->progress = 20;
+            $this->loadingMessage = 'Found ' . $reportedItems->count() . ' of your reported items...';
 
             // Get found items from other users
             $foundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)
@@ -63,28 +51,16 @@ class MatchLostAndFoundItems extends Component
                 ->with(['images', 'category', 'user'])
                 ->get();
 
-            if ($foundItems->isEmpty()) {
-                $this->notification()->info(
-                    'No Found Items',
-                    'There are currently no found items to match against. Please check back later.'
-                );
-                return;
-            }
-
-            Log::info('Found potential matching items', [
-                'unmatched_items' => $this->unmatchedItems->count(),
-                'found_items' => $foundItems->count()
-            ]);
-
+            Log::info('Found potential matching items', ['count' => $foundItems->count()]);
             $this->progress = 40;
             $this->loadingMessage = 'Analyzing ' . $foundItems->count() . ' potential matches...';
 
             // Use the ItemMatchingService to find matches
-            $matches = $this->itemMatchingService->findMatches($this->unmatchedItems, $foundItems);
+            $matches = $this->itemMatchingService->findMatches($reportedItems, $foundItems);
             $this->progress = 80;
             $this->loadingMessage = 'Processing match results...';
 
-            Log::info('Processing matches', ['count' => count($matches)]);
+            Log::info('Processing matches', ['count' => $matches->count()]);
 
             // Transform matches into the required format
             $this->matches = $matches->map(function ($match) {
@@ -140,15 +116,21 @@ class MatchLostAndFoundItems extends Component
             $this->progress = 100;
 
             if (count($this->matches) > 0) {
-                $this->notification()->success(
-                    'Matches Found!',
-                    'Found ' . count($this->matches) . ' potential matches! We\'ve included matches with 40% or higher similarity.'
-                );
+                $this->dispatch('notify', [
+                    'type' => 'success',
+                    'message' => 'Found ' . count($this->matches) . ' potential matches! We\'ve included matches with 40% or higher similarity.'
+                ]);
+                toast()
+                    ->success('Found ' . count($this->matches) . ' potential matches!')
+                    ->push();
             } else {
-                $this->notification()->info(
-                    'No Matches Found',
-                    'No matches found yet. We\'ll keep looking for items with 40% or higher similarity!'
-                );
+                $this->dispatch('notify', [
+                    'type' => 'info',
+                    'message' => 'No matches found yet. We\'ll keep looking for items with 40% or higher similarity!'
+                ]);
+                toast()
+                    ->info('No matches found yet. Keep checking back!')
+                    ->push();
             }
 
             Log::info('Match finding process completed', [
@@ -159,30 +141,16 @@ class MatchLostAndFoundItems extends Component
             Log::error('Error in findMatches: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
-
-            $this->notification()->error(
-                'Error',
-                'An error occurred while finding matches: ' . $e->getMessage()
-            );
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'An error occurred while finding matches.'
+            ]);
+            toast()
+                ->danger('An error occurred while finding matches: ' . $e->getMessage())
+                ->push();
         } finally {
             $this->isLoading = false;
             $this->showAnalysisModal = false;
         }
-    }
-
-    public function refreshMatches()
-    {
-        $this->reset(['matches', 'showMatches']);
-        $this->fetchUnmatchedItems();
-        $this->findMatches();
-    }
-
-    public function render()
-    {
-        return view('livewire.match-lost-and-found-items', [
-            'unmatchedItems' => $this->unmatchedItems,
-            'matches' => collect($this->matches),
-            'hasUnmatchedItems' => $this->unmatchedItems->isNotEmpty(),
-        ]);
     }
 }

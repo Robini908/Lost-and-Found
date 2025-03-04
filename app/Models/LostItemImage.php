@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class LostItemImage extends Model
 {
@@ -14,12 +16,18 @@ class LostItemImage extends Model
         'image_path'
     ];
 
-    protected $casts = [];
+    protected $appends = ['url'];
+
+    protected $casts = [
+        'lost_item_id' => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime'
+    ];
 
     /**
      * Get the lost item that owns the image.
      */
-    public function lostItem()
+    public function lostItem(): BelongsTo
     {
         return $this->belongsTo(LostItem::class);
     }
@@ -27,8 +35,20 @@ class LostItemImage extends Model
     /**
      * Get the full URL for the image
      */
-    public function getUrlAttribute()
+    public function getUrlAttribute(): string
     {
         return asset('storage/' . $this->image_path);
+    }
+
+    /**
+     * Delete the image file from storage when the model is deleted
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function ($image) {
+            Storage::disk('public')->delete($image->image_path);
+        });
     }
 }

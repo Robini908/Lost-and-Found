@@ -5,11 +5,19 @@ namespace App\Observers;
 use App\Models\LostItem;
 use App\Models\Setting;
 use App\Models\RewardHistory;
+use App\Services\ImageProcessingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class LostItemObserver
 {
+    protected $imageProcessor;
+
+    public function __construct(ImageProcessingService $imageProcessor)
+    {
+        $this->imageProcessor = $imageProcessor;
+    }
+
     /**
      * Handle the LostItem "created" event.
      */
@@ -20,6 +28,30 @@ class LostItemObserver
             'item_type' => $lostItem->item_type,
             'user_id' => $lostItem->user_id
         ]);
+
+        // Process images if they exist
+        if ($lostItem->images->isNotEmpty()) {
+            foreach ($lostItem->images as $image) {
+                try {
+                    $this->imageProcessor->processImage($image->image_path, [
+                        'max_width' => config('image.dimensions.max_width'),
+                        'max_height' => config('image.dimensions.max_height'),
+                        'quality' => config('image.quality.jpeg'),
+                    ]);
+
+                    Log::info('Image processed successfully', [
+                        'image_id' => $image->id,
+                        'path' => $image->image_path
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error('Failed to process image: ' . $e->getMessage(), [
+                        'image_id' => $image->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                }
+            }
+        }
 
         // Only award points for found items
         if ($lostItem->item_type !== 'found') {

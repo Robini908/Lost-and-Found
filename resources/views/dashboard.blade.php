@@ -191,7 +191,7 @@
                                         <div class="flex flex-col sm:flex-row gap-6">
                                             <!-- Item Image -->
                                             <div class="flex-shrink-0">
-                                                <a href="{{ route('lost-items.show', $item) }}" class="block">
+                                                <a href="{{ route('lost-items.show', $item->hashed_id) }}" class="block">
                                             @if($item->images->isNotEmpty())
                                                 <img src="{{ Storage::url($item->images->first()->image_path) }}"
                                                      alt="{{ $item->title }}"
@@ -206,7 +206,7 @@
 
                                             <!-- Item Details -->
                                             <div class="flex-1 min-w-0">
-                                                <a href="{{ route('lost-items.show', $item) }}" class="block group-hover:text-blue-600 transition-colors">
+                                                <a href="{{ route('lost-items.show', $item->hashed_id) }}" class="block group-hover:text-blue-600 transition-colors">
                                                     <h4 class="text-lg font-semibold text-gray-900 mb-2 pr-20">
                                                     {{ $item->title }}
                                                 </h4>

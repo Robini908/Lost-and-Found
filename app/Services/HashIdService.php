@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Hashids\Hashids;
+use Illuminate\Support\Facades\Log;
 
 class HashIdService
 {
@@ -10,22 +11,40 @@ class HashIdService
 
     public function __construct()
     {
-        // Use a long, random salt and minimum length for security
         $this->hashids = new Hashids(
-            config('app.key'),
-            16,
-            'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'
+            config('hashids.salt'),
+            config('hashids.min_length'),
+            config('hashids.alphabet')
         );
     }
 
     public function encode($id): string
     {
-        return $this->hashids->encode($id);
+        if (!$id) {
+            Log::error('Attempting to encode null or empty ID');
+            return '';
+        }
+
+        $encoded = $this->hashids->encode($id);
+        Log::info("HashIdService: Encoding ID {$id} to {$encoded}");
+        return $encoded;
     }
 
     public function decode($hash): ?int
     {
+        if (!$hash) {
+            Log::error('Attempting to decode null or empty hash');
+            return null;
+        }
+
         $decoded = $this->hashids->decode($hash);
-        return $decoded[0] ?? null;
+        Log::info("HashIdService: Decoding hash {$hash} to " . json_encode($decoded));
+
+        if (empty($decoded)) {
+            Log::warning("HashIdService: Failed to decode hash {$hash}");
+            return null;
+        }
+
+        return $decoded[0];
     }
 }

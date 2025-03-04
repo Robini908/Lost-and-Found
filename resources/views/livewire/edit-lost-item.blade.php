@@ -200,48 +200,79 @@
                 </div>
 
                 <!-- Images Section -->
-                <div class="p-6 space-y-6">
-                    <h3 class="text-lg font-medium text-gray-900">Images</h3>
+                <div class="p-6 space-y-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-medium text-gray-900 flex items-center">
+                            <i class="fas fa-images text-blue-600 mr-2"></i>
+                            Images
+                            <span class="ml-2 text-sm text-gray-500">(Upload clear, high-quality photos)</span>
+                        </h3>
+                        @if(count($existingImages) > 0)
+                            <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                <i class="fas fa-photo-film mr-1.5"></i>
+                                {{ count($existingImages) }} photos
+                            </span>
+                        @endif
+                    </div>
 
                     <!-- Existing Images -->
                     @if(count($existingImages) > 0)
-                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
                             @foreach($existingImages as $image)
-                                <div class="relative group">
-                                    <img src="{{ asset('storage/' . $image['image_path']) }}"
-                                         alt="Item image"
-                                         class="w-full h-32 object-cover rounded-lg shadow-sm">
-                                    <button type="button"
-                                            wire:click="removeExistingImage({{ $image['id'] }})"
-                                            class="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                        </svg>
-                                    </button>
+                                <div class="group relative aspect-[4/3] bg-gray-100 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+                                    <div class="absolute inset-0 flex items-center justify-center">
+                                        <img src="{{ asset('storage/' . $image['image_path']) }}"
+                                             alt="Item image"
+                                             class="w-full h-full object-contain">
+                                    </div>
+                                    <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                        <div class="absolute bottom-0 left-0 right-0 p-3">
+                                            <button type="button"
+                                                    wire:click="removeExistingImage({{ $image['id'] }})"
+                                                    class="w-full bg-red-500 text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center">
+                                                <i class="fas fa-trash-alt mr-1.5"></i>
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             @endforeach
                         </div>
                     @endif
 
                     <!-- New Images Upload -->
-                    <div class="mt-4">
-                        <x-label for="images" value="Add New Images" />
-                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
-                            <div class="space-y-1 text-center">
-                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                                <div class="flex text-sm text-gray-600">
-                                    <label for="images" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                                        <span>Upload new images</span>
-                                        <input id="images" wire:model="images" type="file" class="sr-only" multiple accept="image/*">
-                                    </label>
-                                    <p class="pl-1">or drag and drop</p>
+                    <div class="mt-6">
+                        <div class="flex items-center justify-center w-full">
+                            <label for="images" class="relative w-full h-48 flex flex-col items-center justify-center px-4 py-6 bg-gray-50 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer hover:bg-gray-100 transition-all duration-300">
+                                <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <i class="fas fa-cloud-upload-alt text-4xl text-blue-500 mb-3"></i>
+                                    <p class="mb-2 text-sm text-gray-700 font-medium">
+                                        <span class="text-blue-600">Click to upload</span> or drag and drop
+                                    </p>
+                                    <p class="text-xs text-gray-500">
+                                        PNG, JPG, GIF up to 5MB
+                                    </p>
                                 </div>
-                                <p class="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
-                            </div>
+                                <input id="images" wire:model="images" type="file" class="hidden" multiple accept="image/*">
+                            </label>
                         </div>
-                        <x-input-error for="images.*" class="mt-2" />
+                        @error('images.*')
+                            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <!-- Upload Tips -->
+                    <div class="mt-4 bg-blue-50 rounded-lg p-4">
+                        <h4 class="text-sm font-medium text-blue-800 mb-2 flex items-center">
+                            <i class="fas fa-lightbulb text-blue-600 mr-2"></i>
+                            Tips for better images:
+                        </h4>
+                        <ul class="text-sm text-blue-700 space-y-1 ml-6 list-disc">
+                            <li>Use good lighting to capture clear details</li>
+                            <li>Include multiple angles of the item</li>
+                            <li>Ensure the item is in focus</li>
+                            <li>Add close-up shots of any identifying marks</li>
+                        </ul>
                     </div>
                 </div>
 

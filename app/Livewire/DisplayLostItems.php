@@ -29,6 +29,7 @@ class DisplayLostItems extends Component
     public $showModal = false;
     public $showMapView = false;
     public $showAdvancedFilters = false;
+    public $activeImageIndex = 0; // Track active image in gallery
 
     // Advanced Filters
     public $priceRange = '';
@@ -69,7 +70,6 @@ class DisplayLostItems extends Component
 
     protected function initializeMapCenter()
     {
-        // Set default map center - you can customize this based on your needs
         $this->mapCenter = [
             'lat' => config('services.google.maps_default_lat', 0),
             'lng' => config('services.google.maps_default_lng', 0)
@@ -90,15 +90,20 @@ class DisplayLostItems extends Component
 
     public function loadMapMarkers()
     {
-        $items = $this->getFilteredQuery()->get();
+        $items = $this->getFilteredQuery()
+            ->with('images')
+            ->get();
+
         $this->markers = $items->map(function ($item) {
+            $firstImage = $item->images->first();
             return [
                 'id' => $item->id,
                 'lat' => (float) $item->location_lat,
                 'lng' => (float) $item->location_lng,
                 'title' => $item->title,
                 'status' => $item->status,
-                'image' => $item->images->first() ? asset('storage/' . $item->images->first()->image_path) : null
+                'image' => $firstImage ? $firstImage->url : null,
+                'imageCount' => $item->images->count()
             ];
         })->toArray();
     }
@@ -106,13 +111,36 @@ class DisplayLostItems extends Component
     public function viewDetails($itemId)
     {
         $this->selectedItem = LostItem::with(['images', 'category', 'user'])->find($itemId);
+        $this->activeImageIndex = 0;
         $this->showModal = true;
+    }
+
+    public function nextImage()
+    {
+        if ($this->selectedItem && $this->selectedItem->images->count() > 0) {
+            $this->activeImageIndex = ($this->activeImageIndex + 1) % $this->selectedItem->images->count();
+        }
+    }
+
+    public function previousImage()
+    {
+        if ($this->selectedItem && $this->selectedItem->images->count() > 0) {
+            $this->activeImageIndex = ($this->activeImageIndex - 1 + $this->selectedItem->images->count()) % $this->selectedItem->images->count();
+        }
+    }
+
+    public function setActiveImage($index)
+    {
+        if ($this->selectedItem && $index >= 0 && $index < $this->selectedItem->images->count()) {
+            $this->activeImageIndex = $index;
+        }
     }
 
     public function closeModal()
     {
         $this->showModal = false;
         $this->selectedItem = null;
+        $this->activeImageIndex = 0;
     }
 
     public function toggleAdvancedFilters()
@@ -137,16 +165,19 @@ class DisplayLostItems extends Component
     public function getMapMarkers()
     {
         return $this->getFilteredQuery()
+            ->with('images')
             ->whereNotNull(['location_lat', 'location_lng'])
             ->get()
             ->map(function ($item) {
+                $firstImage = $item->images->first();
                 return [
                     'id' => $item->id,
                     'title' => $item->title,
                     'lat' => $item->location_lat,
                     'lng' => $item->location_lng,
                     'status' => $item->status,
-                    'image' => $item->images->first()?->image_path,
+                    'image' => $firstImage ? $firstImage->url : null,
+                    'imageCount' => $item->images->count()
                 ];
             });
     }
@@ -242,59 +273,53 @@ class DisplayLostItems extends Component
 
     protected function getFilteredQuery()
     {
-        $query = LostItem::query()
-            ->with(['images', 'category', 'user']);
-
-        if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('title', 'like', '%' . $this->search . '%')
-                    ->orWhere('description', 'like', '%' . $this->search . '%');
-            });
-        }
-
-        if ($this->status) {
-            $query->where('status', $this->status);
-        }
-
-        if ($this->category) {
-            $query->where('category_id', $this->category);
-        }
-
-        if ($this->condition) {
-            $query->where('condition', $this->condition);
-        }
-
-        if ($this->brand) {
-            $query->where('brand', 'like', '%' . $this->brand . '%');
-        }
-
-        if ($this->color) {
-            $query->where('color', 'like', '%' . $this->color . '%');
-        }
-
-        if ($this->location && $this->radius) {
-            // Implement location-based filtering here
-            // You might want to use a geographic search package or custom logic
-        }
-
-        if ($this->dateRange) {
-            $dates = explode(' to ', $this->dateRange);
-            if (count($dates) === 2) {
-                $query->whereBetween('created_at', [$dates[0], $dates[1]]);
-            }
-        }
-
-        return $query->latest();
+        return LostItem::query()
+            ->with(['images', 'category', 'user'])
+            ->when($this->search, function ($q) {
+                $q->where(function ($query) {
+                    $query->where('title', 'like', '%' . $this->search . '%')
+                        ->orWhere('description', 'like', '%' . $this->search . '%');
+                });
+            })
+            ->when($this->status, fn($q) => $q->where('status', $this->status))
+            ->when($this->category, fn($q) => $q->where('category_id', $this->category))
+            ->when($this->condition, fn($q) => $q->where('condition', $this->condition))
+            ->when($this->brand, fn($q) => $q->where('brand', 'like', '%' . $this->brand . '%'))
+            ->when($this->color, fn($q) => $q->where('color', 'like', '%' . $this->color . '%'))
+            ->when($this->dateRange, function ($q) {
+                $dates = explode(' to ', $this->dateRange);
+                if (count($dates) === 2) {
+                    $q->whereBetween('created_at', [$dates[0], $dates[1]]);
+                }
+            })
+            ->when($this->location && $this->radius, function ($q) {
+                // Location-based filtering logic here
+            })
+            ->orderBy($this->sortField, $this->sortDirection);
     }
 
     public function render()
     {
-        $items = $this->getFilteredQuery()->paginate(12);
-        $categories = Category::all();
+        $query = $this->getFilteredQuery();
+
+        // Cache the results for better performance
+        $cacheKey = 'lost_items_' . md5(json_encode([
+            $this->search,
+            $this->status,
+            $this->category,
+            $this->dateRange,
+            $this->sortField,
+            $this->sortDirection,
+            $this->page ?? 1
+        ]));
+
+        $items = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($query) {
+            return $query->paginate($this->perPage);
+        });
 
         return view('livewire.display-lost-items', [
             'items' => $items,
-            'categories' => $categories,
+            'categories' => $this->categories,
             'totalSelected' => count($this->selectedItems)
         ]);
     }
