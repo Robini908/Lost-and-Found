@@ -4,8 +4,70 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d7a5b8d6e29d57b269a75a29cdb47e7c",
+    "content-hash": "f119fcd3b96016de3e4bc758c4e500c3",
     "packages": [
+        {
+            "name": "asantibanez/livewire-charts",
+            "version": "v4.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/asantibanez/livewire-charts.git",
+                "reference": "35324eace3c45112935eba7ccca3087fa52deb48"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/asantibanez/livewire-charts/zipball/35324eace3c45112935eba7ccca3087fa52deb48",
+                "reference": "35324eace3c45112935eba7ccca3087fa52deb48",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/support": "^7.0|^8.0|^9.0|^10.0|^11.0",
+                "livewire/livewire": "^3.0",
+                "php": "^7.2|^7.3|^7.4|^8.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^5.0|^6.0|^7.0|^8.0|^9.0",
+                "phpunit/phpunit": "^8.0|^9.5.10|^10.5"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "LivewireCharts": "Asantibanez\\LivewireCharts\\LivewireChartsFacade"
+                    },
+                    "providers": [
+                        "Asantibanez\\LivewireCharts\\LivewireChartsServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Asantibanez\\LivewireCharts\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Andrés Santibáñez",
+                    "email": "santibanez.andres@gmail.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Livewire Charts",
+            "homepage": "https://github.com/asantibanez/livewire-charts",
+            "keywords": [
+                "asantibanez",
+                "livewire-charts"
+            ],
+            "support": {
+                "issues": "https://github.com/asantibanez/livewire-charts/issues",
+                "source": "https://github.com/asantibanez/livewire-charts/tree/v4.1.0"
+            },
+            "time": "2024-08-22T19:42:07+00:00"
+        },
         {
             "name": "bacon/bacon-qr-code",
             "version": "2.0.8",
@@ -1585,6 +1647,75 @@
             "time": "2025-02-03T10:55:03+00:00"
         },
         {
+            "name": "hashids/hashids",
+            "version": "5.0.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/vinkla/hashids.git",
+                "reference": "197171016b77ddf14e259e186559152eb3f8cf33"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/vinkla/hashids/zipball/197171016b77ddf14e259e186559152eb3f8cf33",
+                "reference": "197171016b77ddf14e259e186559152eb3f8cf33",
+                "shasum": ""
+            },
+            "require": {
+                "ext-mbstring": "*",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^10.0"
+            },
+            "suggest": {
+                "ext-bcmath": "Required to use BC Math arbitrary precision mathematics (*).",
+                "ext-gmp": "Required to use GNU multiple precision mathematics (*)."
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "5.0-dev"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Hashids\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ivan Akimov",
+                    "email": "ivan@barreleye.com"
+                },
+                {
+                    "name": "Vincent Klaiber",
+                    "email": "hello@doubledip.se"
+                }
+            ],
+            "description": "Generate short, unique, non-sequential ids (like YouTube and Bitly) from numbers",
+            "homepage": "https://hashids.org/php",
+            "keywords": [
+                "bitly",
+                "decode",
+                "encode",
+                "hash",
+                "hashid",
+                "hashids",
+                "ids",
+                "obfuscate",
+                "youtube"
+            ],
+            "support": {
+                "issues": "https://github.com/vinkla/hashids/issues",
+                "source": "https://github.com/vinkla/hashids/tree/5.0.2"
+            },
+            "time": "2023-02-23T15:00:54+00:00"
+        },
+        {
             "name": "intervention/gif",
             "version": "4.2.1",
             "source": {
@@ -3093,16 +3224,16 @@
         },
         {
             "name": "livewire/livewire",
-            "version": "v3.5.20",
+            "version": "v3.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/livewire/livewire.git",
-                "reference": "509f2258c51741f6d06deb65d4437654520694e6"
+                "reference": "4c66b569cb729ba9b2f4a3c4e79f50fd8f2b71d1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/livewire/livewire/zipball/509f2258c51741f6d06deb65d4437654520694e6",
-                "reference": "509f2258c51741f6d06deb65d4437654520694e6",
+                "url": "https://api.github.com/repos/livewire/livewire/zipball/4c66b569cb729ba9b2f4a3c4e79f50fd8f2b71d1",
+                "reference": "4c66b569cb729ba9b2f4a3c4e79f50fd8f2b71d1",
                 "shasum": ""
             },
             "require": {
@@ -3157,7 +3288,7 @@
             "description": "A front-end framework for Laravel.",
             "support": {
                 "issues": "https://github.com/livewire/livewire/issues",
-                "source": "https://github.com/livewire/livewire/tree/v3.5.20"
+                "source": "https://github.com/livewire/livewire/tree/v3.6.0"
             },
             "funding": [
                 {
@@ -3165,7 +3296,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2025-02-13T21:05:24+00:00"
+            "time": "2025-02-26T00:57:32+00:00"
         },
         {
             "name": "milon/barcode",
@@ -6080,6 +6211,69 @@
             "time": "2021-02-08T20:43:55+00:00"
         },
         {
+            "name": "sopamo/laravel-filepond",
+            "version": "v1.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Sopamo/laravel-filepond.git",
+                "reference": "fe184c3016346d64e7139f64d9c72f029131ae9f"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/Sopamo/laravel-filepond/zipball/fe184c3016346d64e7139f64d9c72f029131ae9f",
+                "reference": "fe184c3016346d64e7139f64d9c72f029131ae9f",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/contracts": "5.5.*|5.6.*|5.7.*|5.8.*|^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0",
+                "illuminate/http": "5.5.*|5.6.*|5.7.*|5.8.*|^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0",
+                "illuminate/routing": "5.5.*|5.6.*|5.7.*|5.8.*|^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0",
+                "illuminate/support": "5.5.*|5.6.*|5.7.*|5.8.*|^6.0|^7.0|^8.0|^9.0|^10.0|^11.0|^12.0",
+                "php": "^7.0|^8.0"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^7.5|^8.0|^9.0|^10.0",
+                "phpunit/phpunit": "^9.5|^10.5|^11.5.3"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Sopamo\\LaravelFilepond\\LaravelFilepondServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Sopamo\\LaravelFilepond\\": "src/",
+                    "Sopamo\\LaravelFilepond\\Tests\\": "tests/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Paul Mohr",
+                    "email": "p.mohr@sopamo.de"
+                }
+            ],
+            "description": "Laravel backend module for filepond uploads",
+            "keywords": [
+                "filepond",
+                "image",
+                "laravel",
+                "php",
+                "upload"
+            ],
+            "support": {
+                "issues": "https://github.com/Sopamo/laravel-filepond/issues",
+                "source": "https://github.com/Sopamo/laravel-filepond/tree/v1.5.0"
+            },
+            "time": "2025-02-16T19:37:36+00:00"
+        },
+        {
             "name": "spatie/image-optimizer",
             "version": "1.8.0",
             "source": {
@@ -6133,6 +6327,97 @@
                 "source": "https://github.com/spatie/image-optimizer/tree/1.8.0"
             },
             "time": "2024-11-04T08:24:54+00:00"
+        },
+        {
+            "name": "spatie/laravel-activitylog",
+            "version": "4.10.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/spatie/laravel-activitylog.git",
+                "reference": "466f30f7245fe3a6e328ad5e6812bd43b4bddea5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/spatie/laravel-activitylog/zipball/466f30f7245fe3a6e328ad5e6812bd43b4bddea5",
+                "reference": "466f30f7245fe3a6e328ad5e6812bd43b4bddea5",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/config": "^8.0 || ^9.0 || ^10.0 || ^11.0 || ^12.0",
+                "illuminate/database": "^8.69 || ^9.27 || ^10.0 || ^11.0 || ^12.0",
+                "illuminate/support": "^8.0 || ^9.0 || ^10.0 || ^11.0 || ^12.0",
+                "php": "^8.1",
+                "spatie/laravel-package-tools": "^1.6.3"
+            },
+            "require-dev": {
+                "ext-json": "*",
+                "orchestra/testbench": "^6.23 || ^7.0 || ^8.0 || ^9.0 || ^10.0",
+                "pestphp/pest": "^1.20 || ^2.0 || ^3.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Spatie\\Activitylog\\ActivitylogServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
+                "psr-4": {
+                    "Spatie\\Activitylog\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Freek Van der Herten",
+                    "email": "freek@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Sebastian De Deyne",
+                    "email": "sebastian@spatie.be",
+                    "homepage": "https://spatie.be",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Tom Witkowski",
+                    "email": "dev.gummibeer@gmail.com",
+                    "homepage": "https://gummibeer.de",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A very simple activity logger to monitor the users of your website or application",
+            "homepage": "https://github.com/spatie/activitylog",
+            "keywords": [
+                "activity",
+                "laravel",
+                "log",
+                "spatie",
+                "user"
+            ],
+            "support": {
+                "issues": "https://github.com/spatie/laravel-activitylog/issues",
+                "source": "https://github.com/spatie/laravel-activitylog/tree/4.10.1"
+            },
+            "funding": [
+                {
+                    "url": "https://spatie.be/open-source/support-us",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/spatie",
+                    "type": "github"
+                }
+            ],
+            "time": "2025-02-10T15:38:25+00:00"
         },
         {
             "name": "spatie/laravel-csp",

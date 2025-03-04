@@ -15,7 +15,12 @@ class LostItemController extends Controller
      */
     public function show($id)
     {
-        $item = LostItem::with('images', 'user')->findOrFail($id);
+        $item = LostItem::findOrFail($id);
+
+        if (!app('role-permission')->canViewItemDetails(auth()->user(), $item)) {
+            abort(403, 'Unauthorized action.');
+        }
+
         return view('lost-items.show', compact('item'));
     }
 
@@ -23,5 +28,17 @@ class LostItemController extends Controller
     {
         $item = LostItem::with(['images', 'user'])->findOrFail($id);
         return view('lost-items.details', compact('item'));
+    }
+
+    public function destroy($id)
+    {
+        $item = LostItem::findOrFail($id);
+
+        if (!app('role-permission')->canDeleteItem(auth()->user(), $item)) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $item->delete();
+        return redirect()->route('products.view-items')->with('success', 'Item deleted successfully');
     }
 }

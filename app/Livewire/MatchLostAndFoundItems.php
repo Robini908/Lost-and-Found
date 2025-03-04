@@ -15,6 +15,7 @@ use App\Mail\ContactItemFounder;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use App\Models\ItemClaim;
 
 class MatchLostAndFoundItems extends Component
 {
@@ -103,9 +104,10 @@ class MatchLostAndFoundItems extends Component
     {
         $user = Auth::user();
         $this->unmatchedItems = LostItem::where('user_id', $user->id)
-            ->whereIn('item_type', ['reported', 'searched'])
-            ->whereNull('matched_found_item_id')
+            ->whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])
+            ->whereNull('matched_found_item_id')  // Only get items that haven't been matched
             ->with(['images', 'category'])
+            ->orderBy('created_at', 'desc')
             ->get();
     }
 
@@ -113,15 +115,33 @@ class MatchLostAndFoundItems extends Component
     {
         $user = Auth::user();
         $this->matches = LostItem::where('user_id', $user->id)
-            ->whereIn('item_type', ['reported', 'searched'])
-            ->whereNotNull('matched_found_item_id') // Only get matched items
+            ->whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])
+            ->whereNotNull('matched_found_item_id')  // Only get matched items
             ->with(['images', 'category', 'matchedFoundItem.user', 'matchedFoundItem.images'])
+            ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($item) {
                 return [
                     'reported_item' => $item,
                     'found_item' => $item->matchedFoundItem,
-                    'similarity_score' => $this->calculateSimilarityScore($item, $item->matchedFoundItem)
+                    'similarity_score' => $this->calculateSimilarityScore($item, $item->matchedFoundItem),
+                    'match_details' => [
+                        'location_match' => [
+                            'reported' => $item->location_type === 'map' ? $item->location_address : $item->area,
+                            'found' => $item->matchedFoundItem->location_type === 'map' ?
+                                $item->matchedFoundItem->location_address : $item->matchedFoundItem->area
+                        ],
+                        'date_match' => [
+                            'reported' => $item->date_lost?->format('Y-m-d'),
+                            'found' => $item->matchedFoundItem->date_found?->format('Y-m-d')
+                        ],
+                        'attributes_match' => [
+                            'brand' => $item->brand === $item->matchedFoundItem->brand,
+                            'model' => $item->model === $item->matchedFoundItem->model,
+                            'color' => $item->color === $item->matchedFoundItem->color,
+                            'serial_number' => $item->serial_number === $item->matchedFoundItem->serial_number
+                        ]
+                    ]
                 ];
             })->toArray();
     }
@@ -164,35 +184,131 @@ class MatchLostAndFoundItems extends Component
         $this->showAnalysisModal = true;
         $this->progress = 0;
         $this->showMatches = false;
+        $this->loadingMessage = $this->messages[0];
 
         try {
+            Log::info('Starting match finding process in Livewire component');
             $user = Auth::user();
+
+            // Get reported/searched items for the current user that haven't been matched yet
             $reportedItems = LostItem::where('user_id', $user->id)
-                ->whereIn('item_type', ['reported', 'searched'])
+                ->whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])
+                ->whereNull('matched_found_item_id')
                 ->with(['images', 'category'])
                 ->get();
 
-            $foundItems = LostItem::where('item_type', 'found')
+            Log::info('Found reported items', ['count' => $reportedItems->count()]);
+            $this->progress = 20;
+            $this->loadingMessage = $this->messages[1];
+
+            // Get found items from other users that haven't been claimed
+            $foundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)
                 ->where('user_id', '!=', $user->id)
+                ->whereNull('claimed_by')
+                ->whereNull('matched_found_item_id')
                 ->with(['images', 'category', 'user'])
                 ->get();
 
-            $this->matches = $this->itemMatchingService->findMatches($reportedItems, $foundItems);
+            Log::info('Found potential matching items', ['count' => $foundItems->count()]);
+            $this->progress = 40;
+            $this->loadingMessage = $this->messages[2];
 
-            // Update timestamp and hash after successful match
+            // Use the ItemMatchingService to find matches
+            $matches = $this->itemMatchingService->findMatches($reportedItems, $foundItems);
+            $this->progress = 80;
+            $this->loadingMessage = $this->messages[4];
+
+            Log::info('Processing matches', ['count' => $matches->count()]);
+
+            // Transform matches into the required format with detailed information
+            $this->matches = $matches->map(function ($match) {
+                // Save the match to the database
+                try {
+                    \App\Models\PotentialMatch::updateOrCreate(
+                        [
+                            'lost_item_id' => $match['reported_item']->id,
+                            'found_item_id' => $match['found_item']->id,
+                        ],
+                        [
+                            'similarity_score' => $match['similarity_score'],
+                            'match_details' => $match['match_details'],
+                            'is_viewed' => false
+                        ]
+                    );
+                } catch (\Exception $e) {
+                    Log::error('Error saving potential match', [
+                        'error' => $e->getMessage(),
+                        'lost_item_id' => $match['reported_item']->id,
+                        'found_item_id' => $match['found_item']->id
+                    ]);
+                }
+
+                return [
+                    'reported_item' => $match['reported_item'],
+                    'found_item' => $match['found_item'],
+                    'similarity_score' => $match['similarity_score'],
+                    'match_details' => array_merge($match['match_details'], [
+                        'location_match' => [
+                            'reported' => $match['reported_item']->location_type === 'map'
+                                ? $match['reported_item']->location_address
+                                : $match['reported_item']->area,
+                            'found' => $match['found_item']->location_type === 'map'
+                                ? $match['found_item']->location_address
+                                : $match['found_item']->area,
+                        ],
+                        'date_match' => [
+                            'reported' => $match['reported_item']->date_lost?->format('Y-m-d'),
+                            'found' => $match['found_item']->date_found?->format('Y-m-d'),
+                        ],
+                        'attributes_match' => [
+                            'brand' => $match['reported_item']->brand === $match['found_item']->brand,
+                            'model' => $match['reported_item']->model === $match['found_item']->model,
+                            'color' => $match['reported_item']->color === $match['found_item']->color,
+                            'serial_number' => $match['reported_item']->serial_number === $match['found_item']->serial_number,
+                        ]
+                    ])
+                ];
+            })->toArray();
+
+            // Update timestamp and hash
             $this->lastUpdateTimestamp = now();
             $this->lastItemsHash = $this->calculateItemsHash();
             $this->showMatches = true;
+            $this->progress = 100;
 
             if (count($this->matches) > 0) {
-                toast()->success('We found ' . count($this->matches) . ' potential matches!');
+                $this->dispatch('notify', [
+                    'type' => 'success',
+                    'message' => 'Found ' . count($this->matches) . ' potential matches!'
+                ]);
+                toast()
+                    ->success('Found ' . count($this->matches) . ' potential matches!')
+                    ->push();
             } else {
-                toast()->info('No matches found at this time.');
+                $this->dispatch('notify', [
+                    'type' => 'info',
+                    'message' => 'No matches found at this time. We\'ll keep looking!'
+                ]);
+                toast()
+                    ->info('No matches found at this time. We\'ll keep looking!')
+                    ->push();
             }
 
+            Log::info('Match finding process completed', [
+                'matches_found' => count($this->matches)
+            ]);
+
         } catch (\Exception $e) {
-            toast()->danger('An error occurred while matching items: ' . $e->getMessage());
-            logger()->error('Item matching error: ' . $e->getMessage());
+            Log::error('Error in findMatches: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'An error occurred while finding matches.'
+            ]);
+            toast()
+                ->danger('An error occurred while finding matches: ' . $e->getMessage())
+                ->push();
         } finally {
             $this->isLoading = false;
             $this->showAnalysisModal = false;
@@ -331,28 +447,27 @@ class MatchLostAndFoundItems extends Component
             $this->selectedMatchIndex = $selectedMatchIndex;
             $match = $this->matches[$selectedMatchIndex];
             $foundItem = $match['found_item'];
-            $founder = User::findOrFail($foundItem->user_id);
+            $founder = User::findOrFail($foundItem['user_id']);
 
             // Prepare email data
             $emailData = [
                 'founderName' => $founder->name,
-                'requesterName' => auth()->user()->name,
-                'requesterEmail' => auth()->user()->email,
-                'itemTitle' => $foundItem->title,
-                'location' => $foundItem->location,
-                'dateFound' => $foundItem->date_found ? $foundItem->date_found->format('F j, Y') : 'Not specified',
+                'requesterName' => Auth::user()->name,
+                'requesterEmail' => Auth::user()->email,
+                'itemTitle' => $foundItem['title'],
+                'location' => $foundItem['location_address'] ?? $foundItem['area'] ?? 'Location not specified',
+                'dateFound' => isset($foundItem['date_found']) ? Carbon::parse($foundItem['date_found'])->format('F j, Y') : 'Not specified',
                 'similarityScore' => $match['similarity_score'],
             ];
 
             // Send confirmation email to founder
             Mail::to($founder->email)->queue(new ContactItemFounder($emailData));
 
-            // Show success message
             toast()->success('Confirmation email sent to the finder.');
             $this->showContactModal = false;
 
         } catch (\Exception $e) {
-            Log::error('Error sending confirmation email: ' . $e->getMessage());
+            logger()->error('Error sending confirmation email: ' . $e->getMessage());
             toast()->danger('Unable to send confirmation email. Please try again later.');
         }
     }
@@ -368,23 +483,27 @@ class MatchLostAndFoundItems extends Component
             $reportedItem = $this->claimDetails['reported_item'];
             $foundItem = $this->claimDetails['found_item'];
 
-            // Update the items
-            $reportedItem->update([
-                'status' => 'claimed',
-                'claimed_by' => Auth::id()
-            ]);
-
-            $foundItem->update([
-                'status' => 'claimed'
+            // Create a new claim
+            $claim = ItemClaim::create([
+                'user_id' => Auth::id(),
+                'lost_item_id' => $reportedItem->id,
+                'found_item_id' => $foundItem->id,
+                'status' => 'pending',
+                'claim_details' => [
+                    'similarity_score' => $this->claimDetails['similarity_score'],
+                    'reported_date' => $reportedItem->date_lost,
+                    'found_date' => $foundItem->date_found
+                ]
             ]);
 
             $this->showClaimModal = false;
-            toast()->success('Item claimed successfully! The founder has been notified.');
+            toast()->success('Claim submitted successfully!');
 
-            // Refresh the matches
-            $this->loadMatches();
+            // Redirect to the claim verification page
+            return redirect()->route('claims.verify', ['claimId' => $claim->id]);
+
         } catch (\Exception $e) {
-            toast()->danger('Failed to claim item: ' . $e->getMessage());
+            toast()->danger('Failed to submit claim: ' . $e->getMessage());
         }
     }
 

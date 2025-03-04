@@ -15,12 +15,11 @@ class Activity extends Model
         'type',
         'description',
         'link',
-        'item_id',
-        'metadata'
+        'data'
     ];
 
     protected $casts = [
-        'metadata' => 'array',
+        'data' => 'array'
     ];
 
     /**

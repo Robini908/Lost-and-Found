@@ -26,7 +26,20 @@
                             </h4>
                             <p class="mt-1 text-sm text-gray-500 truncate">{{ $item['description'] }}</p>
                             <div class="mt-2 flex items-center space-x-2">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $item['item_type'] === 'lost' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700' }}">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    @switch($item['item_type'])
+                                        @case('reported')
+                                            bg-red-50 text-red-700
+                                            @break
+                                        @case('searched')
+                                            bg-blue-50 text-blue-700
+                                            @break
+                                        @case('found')
+                                            bg-green-50 text-green-700
+                                            @break
+                                        @default
+                                            bg-gray-50 text-gray-700
+                                    @endswitch">
                                     {{ ucfirst($item['item_type']) }}
                                 </span>
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">

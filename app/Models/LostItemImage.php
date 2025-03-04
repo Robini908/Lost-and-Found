@@ -11,12 +11,24 @@ class LostItemImage extends Model
 
     protected $fillable = [
         'lost_item_id',
-        'image_path',
+        'image_path'
     ];
 
-    // Relationship to LostItem model
+    protected $casts = [];
+
+    /**
+     * Get the lost item that owns the image.
+     */
     public function lostItem()
     {
         return $this->belongsTo(LostItem::class);
+    }
+
+    /**
+     * Get the full URL for the image
+     */
+    public function getUrlAttribute()
+    {
+        return asset('storage/' . $this->image_path);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Livewire;
 use Livewire\Component;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use App\Facades\RolePermission;
 
 class ManageUserTypes extends Component
 {
@@ -23,6 +24,10 @@ class ManageUserTypes extends Component
 
     public function mount()
     {
+        if (!RolePermission::canManageContent(auth()->user(), 'roles', 'view')) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $this->roles = Role::all();
         $this->permissions = Permission::all();
     }
@@ -64,6 +69,16 @@ class ManageUserTypes extends Component
     public function deleteRole($roleId)
     {
         $role = Role::findOrFail($roleId);
+
+        // Prevent deletion of higher priority roles
+        if (!RolePermission::hasHigherOrEqualPriority(
+            RolePermission::getHighestRole(auth()->user()),
+            $role->name
+        )) {
+            $this->addError('role', 'You cannot delete a higher-ranking role.');
+            return;
+        }
+
         $role->delete();
         $this->roles = Role::all();
     }

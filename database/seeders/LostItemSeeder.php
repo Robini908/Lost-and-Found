@@ -41,67 +41,118 @@ class LostItemSeeder extends Seeder
      */
     public function run()
     {
-        // Ensure you have some users and categories in the database
+        // Get users and categories
         $users = User::all();
         $categories = Category::all();
 
-        // Create sample lost items
-        for ($i = 0; $i < 10; $i++) {
-            $lostItem = LostItem::firstOrCreate([
+        // Create sample reported items (user reporting their own lost items)
+        for ($i = 0; $i < 5; $i++) {
+            $lat = $this->faker->latitude;
+            $lng = $this->faker->longitude;
+
+            LostItem::create([
+                'user_id' => $users->random()->id,
                 'title' => $this->faker->sentence,
                 'description' => $this->faker->paragraph,
-                'location' => $this->faker->address,
-            ], [
-                'user_id' => $users->random()->id,
                 'category_id' => $categories->random()->id,
                 'status' => 'lost',
+                'item_type' => LostItem::TYPE_REPORTED,
+                'condition' => $this->faker->randomElement(['new', 'like_new', 'excellent', 'good', 'fair', 'poor', 'damaged']),
+                'brand' => $this->faker->company,
+                'model' => $this->faker->word,
+                'color' => $this->faker->safeColorName,
+                'serial_number' => $this->faker->bothify('??-####-####'),
+                'estimated_value' => $this->faker->randomFloat(2, 10, 1000),
+                'currency' => 'USD',
+                'location_type' => $this->faker->randomElement(['specific', 'area']),
+                'location_address' => $this->faker->address,
+                'location_lat' => $lat,
+                'location_lng' => $lng,
+                'area' => $this->faker->optional()->city,
+                'landmarks' => $this->faker->optional()->sentence,
                 'date_lost' => Carbon::now()->subDays(rand(1, 30)),
-                'date_found' => null,
-                'found_by' => null,
-                'claimed_by' => null,
-                'condition' => $this->faker->randomElement(['good', 'fair', 'poor']),
-                'value' => rand(10, 1000),
-                'item_type' => $this->faker->randomElement(['found', 'reported', 'searched']),
-                'is_anonymous' => rand(0, 1),
-                'is_verified' => rand(0, 1),
-                'expiry_date' => Carbon::now()->addDays(rand(1, 30)),
-                'geolocation' => ['lat' => rand(-90, 90), 'lng' => rand(-180, 180)],
-                'matched_found_item_id' => null,
-            ]);
-
-            // Create images for each lost item using the factory
-            LostItemImage::factory()->count(rand(1, 3))->create([
-                'lost_item_id' => $lostItem->id,
+                'is_anonymous' => $this->faker->boolean(20),
+                'is_verified' => $this->faker->boolean(20),
+                'expires_at' => Carbon::now()->addDays(30),
+                'additional_details' => json_encode([
+                    'distinguishing_marks' => $this->faker->optional()->sentence,
+                    'last_seen' => $this->faker->dateTimeThisMonth()->format('Y-m-d H:i:s'),
+                ])
             ]);
         }
 
-        // Optionally, create some found items
-        for ($i = 0; $i < 5; $i++) {
-            $foundItem = LostItem::firstOrCreate([
+        // Create sample searched items (user searching for someone else's lost items)
+        for ($i = 0; $i < 3; $i++) {
+            $lat = $this->faker->latitude;
+            $lng = $this->faker->longitude;
+
+            LostItem::create([
+                'user_id' => $users->random()->id,
                 'title' => $this->faker->sentence,
                 'description' => $this->faker->paragraph,
-                'location' => $this->faker->address,
-            ], [
-                'user_id' => $users->random()->id,
+                'category_id' => $categories->random()->id,
+                'status' => 'lost',
+                'item_type' => LostItem::TYPE_SEARCHED,
+                'condition' => $this->faker->randomElement(['new', 'like_new', 'excellent', 'good', 'fair', 'poor', 'damaged']),
+                'brand' => $this->faker->optional()->company,
+                'model' => $this->faker->optional()->word,
+                'color' => $this->faker->safeColorName,
+                'estimated_value' => $this->faker->optional()->randomFloat(2, 10, 1000),
+                'currency' => 'USD',
+                'location_type' => $this->faker->randomElement(['specific', 'area']),
+                'location_address' => $this->faker->address,
+                'location_lat' => $lat,
+                'location_lng' => $lng,
+                'area' => $this->faker->optional()->city,
+                'landmarks' => $this->faker->optional()->sentence,
+                'date_lost' => Carbon::now()->subDays(rand(1, 30)),
+                'is_anonymous' => $this->faker->boolean(20),
+                'is_verified' => $this->faker->boolean(20),
+                'expires_at' => Carbon::now()->addDays(30),
+                'additional_details' => json_encode([
+                    'owner_description' => $this->faker->sentence,
+                    'last_known_location' => $this->faker->sentence,
+                ])
+            ]);
+        }
+
+        // Create sample found items
+        for ($i = 0; $i < 4; $i++) {
+            $lat = $this->faker->latitude;
+            $lng = $this->faker->longitude;
+            $finder = $users->random();
+
+            LostItem::create([
+                'user_id' => $finder->id,
+                'title' => $this->faker->sentence,
+                'description' => $this->faker->paragraph,
                 'category_id' => $categories->random()->id,
                 'status' => 'found',
-                'date_lost' => null,
+                'item_type' => LostItem::TYPE_FOUND,
+                'condition' => $this->faker->randomElement(['new', 'like_new', 'excellent', 'good', 'fair', 'poor', 'damaged']),
+                'brand' => $this->faker->optional()->company,
+                'model' => $this->faker->optional()->word,
+                'color' => $this->faker->safeColorName,
+                'serial_number' => $this->faker->optional()->bothify('??-####-####'),
+                'estimated_value' => $this->faker->optional()->randomFloat(2, 10, 1000),
+                'currency' => 'USD',
+                'location_type' => $this->faker->randomElement(['specific', 'area']),
+                'location_address' => $this->faker->address,
+                'location_lat' => $lat,
+                'location_lng' => $lng,
+                'area' => $this->faker->optional()->city,
+                'landmarks' => $this->faker->optional()->sentence,
                 'date_found' => Carbon::now()->subDays(rand(1, 30)),
-                'found_by' => $users->random()->id,
-                'claimed_by' => null,
-                'condition' => $this->faker->randomElement(['good', 'fair', 'poor']),
-                'value' => rand(10, 1000),
-                'item_type' => $this->faker->randomElement(['found', 'reported', 'searched']),
-                'is_anonymous' => rand(0, 1),
-                'is_verified' => rand(0, 1),
-                'expiry_date' => Carbon::now()->addDays(rand(1, 30)),
-                'geolocation' => ['lat' => rand(-90, 90), 'lng' => rand(-180, 180)],
-                'matched_found_item_id' => null,
-            ]);
-
-            // Create images for each found item using the factory
-            LostItemImage::factory()->count(rand(1, 3))->create([
-                'lost_item_id' => $foundItem->id,
+                'found_by' => $finder->id,
+                'found_at' => Carbon::now()->subDays(rand(1, 30)),
+                'is_anonymous' => $this->faker->boolean(20),
+                'is_verified' => $this->faker->boolean(80),
+                'expires_at' => Carbon::now()->addDays(30),
+                'additional_details' => json_encode([
+                    'found_location_details' => $this->faker->sentence,
+                    'storage_location' => $this->faker->word,
+                    'condition_details' => $this->faker->optional()->sentence,
+                ])
             ]);
         }
     }

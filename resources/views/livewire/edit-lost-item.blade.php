@@ -1,273 +1,299 @@
-<div>
-    <!-- Table View -->
-    @if (!$editingItem)
-        <div class="bg-gray-100 shadow-sm rounded-lg p-3 mb-2">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Items you reported to have lost') }}
+<div class="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12">
+    <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+        <!-- Header Section -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900">
+                Edit Item Details
             </h2>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead>
-                        <tr>
-                            <th
-                                class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Title
-                            </th>
-                            <th
-                                class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Location
-                            </th>
-                            <th
-                                class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Date Lost
-                            </th>
-                            <th
-                                class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Actions
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-gray-100 divide-y divide-gray-200">
-                        @foreach ($userItems as $item)
-                            <tr class="{{ $item->user_id === Auth::id() ? 'bg-blue-100' : '' }}">
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {{ $item->title }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {{ $item->location }}
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    <div class="text-sm text-gray-600 mb-1">
-                                        <span class="font-semibold">
-                                            {{ $item->date_lost ? $item->date_lost->format('F j, Y') : 'Not provided' }}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <button wire:click="loadItem({{ $item->id }})"
-                                        class="text-blue-500 hover:text-blue-700" data-tippy-content="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    @if (auth()->user()->hasRole('admin') || auth()->user()->hasRole('superadmin') || $item->user_id === Auth::id())
-                                        <button wire:click="confirmDelete({{ $item->id }})"
-                                            class="text-red-500 hover:text-red-700" data-tippy-content="Delete">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    @endif
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+            <p class="mt-1 text-sm text-gray-600">
+                Update the information for your {{ $status }} item
+            </p>
         </div>
-    @endif
 
-    <!-- Edit Form -->
-    @if ($editingItem)
-        <div class="bg-gray-100  shadow-sm rounded-lg p-4 mb-6">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Edit Lost Item') }}
-            </h2>
-            <form wire:submit.prevent="saveItem">
-                <!-- Two Grid Layout -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <!-- Left Grid: Form Fields -->
-                    <div class="space-y-6">
-                        <!-- Group 1: Basic Details -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Title -->
-                            <div>
-                                <x-label for="title" value="Title" />
-                                <x-input wire:model="title" id="title" class="mt-1 block w-full" />
-                                <x-input-error for="title" class="mt-2" />
-                            </div>
-
-                            <!-- Location -->
-                            <div>
-                                <x-label for="location" value="Location" />
-                                <x-input wire:model="location" id="location" class="mt-1 block w-full" />
-                                <x-input-error for="location" class="mt-2" />
-                            </div>
-                        </div>
-
-                        <!-- Date Lost -->
-                        <div>
-                            <!-- Display the Retrieved Date -->
-                            <div class="text-sm text-gray-600 mb-1">
-
-                                <span class="font-semibold">
-                                    {{ $date_lost ? \Carbon\Carbon::parse($date_lost)->format('F j, Y') : 'Not provided' }}
-                                </span>
-                            </div>
-                            <!-- Date Input Field -->
-                            <div>
-                                <x-label for="date_lost" value="Date Lost" />
-                                <x-input wire:model="date_lost" type="date" id="date_lost"
-                                    class="mt-1 block w-full" />
-                                <x-input-error for="date_lost" class="mt-2" />
-                            </div>
-                        </div>
-
-                        <!-- Group 2: Category and Condition -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Category -->
-                            <div>
-                                <x-label for="category_id" value="Category" />
-                                <x-select wire:model.live="category_id" id="category_id" class="mt-1 block w-full">
-                                    <option value="">Select Category</option>
-                                    @foreach ($categories as $category)
-                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
-                                    @endforeach
-                                </x-select>
-                                <x-input-error for="category_id" class="mt-2" />
-                            </div>
-
-                            <!-- Condition -->
-                            <div>
-                                <!-- Display Retrieved Condition -->
-                                <div class="mb-2">
-                                    <span class="text-sm text-gray-600">Current Condition:
-                                        <strong>{{ $condition }}</strong></span>
-                                </div>
-
-                                <!-- Condition Field -->
-                                <div>
-                                    <x-label for="condition" value="Condition" />
-                                    <div class="relative">
-                                        <!-- Dropdown -->
-                                        <x-select wire:model="condition" id="condition" class="mt-1 block w-full pr-10">
-                                            <option value="New">New</option>
-                                            <option value="Used">Used</option>
-                                            <option value="Damaged">Damaged</option>
-                                            <option value="Other">Other (Type Below)</option>
-                                        </x-select>
-                                        <!-- Input for Custom Value -->
-                                        @if ($condition === 'Other')
-                                            <x-input wire:model="condition" id="custom_condition"
-                                                class="mt-2 block w-full" placeholder="Enter custom condition" />
-                                        @endif
-                                    </div>
-                                    <x-input-error for="condition" class="mt-2" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Value -->
-                        <div>
-                            <x-label for="value" value="Value" />
-                            <x-input wire:model="value" type="number" id="value" class="mt-1 block w-full" />
-                            <x-input-error for="value" class="mt-2" />
-                        </div>
-
-                        <!-- Is Anonymous -->
-                        <div>
-                            <x-label for="is_anonymous" value="Is Anonymous?" />
-                            <x-checkbox wire:model="is_anonymous" id="is_anonymous" class="mt-1" />
-                            <x-input-error for="is_anonymous" class="mt-2" />
-                        </div>
-
-                        <!-- Description (Full Width) -->
-                        <div>
-                            <x-label for="description" value="Description" />
-                            <x-textarea wire:model="description" id="description" class="mt-1 block w-full"
-                                rows="4" />
-                            <x-input-error for="description" class="mt-2" />
-                        </div>
+        <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg">
+            <form wire:submit="submit" class="divide-y divide-gray-200">
+                <!-- Basic Information Section -->
+                <div class="p-6 space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-medium text-gray-900">Basic Information</h3>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {{ $status === 'lost' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800' }}">
+                            {{ ucfirst($status) }} Item
+                        </span>
                     </div>
 
-
-                    <!-- Right Grid: Images -->
                     <div class="space-y-6">
-                        <!-- Image Upload and Management -->
+                        <!-- Title -->
                         <div>
-                            <x-label for="images" value="Images"
-                                class="block text-sm font-medium text-gray-700 mb-2" />
-
-                            <!-- Image Grid -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-2 gap-4">
-                                <!-- Existing Images -->
-                                <!-- Existing Images -->
-                                @foreach ($existingImages as $image)
-                                    <div
-                                        class="relative group overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
-                                        <img src="{{ asset('storage/' . $image->image_path) }}" alt="Lost Item Image"
-                                            class="w-full h-32 object-cover rounded-lg transform transition-transform duration-300 group-hover:scale-105">
-                                        <!-- Delete Button (for existing images only) -->
-                                        <button type="button" wire:click.prevent="deleteImage({{ $image->id }})"
-                                            class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-black bg-opacity-50 text-white p-2 rounded-lg transition-opacity duration-300"
-                                            data-tippy-content="Delete Image">
-                                            <i class="fas fa-trash-alt text-lg"></i>
-                                        </button>
-                                    </div>
-                                @endforeach
-
-                                <!-- New Image Upload -->
-                                @foreach ($images as $image)
-                                    <div
-                                        class="relative group overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
-                                        <img src="{{ $image->temporaryUrl() }}" alt="New Image"
-                                            class="w-full h-32 object-cover rounded-lg transform transition-transform duration-300 group-hover:scale-105">
-                                    </div>
-                                @endforeach
+                            <label for="title" class="block text-sm font-medium text-gray-700">Title</label>
+                            <div class="mt-1">
+                                <input type="text" wire:model="title" id="title"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    placeholder="Brief title of the item">
                             </div>
+                            @error('title')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
 
-                            <!-- FilePond Upload Area -->
-                            <div wire:ignore class="mt-4">
-                                <x-filepond::upload wire:model="images" id="images" max-files="5" />
+                        <!-- Description -->
+                        <div>
+                            <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                            <div class="mt-1">
+                                <textarea wire:model="description" id="description" rows="4"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    placeholder="Detailed description of the item"></textarea>
+                            </div>
+                            @error('description')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Category -->
+                        <div>
+                            <label for="category_id" class="block text-sm font-medium text-gray-700">Category</label>
+                            <div class="mt-1">
+                                <select wire:model="category_id" id="category_id"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">Select a category</option>
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}">{{ $category->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @error('category_id')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Brand -->
+                        <div>
+                            <label for="brand" class="block text-sm font-medium text-gray-700">Brand</label>
+                            <div class="mt-1">
+                                <input type="text" wire:model="brand" id="brand"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    placeholder="Brand name (if applicable)">
+                            </div>
+                            @error('brand')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Color -->
+                        <div>
+                            <label for="color" class="block text-sm font-medium text-gray-700">Color</label>
+                            <div class="mt-1">
+                                <input type="text" wire:model="color" id="color"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    placeholder="Primary color of the item">
+                            </div>
+                            @error('color')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Condition -->
+                        <div>
+                            <label for="condition" class="block text-sm font-medium text-gray-700">Condition</label>
+                            <div class="mt-1">
+                                <select wire:model="condition" id="condition"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">Select condition</option>
+                                    <option value="new">New</option>
+                                    <option value="like_new">Like New</option>
+                                    <option value="excellent">Excellent</option>
+                                    <option value="good">Good</option>
+                                    <option value="fair">Fair</option>
+                                    <option value="poor">Poor</option>
+                                    <option value="damaged">Damaged</option>
+                                </select>
+                            </div>
+                            @error('condition')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Date -->
+                        <div>
+                            <label for="date" class="block text-sm font-medium text-gray-700">
+                                {{ $status === 'lost' ? 'Date Lost' : 'Date Found' }}
+                            </label>
+                            <div class="mt-1">
+                                <input type="date" wire:model="date" id="date"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            </div>
+                            @error('date')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Additional Notes -->
+                        <div>
+                            <label for="notes" class="block text-sm font-medium text-gray-700">Additional Notes</label>
+                            <div class="mt-1">
+                                <textarea wire:model="notes" id="notes" rows="3"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                    placeholder="Any additional details that might help identify the item"></textarea>
+                            </div>
+                            @error('notes')
+                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <!-- Anonymous Reporting -->
+                        <div class="relative flex items-start">
+                            <div class="flex items-center h-5">
+                                <input wire:model="is_anonymous" id="is_anonymous" type="checkbox"
+                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                            </div>
+                            <div class="ml-3 text-sm">
+                                <label for="is_anonymous" class="font-medium text-gray-700">Report Anonymously</label>
+                                <p class="text-gray-500">Your identity will not be shown publicly</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Save and Cancel Buttons -->
-                <div class="flex justify-end space-x-4 mt-6">
-                    <button type="button" wire:click="cancelEdit"
-                        class="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors duration-300"
-                        data-tippy-content="Cancel">
-                        Cancel
-                    </button>
+                <!-- Location Section -->
+                <div class="p-6 space-y-6">
+                    <h3 class="text-lg font-medium text-gray-900">Location Information</h3>
+
+                    <div class="space-y-6">
+                        <!-- Location Type -->
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center">
+                                <input type="radio" wire:model="locationType" value="specific" class="form-radio h-4 w-4 text-blue-600">
+                                <span class="ml-2">Specific Location</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" wire:model="locationType" value="area" class="form-radio h-4 w-4 text-blue-600">
+                                <span class="ml-2">General Area</span>
+                            </label>
+                        </div>
+
+                        @if($locationType === 'specific')
+                            <div class="space-y-4">
+                                <x-map-selector
+                                    wire:model.live="location_address"
+                                    :lat="$location_lat"
+                                    :lng="$location_lng"
+                                    class="w-full h-64 rounded-lg shadow-sm"
+                                />
+                                <x-input-error for="location_address" class="mt-2" />
+                                <x-input-error for="location_lat" class="mt-2" />
+                                <x-input-error for="location_lng" class="mt-2" />
+                            </div>
+                        @else
+                            <div>
+                                <x-label for="area" value="Area Description" />
+                                <x-textarea wire:model="area" class="mt-1 block w-full" rows="2" placeholder="Describe the general area..." />
+                                <x-input-error for="area" class="mt-2" />
+                            </div>
+                        @endif
+
+                        <!-- Landmarks -->
+                        <div>
+                            <x-label for="landmarks" value="Nearby Landmarks" />
+                            <x-textarea wire:model="landmarks" class="mt-1 block w-full" rows="2" placeholder="Describe any nearby landmarks..." />
+                            <x-input-error for="landmarks" class="mt-2" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Images Section -->
+                <div class="p-6 space-y-6">
+                    <h3 class="text-lg font-medium text-gray-900">Images</h3>
+
+                    <!-- Existing Images -->
+                    @if(count($existingImages) > 0)
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            @foreach($existingImages as $image)
+                                <div class="relative group">
+                                    <img src="{{ asset('storage/' . $image['image_path']) }}"
+                                         alt="Item image"
+                                         class="w-full h-32 object-cover rounded-lg shadow-sm">
+                                    <button type="button"
+                                            wire:click="removeExistingImage({{ $image['id'] }})"
+                                            class="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <!-- New Images Upload -->
+                    <div class="mt-4">
+                        <x-label for="images" value="Add New Images" />
+                        <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+                            <div class="space-y-1 text-center">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                <div class="flex text-sm text-gray-600">
+                                    <label for="images" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                        <span>Upload new images</span>
+                                        <input id="images" wire:model="images" type="file" class="sr-only" multiple accept="image/*">
+                                    </label>
+                                    <p class="pl-1">or drag and drop</p>
+                                </div>
+                                <p class="text-xs text-gray-500">PNG, JPG, GIF up to 5MB</p>
+                            </div>
+                        </div>
+                        <x-input-error for="images.*" class="mt-2" />
+                    </div>
+                </div>
+
+                <!-- Additional Information -->
+                <div class="p-6 space-y-6">
+                    <h3 class="text-lg font-medium text-gray-900">Additional Information</h3>
+
+                    <div class="space-y-6">
+                        <!-- Notes -->
+                        <div>
+                            <x-label for="notes" value="Additional Notes" />
+                            <x-textarea wire:model="notes" class="mt-1 block w-full" rows="3" placeholder="Any additional details that might help identify the item..." />
+                            <x-input-error for="notes" class="mt-2" />
+                        </div>
+
+                        <!-- Anonymous Reporting -->
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                <input wire:model="is_anonymous" type="checkbox" class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded">
+                            </div>
+                            <div class="ml-3 text-sm">
+                                <label for="is_anonymous" class="font-medium text-gray-700">Report Anonymously</label>
+                                <p class="text-gray-500">Your contact information will not be shared with others</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="px-6 py-4 bg-gray-50 flex justify-between items-center">
+                    <div class="flex space-x-3">
+                        <button type="button"
+                                wire:click="cancel"
+                                class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i class="fas fa-arrow-left mr-1.5"></i>
+                            Back
+                        </button>
+                        <button type="button"
+                                wire:click="deleteItem"
+                                wire:confirm="Are you sure you want to delete this item? This action cannot be undone."
+                                class="inline-flex items-center px-4 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                            <i class="fas fa-trash mr-1.5"></i>
+                            Delete
+                        </button>
+                    </div>
                     <button type="submit"
-                        class="bg-green-500 text-white p-2 rounded-full hover:bg-green-600 transition-colors duration-300"
-                        data-tippy-content="Save Changes">
-                        Save
+                            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-save mr-1.5"></i>
+                        Save Changes
                     </button>
                 </div>
             </form>
         </div>
-    @endif
-
-    <x-dialog-modal wire:model.live="confirmingDelete">
-        <x-slot name="title">
-            {{ __('Delete Item') }}
-        </x-slot>
-
-        <x-slot name="content">
-            <div class="space-y-6">
-                <p class="text-gray-700 text-sm leading-relaxed">
-                    {{ __('Are you sure you want to delete this item? This action cannot be undone.') }}
-                </p>
-            </div>
-        </x-slot>
-
-        <x-slot name="footer">
-            <x-secondary-button wire:click="cancelDelete" wire:loading.attr="disabled">
-                {{ __('Cancel') }}
-            </x-secondary-button>
-
-            <x-button class="ms-3 bg-red-600 hover:bg-red-700" wire:click="deleteItem"
-                wire:loading.attr="disabled">
-                {{ __('Delete') }}
-            </x-button>
-        </x-slot>
-    </x-dialog-modal>
+    </div>
 </div>
-
-@script
-    <script>
-        // Open file picker when the "Add New Image" button is clicked
-        Livewire.on('openFilePicker', () => {
-            document.getElementById('images').click();
-        });
-    </script>
-@endscript

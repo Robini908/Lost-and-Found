@@ -2,316 +2,131 @@
 
 namespace App\Livewire;
 
-use Mpdf\Mpdf;
 use Livewire\Component;
-use App\Models\Category;
-use App\Models\LostItem;
 use Livewire\WithPagination;
-use Illuminate\Support\Facades\Log;
+use App\Models\LostItem;
+use App\Models\Category;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Auth;
-use App\Services\ItemMatchingService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
-use Usernotnull\Toast\Concerns\WireToast;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
-use Milon\Barcode\Facades\DNS1DFacade as DNS1D;
 
 class DisplayLostItems extends Component
 {
-    use WithPagination, WireToast;
+    use WithPagination;
 
+    // Filters
     public $search = '';
+    public $status = '';
     public $category = '';
-    public $location = '';
-    public $date_lost = '';
+    public $dateRange = '';
+    public $sortField = 'created_at';
+    public $sortDirection = 'desc';
+    public $perPage = 12;
+    public $view = 'grid';
+    public $categories = [];
+    public $selectedItem = null;
+    public $showModal = false;
+    public $showMapView = false;
+    public $showAdvancedFilters = false;
+
+    // Advanced Filters
+    public $priceRange = '';
     public $condition = '';
-    public $reportedItems = null;
-    public $confirmingDelete = false;
-    public $itemToDelete = null;
-    public $selectedItem = null; // Track the selected item
-    public $filter = 'all'; // Track the filter type
-    public $confirmingDownload = false; // Track download confirmation
-    public $downloadType = ''; // Track the type of download (QR, barcode, PDF)
-    public $previewContent = ''; // Track content for preview modal
-    public $editingItem = false; // Controls the visibility of the modal
-    public $itemToEdit = null; // Stores the item being edited
-    public $step = 1; // Tracks the current step in the modal
-    public $selectedItemId = null; // Track the selected item ID
-    public $isEditing = false; // Track if editing is active
+    public $brand = '';
+    public $color = '';
+    public $location = '';
+    public $radius = '';
+    public $selectedItems = [];
+    public $bulkAction = '';
 
-    public $checks = []; // Track the checks to display in the modal
-
-
-    // Item Properties
-    public $title, $description, $category_id, $value, $is_anonymous;
-    public $itemToClaim = null; // Tracks the item being claimed
-    public $confirmingClaim = false; // Tracks if the claim confirmation modal is open
-    public $similarityScore = 0;
-    public $imageSimilarityScore = 0; // Tracks the image similarity score
-    public $textSimilarityScore = 0; // Tracks the text similarity score
-    public $locationSimilarityScore = 0;
-    public $timeSimilarityScore = 0;
-    public $categorySimilarityScore = 0;
-    public $totalSimilarityScore = 0;
-
-    public $itemToReset = null;
-    public $confirmingResetClaim = false;
-
+    // Map View
+    public $mapCenter = ['lat' => 0, 'lng' => 0];
+    public $mapZoom = 12;
+    public $markers = [];
 
     protected $queryString = [
         'search' => ['except' => ''],
+        'status' => ['except' => ''],
         'category' => ['except' => ''],
-        'location' => ['except' => ''],
-        'date_lost' => ['except' => ''],
+        'dateRange' => ['except' => ''],
+        'sortField' => ['except' => 'created_at'],
+        'sortDirection' => ['except' => 'desc'],
+        'perPage' => ['except' => 12],
+        'view' => ['except' => 'grid'],
         'condition' => ['except' => ''],
-        'filter' => ['except' => 'all']
+        'brand' => ['except' => ''],
+        'color' => ['except' => ''],
+        'location' => ['except' => ''],
+        'radius' => ['except' => ''],
     ];
-    protected $itemMatchingService;
-
-    protected $listeners = ['itemDeleted' => 'refreshList']; // Define listeners here
 
     public function mount()
     {
-        $this->itemMatchingService = app(ItemMatchingService::class);
+        $this->categories = Category::all();
+        $this->initializeMapCenter();
     }
 
-    public function calculateImageSimilarity($userReportedItem, $foundItem)
+    protected function initializeMapCenter()
     {
-        if (!$this->itemMatchingService) {
-            $this->itemMatchingService = app(ItemMatchingService::class);
-        }
-
-        if (!$userReportedItem || !$foundItem ||
-            $userReportedItem->images->isEmpty() ||
-            $foundItem->images->isEmpty()) {
-            return 0;
-        }
-
-        $reportedFeatures = $this->itemMatchingService->extractImageFeatures($userReportedItem->images);
-        $foundFeatures = $this->itemMatchingService->extractImageFeatures($foundItem->images);
-
-        if (empty($reportedFeatures) || empty($foundFeatures)) {
-            return 0;
-        }
-
-        return $this->itemMatchingService->calculateBestImageSimilarity($reportedFeatures, $foundFeatures);
+        // Set default map center - you can customize this based on your needs
+        $this->mapCenter = [
+            'lat' => config('services.google.maps_default_lat', 0),
+            'lng' => config('services.google.maps_default_lng', 0)
+        ];
+        $this->mapZoom = config('services.google.maps_default_zoom', 12);
     }
 
-    public function confirmClaim($itemId)
+    public function toggleView($view)
     {
-        $this->itemToClaim = LostItem::find($itemId);
-
-        // Get the authenticated user's reported items
-        $reportedItems = Cache::remember("user_reported_items_" . Auth::id(), now()->addMinutes(5), function () {
-            return LostItem::where('user_id', Auth::id())
-                ->whereIn('item_type', ['reported', 'searched'])
-                ->with('images')
-                ->get();
-        });
-
-        if ($reportedItems->isEmpty()) {
-            toast()->danger('No reported items found for comparison.')->push();
-            return;
+        $this->view = $view;
+        if ($view === 'map') {
+            $this->showMapView = true;
+            $this->loadMapMarkers();
+        } else {
+            $this->showMapView = false;
         }
-
-        // Calculate similarity scores
-        $this->calculateSimilarityScores($reportedItems->first(), $this->itemToClaim);
-
-        $this->confirmingClaim = true;
     }
 
-    protected function calculateSimilarityScores($reportedItem, $foundItem)
+    public function loadMapMarkers()
     {
-        // Initialize all scores to 0
-        $this->textSimilarityScore = 0;
-        $this->imageSimilarityScore = 0;
-        $this->locationSimilarityScore = 0;
-        $this->timeSimilarityScore = 0;
-        $this->categorySimilarityScore = 0;
-        $this->totalSimilarityScore = 0;
-
-        if (!$reportedItem || !$foundItem || !$this->itemMatchingService) {
-            return;
-        }
-
-        try {
-            // Calculate text similarity
-            $this->textSimilarityScore = $this->itemMatchingService->calculateTextSimilarityWithContext(
-                $reportedItem->title . ' ' . $reportedItem->description,
-                $foundItem->title . ' ' . $foundItem->description
-            );
-
-            // Calculate location similarity
-            $this->locationSimilarityScore = $this->itemMatchingService->calculateLocationSimilarity(
-                $reportedItem->geolocation,
-                $foundItem->geolocation
-            );
-
-            // Calculate time similarity
-            $this->timeSimilarityScore = $this->itemMatchingService->calculateTimeSimilarity(
-                $reportedItem->date_lost,
-                $foundItem->date_found
-            );
-
-            // Calculate category similarity
-            $this->categorySimilarityScore = $reportedItem->category_id === $foundItem->category_id ? 1.0 : 0.0;
-
-            // Calculate image similarity
-            $this->imageSimilarityScore = $this->calculateImageSimilarity($reportedItem, $foundItem);
-
-            // Calculate total similarity score with weighted average
-            $weights = [
-                'text' => 0.35,
-                'image' => 0.25,
-                'category' => 0.15,
-                'location' => 0.15,
-                'time' => 0.10
+        $items = $this->getFilteredQuery()->get();
+        $this->markers = $items->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'lat' => (float) $item->location_lat,
+                'lng' => (float) $item->location_lng,
+                'title' => $item->title,
+                'status' => $item->status,
+                'image' => $item->images->first() ? asset('storage/' . $item->images->first()->image_path) : null
             ];
-
-            $this->totalSimilarityScore = min(1.0,
-                ($this->textSimilarityScore * $weights['text']) +
-                ($this->imageSimilarityScore * $weights['image']) +
-                ($this->categorySimilarityScore * $weights['category']) +
-                ($this->locationSimilarityScore * $weights['location']) +
-                ($this->timeSimilarityScore * $weights['time'])
-            );
-
-            // Update checks based on scores
-            $this->checks = [
-                'description_matches' => $this->textSimilarityScore > 0.5,
-                'images_match' => $this->imageSimilarityScore > 0.5,
-                'category_matches' => $this->categorySimilarityScore > 0.9,
-                'location_matches' => $this->locationSimilarityScore > 0.1,
-                'time_matches' => $this->timeSimilarityScore > 0.1,
-            ];
-
-            // Auto-match if similarity is high
-            if ($this->totalSimilarityScore > 0.6) {
-                $reportedItem->update(['matched_found_item_id' => $foundItem->id]);
-                Cache::tags(['matched_items'])->flush();
-                $this->dispatch('itemMatched');
-            }
-        } catch (\Exception $e) {
-            \Log::error('Error calculating similarity scores: ' . $e->getMessage());
-            toast()->danger('Error calculating similarity scores.')->push();
-        }
+        })->toArray();
     }
 
-    public function processClaim()
+    public function viewDetails($itemId)
     {
-        if ($this->itemToClaim) {
-            $this->itemToClaim->update(['claimed_by' => Auth::id()]);
-            Cache::forget("item_{$this->itemToClaim->id}");
-            $this->closeClaimModal();
-            toast()->success('Item claimed successfully!')->push();
-            return redirect()->route('matched-items');
-        }
+        $this->selectedItem = LostItem::with(['images', 'category', 'user'])->find($itemId);
+        $this->showModal = true;
     }
 
-    public function closeClaimModal()
+    public function closeModal()
     {
-        $this->confirmingClaim = false;
-        $this->itemToClaim = null;
-        $this->resetSimilarityScores();
+        $this->showModal = false;
+        $this->selectedItem = null;
     }
 
-    protected function resetSimilarityScores()
+    public function toggleAdvancedFilters()
     {
-        $this->imageSimilarityScore = 0;
-        $this->textSimilarityScore = 0;
-        $this->locationSimilarityScore = 0;
-        $this->timeSimilarityScore = 0;
-        $this->totalSimilarityScore = 0;
-        $this->checks = [];
+        $this->showAdvancedFilters = !$this->showAdvancedFilters;
     }
 
-    public function confirmResetClaim($itemId)
+    public function resetFilters()
     {
-        $this->itemToReset = LostItem::find($itemId);
-        $this->confirmingResetClaim = true;
-    }
-
-    public function resetClaim()
-    {
-        if ($this->itemToReset) {
-            $this->itemToReset->update([
-                'claimed_by' => null,
-                'matched_found_item_id' => null
-            ]);
-
-            Cache::forget("item_{$this->itemToReset->id}");
-            Cache::tags(['matched_items'])->flush();
-
-            $this->closeResetClaimModal();
-            toast()->success('Claim has been reset successfully.')->push();
-            return redirect()->route('products.view-items');
-        }
-    }
-
-    public function closeResetClaimModal()
-    {
-        $this->confirmingResetClaim = false;
-        $this->itemToReset = null;
-    }
-
-    public function editItem($itemId)
-    {
-        try {
-            // Validate the item ID
-            if (!$itemId) {
-                throw new \Exception("Item ID is required.");
-            }
-
-            // Set the selected item ID
-            $this->selectedItemId = $itemId;
-
-            // Find the item using the ID
-            $this->itemToEdit = LostItem::find($this->selectedItemId);
-
-            // Check if the item exists
-            if (!$this->itemToEdit) {
-                throw new \Exception("Item not found.");
-            }
-
-            // Check if the item belongs to the authenticated user
-            if ($this->itemToEdit->user_id !== Auth::id()) {
-                throw new \Exception("You are not authorized to edit this item.");
-            }
-
-            // Open the modal
-            $this->isEditing = true;
-
-            // Notify the user that the item is ready for editing
-            toast()
-                ->success("Item loaded successfully.", "Ready to Edit")
-                ->push();
-        } catch (\Exception $e) {
-            // Log the error for debugging
-            Log::error("Error in editItem: " . $e->getMessage());
-
-            // Notify the user about the error
-            toast()
-                ->danger($e->getMessage(), "Error")
-                ->push();
-
-            // Reset the state
-            $this->selectedItemId = null;
-            $this->itemToEdit = null;
-            $this->isEditing = false;
-        }
-    }
-
-    public function closeEditModal()
-    {
-        $this->isEditing = false; // Close the modal
-        $this->selectedItemId = null; // Reset the selected item ID
-        $this->itemToEdit = null; // Reset the item being edited
-    }
-
-    public function updatedDateLost($value)
-    {
-        // No encryption/decryption needed for date_lost
-        $this->date_lost = $value;
+        $this->reset([
+            'search', 'status', 'category', 'dateRange',
+            'condition', 'brand', 'color', 'location',
+            'radius'
+        ]);
     }
 
     public function updatingSearch()
@@ -319,183 +134,168 @@ class DisplayLostItems extends Component
         $this->resetPage();
     }
 
-    public function clearFilter($filter)
+    public function getMapMarkers()
     {
-        $this->$filter = '';
-        $this->resetPage();
+        return $this->getFilteredQuery()
+            ->whereNotNull(['location_lat', 'location_lng'])
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'title' => $item->title,
+                    'lat' => $item->location_lat,
+                    'lng' => $item->location_lng,
+                    'status' => $item->status,
+                    'image' => $item->images->first()?->image_path,
+                ];
+            });
     }
 
-    public function clearAllFilters()
+    public function toggleItemSelection($itemId)
     {
-        $this->search = '';
-        $this->category = '';
-        $this->location = '';
-        $this->date_lost = '';
-        $this->condition = '';
-        $this->resetPage();
-    }
-
-    public function showItemDetails($itemId)
-    {
-        $this->selectedItem = Cache::remember("item_{$itemId}", now()->addMinutes(5), function () use ($itemId) {
-            return LostItem::with(['images', 'user', 'category'])->find($itemId);
-        });
-    }
-
-    public function closeItemDetails()
-    {
-        $this->selectedItem = null;
-    }
-
-    public function confirmDownload($type)
-    {
-        $this->downloadType = $type;
-        $this->confirmingDownload = true;
-    }
-
-    public function downloadItem()
-    {
-        if ($this->selectedItem) {
-            $item = $this->selectedItem;
-
-            switch ($this->downloadType) {
-                case 'pdf':
-                    // Generate QR Code and Barcode
-                    $qrCode = QrCode::size(150)->generate(route('lost-items.show', $item->id));
-                    $barcode = DNS1D::getBarcodeSVG($item->id, 'C39');
-
-                    // Generate PDF
-                    $mpdf = new Mpdf();
-                    $html = view('pdf.lost-item', [
-                        'item' => $item,
-                        'qrCode' => $qrCode,
-                        'barcode' => $barcode,
-                    ])->render();
-                    $mpdf->WriteHTML($html);
-                    return response()->streamDownload(function () use ($mpdf) {
-                        echo $mpdf->Output('', 'S');
-                    }, 'lost-item-' . $item->id . '.pdf');
-                    break;
-
-                case 'qr':
-                    // Generate QR Code with additional information
-                    $qrContent = "Item: {$item->title}\n";
-                    $qrContent .= "Location: {$item->location}\n";
-                    $qrContent .= "Date Lost: {$item->date_lost->format('F j, Y')}\n";
-                    $qrContent .= "Condition: {$item->condition}\n";
-                    $qrContent .= "Reported By: " . ($item->is_anonymous ? 'Anonymous' : $item->user->name) . "\n";
-                    $qrContent .= "Login/Register: " . route('login'); // Add login/register link
-
-                    // Generate QR Code as JPG
-                    $qrCode = QrCode::format('png')
-                        ->size(500)
-                        ->backgroundColor(255, 255, 255) // White background
-                        ->color(0, 0, 128) // Navy blue color
-                        ->generate($qrContent);
-
-                    // Save QR Code to a temporary file
-                    $tempFile = tempnam(sys_get_temp_dir(), 'qr') . '.png';
-                    file_put_contents($tempFile, $qrCode);
-
-                    // Download the QR Code as JPG
-                    return response()->download($tempFile, 'qr-code-' . $item->id . '.png')->deleteFileAfterSend(true);
-                    break;
-            }
-        }
-
-        $this->confirmingDownload = false;
-    }
-
-    public function previewContent($type)
-    {
-        if ($this->selectedItem) {
-            $item = $this->selectedItem;
-
-            switch ($type) {
-                case 'qr':
-                    $this->previewContent = QrCode::size(200)->generate(route('lost-items.show', $item->id));
-                    break;
-                case 'barcode':
-                    $this->previewContent = DNS1D::getBarcodeSVG($item->id, 'C39');
-                    break;
-            }
+        if (in_array($itemId, $this->selectedItems)) {
+            $this->selectedItems = array_diff($this->selectedItems, [$itemId]);
+        } else {
+            $this->selectedItems[] = $itemId;
         }
     }
 
-    public function confirmDelete($itemId)
+    public function selectAll()
     {
-        $this->itemToDelete = $itemId;
-        $this->confirmingDelete = true;
+        $this->selectedItems = $this->getFilteredQuery()->pluck('id')->toArray();
     }
 
-    public function deleteItem()
+    public function deselectAll()
     {
-        if ($this->itemToDelete) {
-            $item = LostItem::find($this->itemToDelete);
-            if ($item && $item->user_id === Auth::id()) {
-                // Delete associated images
-                foreach ($item->images as $image) {
-                    Storage::delete($image->image_path);
-                }
+        $this->selectedItems = [];
+    }
 
-                $item->delete();
-                Cache::forget("item_{$this->itemToDelete}");
+    public function exportSelected($format = 'csv')
+    {
+        if (empty($this->selectedItems)) {
+            $this->addError('export', 'Please select items to export');
+            return;
+        }
 
-                toast()->success('Item deleted successfully.')->push();
-                return redirect()->route('products.view-items');
+        return response()->streamDownload(function () use ($format) {
+            $items = LostItem::whereIn('id', $this->selectedItems)
+                ->with(['category', 'user'])
+                ->get();
+
+            if ($format === 'csv') {
+                $this->exportToCsv($items);
+            } else {
+                $this->exportToPdf($items);
+            }
+        }, 'lost-items.' . $format);
+    }
+
+    public function claimItem($itemId)
+    {
+        $item = LostItem::find($itemId);
+        if ($item && $item->status === 'found') {
+            $item->update([
+                'status' => 'claimed',
+                'claimed_by' => Auth::id(),
+                'claimed_at' => now(),
+            ]);
+
+            $this->dispatch('item-claimed', $itemId);
+            $this->closeModal();
+        }
+    }
+
+    public function markAsFound($itemId)
+    {
+        $item = LostItem::find($itemId);
+        if ($item && $item->status === 'lost') {
+            $item->update([
+                'status' => 'found',
+                'found_by' => Auth::id(),
+                'found_at' => now(),
+            ]);
+
+            $this->dispatch('item-found', $itemId);
+            $this->closeModal();
+        }
+    }
+
+    public function markAsReturned($itemId)
+    {
+        $item = LostItem::find($itemId);
+        if ($item && $item->status === 'claimed') {
+            $item->update([
+                'status' => 'returned',
+                'returned_at' => now(),
+            ]);
+
+            $this->dispatch('item-returned', $itemId);
+            $this->closeModal();
+        }
+    }
+
+    public function reportMatch($itemId)
+    {
+        // Implement potential match reporting logic
+        $this->dispatch('show-match-form', $itemId);
+    }
+
+    protected function getFilteredQuery()
+    {
+        $query = LostItem::query()
+            ->with(['images', 'category', 'user']);
+
+        if ($this->search) {
+            $query->where(function ($q) {
+                $q->where('title', 'like', '%' . $this->search . '%')
+                    ->orWhere('description', 'like', '%' . $this->search . '%');
+            });
+        }
+
+        if ($this->status) {
+            $query->where('status', $this->status);
+        }
+
+        if ($this->category) {
+            $query->where('category_id', $this->category);
+        }
+
+        if ($this->condition) {
+            $query->where('condition', $this->condition);
+        }
+
+        if ($this->brand) {
+            $query->where('brand', 'like', '%' . $this->brand . '%');
+        }
+
+        if ($this->color) {
+            $query->where('color', 'like', '%' . $this->color . '%');
+        }
+
+        if ($this->location && $this->radius) {
+            // Implement location-based filtering here
+            // You might want to use a geographic search package or custom logic
+        }
+
+        if ($this->dateRange) {
+            $dates = explode(' to ', $this->dateRange);
+            if (count($dates) === 2) {
+                $query->whereBetween('created_at', [$dates[0], $dates[1]]);
             }
         }
 
-        $this->confirmingDelete = false;
-        $this->itemToDelete = null;
-    }
-    public function refreshList()
-    {
-        // Fetch the latest list of reported items for the authenticated user
-        $this->reportedItems = LostItem::where('user_id', Auth::id())
-            ->whereIn('item_type', ['reported', 'searched'])
-            ->with('images')
-            ->get();
+        return $query->latest();
     }
 
     public function render()
     {
-        $categories = Cache::remember('categories', now()->addDay(), function () {
-            return Category::all();
-        });
-
-        $query = LostItem::query()
-            ->with(['images', 'category', 'user'])
-            ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('title', 'like', '%' . $this->search . '%')
-                      ->orWhere('description', 'like', '%' . $this->search . '%');
-                });
-            })
-            ->when($this->category, function ($query) {
-                $query->where('category_id', $this->category);
-            })
-            ->when($this->location, function ($query) {
-                $query->where('location', 'like', '%' . $this->location . '%');
-            })
-            ->when($this->date_lost, function ($query) {
-                $query->whereDate('date_lost', $this->date_lost);
-            })
-            ->when($this->condition, function ($query) {
-                $query->where('condition', 'like', '%' . $this->condition . '%');
-            })
-            ->when($this->filter === 'mine', function ($query) {
-                $query->where('user_id', Auth::id());
-            })
-            ->when($this->filter === 'others', function ($query) {
-                $query->where('user_id', '!=', Auth::id());
-            });
-
-        $lostItems = $query->latest()->paginate(12);
+        $items = $this->getFilteredQuery()->paginate(12);
+        $categories = Category::all();
 
         return view('livewire.display-lost-items', [
-            'lostItems' => $lostItems,
+            'items' => $items,
             'categories' => $categories,
+            'totalSelected' => count($this->selectedItems)
         ]);
     }
 }

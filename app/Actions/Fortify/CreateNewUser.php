@@ -22,10 +22,17 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         Validator::make($input, [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/^[^0-9]*$/'
+            ],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => $this->passwordRules(),
             'terms' => Jetstream::hasTermsAndPrivacyPolicyFeature() ? ['accepted', 'required'] : '',
+        ], [
+            'name.regex' => 'Please use only letters in your name - numbers aren\'t allowed. For example, "John Smith" is perfect! 😊'
         ])->validate();
 
         return DB::transaction(function () use ($input) {

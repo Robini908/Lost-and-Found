@@ -18,7 +18,9 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ["Figtree", ...defaultTheme.fontFamily.sans],
+                'primary': ['Poppins', ...defaultTheme.fontFamily.sans],
+                'secondary': ['Inter', ...defaultTheme.fontFamily.sans],
+                'accent': ['Montserrat', ...defaultTheme.fontFamily.sans],
             },
             animation: {
                 "fade-in-up": "fadeInUp 0.5s ease-out",

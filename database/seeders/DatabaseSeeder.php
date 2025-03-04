@@ -15,7 +15,13 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->withPersonalTeam()->create();
          // Run the RolesAndPermissionsSeeder first
-         $this->call(RolesAndPermissionsSeeder::class);
+         $this->call([
+             RolesAndPermissionsSeeder::class,
+             UserSeeder::class,
+             CategorySeeder::class,
+             RewardSettingsSeeder::class,
+             LostItemSeeder::class,
+         ]);
 
     }
 }

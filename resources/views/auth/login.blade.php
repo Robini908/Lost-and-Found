@@ -1,5 +1,9 @@
-<x-guest-layout>
-    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gradient-to-b from-blue-50 to-white">
+<x-guest-auth>
+    <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gradient-to-b from-blue-50 to-white"
+         x-data="{ loading: false }">
+        <!-- Loading State -->
+        <x-loading-state message="Authenticating..." />
+
         <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-2xl overflow-hidden sm:rounded-2xl">
             <div class="text-center mb-8">
                 <a href="/" class="flex justify-center mb-4">
@@ -17,7 +21,8 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('login') }}">
+            <form method="POST" action="{{ route('login') }}"
+                  @submit="loading = true">
                 @csrf
 
                 <div>
@@ -50,6 +55,16 @@
                             {{ __('Forgot password?') }}
                         </a>
                     @endif
+                </div>
+
+                <div class="mt-4">
+                    <div class="bg-gray-50 rounded-xl p-4 shadow-sm">
+                        <div class="mb-2">
+                            <h3 class="text-sm font-medium text-gray-700">Security Check</h3>
+                            <p class="text-xs text-gray-500">Quick verification to keep your account safe</p>
+                        </div>
+                        <x-recaptcha />
+                    </div>
                 </div>
 
                 <div class="mt-6">
@@ -91,4 +106,4 @@
             </p>
         </div>
     </div>
-</x-guest-layout>
+</x-guest-auth>

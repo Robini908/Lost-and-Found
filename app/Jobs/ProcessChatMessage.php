@@ -9,7 +9,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
 use App\Livewire\ChatInterfaces;
 
 class ProcessChatMessage implements ShouldQueue
@@ -30,122 +29,63 @@ class ProcessChatMessage implements ShouldQueue
     public function handle()
     {
         try {
-            Log::info('Starting ProcessChatMessage job', ['message' => $this->message, 'threadId' => $this->threadId]);
+            // Get API key from config
+            $apiKey = config('services.huggingface.key');
 
-            // OpenAI API endpoint for creating a thread and running the assistant
-            $url = 'https://api.openai.com/v1/threads';
-
-            // OpenAI API key from .env
-            $apiKey = env('OPENAI_API_KEY');
+            // Debug API key (mask it for security)
+            Log::debug('API Key Check', [
+                'has_key' => !empty($apiKey),
+                'key_start' => $apiKey ? substr($apiKey, 0, 4) : null,
+                'key_length' => $apiKey ? strlen($apiKey) : 0
+            ]);
 
             if (empty($apiKey)) {
-                throw new \Exception('OpenAI API key is missing.');
+                throw new \Exception('Hugging Face API key not configured');
             }
 
-            // Use the existing thread ID or create a new thread
-            if (!$this->threadId) {
-                Log::info('Creating a new thread');
-                $threadResponse = Http::withHeaders([
-                    'Content-Type' => 'application/json',
+            // Use a simpler model for testing
+            $response = Http::withHeaders([
                     'Authorization' => 'Bearer ' . $apiKey,
-                    'OpenAI-Beta' => 'assistants=v2', // Required for Assistants API
-                ])->post($url);
-
-                if (!$threadResponse->successful()) {
-                    Log::error('Failed to create a thread', ['response' => $threadResponse->json()]);
-                    throw new \Exception('Failed to create a thread.');
-                }
-
-                $this->threadId = $threadResponse->json()['id'];
-                Session::put('thread_id', $this->threadId); // Save the thread ID to the session
-                Log::info('Thread created', ['threadId' => $this->threadId]);
-            }
-
-            // Add the user's message to the thread
-            Log::info('Adding message to thread', ['threadId' => $this->threadId, 'message' => $this->message]);
-            $messageResponse = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $apiKey,
-                'OpenAI-Beta' => 'assistants=v2', // Required for Assistants API
-            ])->post("{$url}/{$this->threadId}/messages", [
-                'role' => 'user',
-                'content' => $this->message,
+            ])->post('https://api-inference.huggingface.co/models/gpt2', [
+                'inputs' => $this->message,
+                'parameters' => [
+                    'max_length' => 50,
+                    'temperature' => 0.7
+                ]
             ]);
 
-            if (!$messageResponse->successful()) {
-                Log::error('Failed to add message to the thread', ['response' => $messageResponse->json()]);
-                throw new \Exception('Failed to add message to the thread.');
-            }
-
-            // Run the assistant on the thread
-            Log::info('Running assistant on thread', ['threadId' => $this->threadId]);
-            $runResponse = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $apiKey,
-                'OpenAI-Beta' => 'assistants=v2', // Required for Assistants API
-            ])->post("{$url}/{$this->threadId}/runs", [
-                'assistant_id' => env('OPENAI_ASSISTANT_ID'), // Use the assistant ID
+            Log::debug('API Response', [
+                'status' => $response->status(),
+                'body' => $response->json()
             ]);
 
-            if (!$runResponse->successful()) {
-                $errorDetails = $runResponse->json();
-                Log::error('Failed to run the assistant', ['response' => $errorDetails]);
-                throw new \Exception("Failed to run the assistant. Error: " . json_encode($errorDetails));
+            if (!$response->successful()) {
+                throw new \Exception('API request failed: ' . $response->body());
             }
 
-            $runId = $runResponse->json()['id'];
-            Log::info('Assistant run started', ['runId' => $runId]);
+            $result = $response->json();
 
-            // Wait for the run to complete
-            do {
-                sleep(1); // Wait for 1 second before checking the status
-                Log::info('Checking run status', ['runId' => $runId]);
-                $runStatusResponse = Http::withHeaders([
-                    'Content-Type' => 'application/json',
-                    'Authorization' => 'Bearer ' . $apiKey,
-                    'OpenAI-Beta' => 'assistants=v2', // Required for Assistants API
-                ])->get("{$url}/{$this->threadId}/runs/{$runId}");
+            // Extract the response text
+            $botResponse = is_array($result) && !empty($result[0]) ?
+                          $result[0]['generated_text'] :
+                          'Sorry, I could not generate a response.';
 
-                if (!$runStatusResponse->successful()) {
-                    Log::error('Failed to check run status', ['response' => $runStatusResponse->json()]);
-                    throw new \Exception('Failed to check run status.');
-                }
-
-                $runStatus = $runStatusResponse->json()['status'];
-                Log::info('Run status', ['status' => $runStatus]);
-
-                // Handle failed or cancelled runs
-                if ($runStatus === 'failed' || $runStatus === 'cancelled') {
-                    throw new \Exception("Run failed or was cancelled. Status: {$runStatus}");
-                }
-            } while ($runStatus !== 'completed');
-
-            // Retrieve the assistant's response
-            Log::info('Retrieving assistant response', ['threadId' => $this->threadId]);
-            $messagesResponse = Http::withHeaders([
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $apiKey,
-                'OpenAI-Beta' => 'assistants=v2', // Required for Assistants API
-            ])->get("{$url}/{$this->threadId}/messages");
-
-            if (!$messagesResponse->successful()) {
-                Log::error('Failed to retrieve messages', ['response' => $messagesResponse->json()]);
-                throw new \Exception('Failed to retrieve messages.');
-            }
-
-            // Extract the assistant's response
-            $messages = $messagesResponse->json()['data'];
-            $botResponse = $messages[0]['content'][0]['text']['value'];
-            Log::info('Assistant response received', ['response' => $botResponse]);
-
-            // Dispatch an event to update the chat interface
+            // Send response back to chat interface
             $this->chatInterfaces->dispatch('messageReceived', [
                 'response' => $botResponse,
-                'thread_id' => $this->threadId, // Pass the thread ID back to the Livewire component
+                'thread_id' => $this->threadId ?? uniqid()
             ]);
+
         } catch (\Exception $e) {
-            Log::error('Error in ProcessChatMessage job', ['error' => $e->getMessage()]);
-            $this->chatInterfaces->dispatch('messageError', ['error' => $e->getMessage()]);
+            Log::error('Chat Processing Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            $this->chatInterfaces->dispatch('messageError', [
+                'error' => 'Sorry, I encountered an error. Please try again.'
+            ]);
         }
     }
 }

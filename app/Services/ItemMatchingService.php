@@ -10,20 +10,22 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Bus;
 use App\Jobs\ProcessImageFeatures;
+use Carbon\Carbon;
 
 class ItemMatchingService
 {
     protected $cacheKey = 'matched_items';
     protected $cacheDuration = 1440; // 24 hours in minutes
     protected $batchSize = 50; // Process items in batches of 50
-    protected $similarityThreshold = 0.6; // Minimum similarity score to consider a match (60%)
+    protected $similarityThreshold = 0.4; // Reduced from 0.6 to 0.4 (40% similarity threshold)
     protected $maxImagesPerItem = 5; // Maximum number of images to process per item
     protected $weights = [
-        'text' => 0.35,      // Title and description similarity
+        'text' => 0.30,      // Title and description similarity
         'category' => 0.15,  // Category matching
-        'image' => 0.25,     // Image similarity
-        'location' => 0.15,  // Location proximity
-        'time' => 0.10       // Time difference between lost and found
+        'image' => 0.20,     // Image similarity
+        'location' => 0.20,  // Location proximity
+        'attributes' => 0.10, // Brand, model, color matching
+        'time' => 0.05       // Time difference between lost and found
     ];
 
     /**
@@ -31,29 +33,66 @@ class ItemMatchingService
      */
     public function findMatches(Collection $reportedItems, Collection $foundItems)
     {
-        // Check cache first
+        Log::info('Starting match finding process', [
+            'reported_items_count' => $reportedItems->count(),
+            'found_items_count' => $foundItems->count()
+        ]);
+
         $cacheKey = $this->generateCacheKey($reportedItems, $foundItems);
+
         if (Cache::has($cacheKey)) {
+            Log::info('Returning cached matches');
             return Cache::get($cacheKey);
         }
 
         $matches = collect();
 
-        // Process each reported item
         foreach ($reportedItems as $reportedItem) {
-            $itemMatches = $this->findMatchesForItem($reportedItem, $foundItems);
-            $matches = $matches->concat($itemMatches);
+            Log::info('Processing reported item', [
+                'item_id' => $reportedItem->id,
+                'title' => $reportedItem->title,
+                'type' => $reportedItem->item_type
+            ]);
+
+            // Pre-filter candidates before detailed matching
+            $filteredFoundItems = $this->preFilterCandidates($reportedItem, $foundItems);
+
+            Log::info('Filtered found items', [
+                'original_count' => $foundItems->count(),
+                'filtered_count' => $filteredFoundItems->count()
+            ]);
+
+            // Skip detailed matching if no candidates pass pre-filtering
+            if ($filteredFoundItems->isEmpty()) {
+                Log::info('No candidates passed pre-filtering for item', ['item_id' => $reportedItem->id]);
+                continue;
+            }
+
+            // Extract features and embeddings once for the reported item
+            $reportedEmbedding = $this->getTextEmbedding($reportedItem);
+            $reportedFeatures = $this->extractImageFeatures($reportedItem->images);
+
+            $itemMatches = $this->findMatchesForItem($reportedItem, $filteredFoundItems);
+
+            Log::info('Found matches for item', [
+                'item_id' => $reportedItem->id,
+                'matches_count' => $itemMatches->count()
+            ]);
+
+            if ($itemMatches->isNotEmpty()) {
+                $matches = $matches->concat($itemMatches);
+            }
         }
 
-        // Sort by similarity score and filter out low-quality matches
-        $matches = $matches->filter(function ($match) {
-            return $match['similarity_score'] >= $this->similarityThreshold;
-        })->sortByDesc('similarity_score')->values();
+        $matches = $matches->sortByDesc('similarity_score')->values();
 
-        // Cache the results
-        Cache::put($cacheKey, $matches->all(), $this->cacheDuration);
+        Log::info('Completed match finding process', [
+            'total_matches' => $matches->count()
+        ]);
 
-        return $matches->all();
+        Cache::put($cacheKey, $matches, now()->addHours(24));
+
+        return $matches;
     }
 
     /**
@@ -66,8 +105,8 @@ class ItemMatchingService
         $reportedItemFeatures = $this->extractImageFeatures($reportedItem->images);
 
         foreach ($foundItems as $foundItem) {
-            // Skip if the found item is from the same user
-            if ($foundItem->user_id === $reportedItem->user_id) {
+            // Skip if the found item is from the same user or not marked as found
+            if ($foundItem->user_id === $reportedItem->user_id || $foundItem->item_type !== LostItem::TYPE_FOUND) {
                 continue;
             }
 
@@ -80,13 +119,8 @@ class ItemMatchingService
             );
 
             // Only add matches that meet the minimum similarity threshold
-            if ($similarityScore >= $this->similarityThreshold) {
-                $matches->push([
-                        'reported_item' => $reportedItem,
-                        'found_item' => $foundItem,
-                        'similarity_score' => $similarityScore,
-                    'match_details' => $this->generateMatchDetails($reportedItem, $foundItem)
-                ]);
+            if ($similarityScore !== null) {
+                $matches->push($similarityScore);
             }
         }
 
@@ -98,25 +132,41 @@ class ItemMatchingService
      */
     protected function calculateComprehensiveSimilarity($reportedItem, $foundItem, $reportedEmbedding, $reportedFeatures)
     {
-        // Get text embedding for found item
-        $foundEmbedding = $this->getTextEmbedding($foundItem);
+        $weights = [
+            'text' => 0.35,
+            'category' => 0.15,
+            'image' => 0.20,
+            'location' => 0.15,
+            'time' => 0.15
+        ];
 
-        // Get image features for found item
-        $foundFeatures = $this->extractImageFeatures($foundItem->images);
+        $similarities = [
+            'text' => $this->calculateTextSimilarity($reportedEmbedding, $this->getTextEmbedding($foundItem)),
+            'category' => $this->calculateCategorySimilarity($reportedItem, $foundItem),
+            'image' => $this->calculateBestImageSimilarity($reportedFeatures, $this->extractImageFeatures($foundItem->images)),
+            'location' => $this->calculateLocationSimilarity($reportedItem, $foundItem),
+            'time' => $this->calculateTimeSimilarity($reportedItem->date, $foundItem->date)
+        ];
 
-        // Calculate individual similarity scores
-        $textSimilarity = $this->calculateTextSimilarity($reportedEmbedding, $foundEmbedding);
-        $categorySimilarity = $this->calculateCategorySimilarity($reportedItem, $foundItem);
-        $imageSimilarity = $this->calculateBestImageSimilarity($reportedFeatures, $foundFeatures);
-        $locationSimilarity = $this->calculateLocationSimilarity($reportedItem->geolocation, $foundItem->geolocation);
-        $timeSimilarity = $this->calculateTimeSimilarity($reportedItem->date_lost, $foundItem->date_found);
+        $weightedSum = 0;
+        foreach ($weights as $key => $weight) {
+            $weightedSum += $similarities[$key] * $weight;
+        }
 
-        // Calculate weighted average
-        return ($textSimilarity * $this->weights['text']) +
-               ($categorySimilarity * $this->weights['category']) +
-               ($imageSimilarity * $this->weights['image']) +
-               ($locationSimilarity * $this->weights['location']) +
-               ($timeSimilarity * $this->weights['time']);
+        // Lower the threshold to 0.4 (40%)
+        if ($weightedSum < 0.4) {
+            Log::info("Match score too low: {$weightedSum} for items {$reportedItem->id} and {$foundItem->id}");
+            return null;
+        }
+
+        Log::info("Found potential match with score {$weightedSum} for items {$reportedItem->id} and {$foundItem->id}");
+
+        return [
+            'similarity_score' => $weightedSum,
+            'reported_item' => $reportedItem,
+            'found_item' => $foundItem,
+            'match_details' => $this->generateMatchDetails($reportedItem, $foundItem)
+        ];
     }
 
     /**
@@ -206,7 +256,17 @@ class ItemMatchingService
      */
     public function getTextEmbedding($item)
     {
-        $text = $item->title . ' ' . $item->description;
+        // Combine all relevant text fields for better matching
+        $text = implode(' ', array_filter([
+            $item->title,
+            $item->description,
+            $item->brand,
+            $item->model,
+            $item->color,
+            $item->condition,
+            $item->additional_details ? json_encode($item->additional_details) : null
+        ]));
+
         $cacheKey = 'text_embedding_' . md5($text);
 
         return Cache::remember($cacheKey, $this->cacheDuration, function () use ($text) {
@@ -230,26 +290,55 @@ class ItemMatchingService
     }
 
     /**
-     * Generate detailed match information
+     * Generate detailed match information with confidence levels
      */
     protected function generateMatchDetails($reportedItem, $foundItem)
     {
-        return [
+        $details = [
+            'title_similarity' => $this->calculateTextSimilarityWithContext($reportedItem->title, $foundItem->title),
+            'description_similarity' => $this->calculateTextSimilarityWithContext($reportedItem->description, $foundItem->description),
             'category_match' => $reportedItem->category_id === $foundItem->category_id,
-            'location_distance' => $this->calculateDistance(
-                $reportedItem->geolocation['lat'] ?? 0,
-                $reportedItem->geolocation['lng'] ?? 0,
-                $foundItem->geolocation['lat'] ?? 0,
-                $foundItem->geolocation['lng'] ?? 0
+            'location_similarity' => $this->calculateLocationSimilarity($reportedItem, $foundItem),
+            'attribute_similarity' => $this->calculateAttributesSimilarity($reportedItem, $foundItem),
+            'time_similarity' => $this->calculateTimeSimilarity(
+                $reportedItem->date_lost ?? $reportedItem->created_at,
+                $foundItem->date_found ?? $foundItem->created_at
             ),
-            'time_difference' => $reportedItem->date_lost && $foundItem->date_found
-                ? $reportedItem->date_lost->diffInDays($foundItem->date_found)
-                : null,
-            'image_count' => [
-                'reported' => $reportedItem->images->count(),
-                'found' => $foundItem->images->count()
-            ]
         ];
+
+        // Calculate confidence level
+        $confidenceScore = 0;
+        $confidenceScore += $details['title_similarity'] * 0.25;
+        $confidenceScore += $details['description_similarity'] * 0.20;
+        $confidenceScore += ($details['category_match'] ? 1 : 0) * 0.15;
+        $confidenceScore += $details['location_similarity'] * 0.25;
+        $confidenceScore += $details['attribute_similarity'] * 0.10;
+        $confidenceScore += $details['time_similarity'] * 0.05;
+
+        if ($confidenceScore >= 0.8) {
+            $details['confidence'] = 'high';
+        } elseif ($confidenceScore >= 0.5) {
+            $details['confidence'] = 'medium';
+        } else {
+            $details['confidence'] = 'low';
+        }
+
+        // Add location details for better user feedback
+        $details['location_details'] = [
+            'reported_location' => $reportedItem->location_lost ?? $reportedItem->location_address ?? $reportedItem->area,
+            'found_location' => $foundItem->location_found ?? $foundItem->location_address ?? $foundItem->area,
+            'distance' => ($reportedItem->location_lat && $reportedItem->location_lng &&
+                          $foundItem->location_lat && $foundItem->location_lng)
+                ? round($this->calculateDistance(
+                    $reportedItem->location_lat,
+                    $reportedItem->location_lng,
+                    $foundItem->location_lat,
+                    $foundItem->location_lng
+                ) / 1000, 2) . ' km'
+                : null
+        ];
+
+        return $details;
     }
 
     /**
@@ -295,35 +384,134 @@ class ItemMatchingService
     }
 
     /**
-     * Calculate location similarity using the Haversine formula.
-     *
-     * @param array $location1
-     * @param array $location2
-     * @return float
+     * Calculate location similarity considering both coordinates and text
      */
-    public function calculateLocationSimilarity($location1, $location2)
+    protected function calculateLocationSimilarity($reportedItem, $foundItem)
     {
-        if (!$location1 || !$location2) {
-            return 0; // No location data
+        // First, determine the location type of the reported/searched item
+        $reportedLocationType = $reportedItem->location_type;
+
+        // If the reported item uses map-based location
+        if ($reportedLocationType === 'map') {
+            // Ensure we have the required coordinates for the reported item
+            if (!$reportedItem->location_lat || !$reportedItem->location_lng) {
+                return 0.1; // Return low similarity if coordinates are missing
+            }
+
+            // If found item also uses map
+            if ($foundItem->location_type === 'map' && $foundItem->location_lat && $foundItem->location_lng) {
+                $distance = $this->calculateDistance(
+                    $reportedItem->location_lat,
+                    $reportedItem->location_lng,
+                    $foundItem->location_lat,
+                    $foundItem->location_lng
+                );
+
+                // Convert distance to similarity score using exponential decay
+                // 5km is considered the threshold for good matches
+                $coordinateSimilarity = exp(-$distance / 5000);
+
+                // Compare addresses if available (as secondary factor)
+                $addressSimilarity = 0;
+                if ($reportedItem->location_address && $foundItem->location_address) {
+                    $addressSimilarity = $this->calculateTextSimilarityWithContext(
+                        $reportedItem->location_address,
+                        $foundItem->location_address
+                    );
+                }
+
+                // Weight heavily towards coordinate matching (80%) with address as supporting factor (20%)
+                return ($coordinateSimilarity * 0.8) + ($addressSimilarity * 0.2);
+            }
+
+            // If found item uses area, try to match address with area
+            if ($foundItem->location_type === 'area' && $foundItem->area) {
+                $similarity = 0;
+
+                if ($reportedItem->location_address) {
+                    $similarity = $this->calculateTextSimilarityWithContext(
+                        $reportedItem->location_address,
+                        $foundItem->area
+                    );
+
+                    // Consider landmarks if available
+                    if ($foundItem->landmarks) {
+                        $landmarkSimilarity = $this->calculateTextSimilarityWithContext(
+                            $reportedItem->location_address,
+                            $foundItem->landmarks
+                        );
+                        $similarity = max($similarity, $landmarkSimilarity * 0.7);
+                    }
+                }
+
+                // Reduce confidence due to different location types
+                return $similarity * 0.6;
+            }
+
+            return 0.1; // Return low similarity if found item has no valid location data
         }
 
-        $earthRadius = 6371; // Earth's radius in kilometers
+        // If the reported item uses area-based location
+        if ($reportedLocationType === 'area') {
+            // Ensure we have the area for the reported item
+            if (!$reportedItem->area) {
+                return 0.1; // Return low similarity if area is missing
+            }
 
-        $lat1 = deg2rad($location1['lat']);
-        $lng1 = deg2rad($location1['lng']);
-        $lat2 = deg2rad($location2['lat']);
-        $lng2 = deg2rad($location2['lng']);
+            // If found item uses area
+            if ($foundItem->location_type === 'area' && $foundItem->area) {
+                $similarity = 0;
+                $weights = [
+                    'area' => 0.8,
+                    'landmarks' => 0.2
+                ];
 
-        $dlat = $lat2 - $lat1;
-        $dlng = $lng2 - $lng1;
+                // Primary comparison based on area text
+                $areaSimilarity = $this->calculateTextSimilarityWithContext(
+                    $reportedItem->area,
+                    $foundItem->area
+                );
+                $similarity += $areaSimilarity * $weights['area'];
 
-        $a = sin($dlat / 2) ** 2 + cos($lat1) * cos($lat2) * sin($dlng / 2) ** 2;
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+                // Secondary comparison based on landmarks if available
+                if ($reportedItem->landmarks && $foundItem->landmarks) {
+                    $landmarkSimilarity = $this->calculateTextSimilarityWithContext(
+                        $reportedItem->landmarks,
+                        $foundItem->landmarks
+                    );
+                    $similarity += $landmarkSimilarity * $weights['landmarks'];
+                }
 
-        $distance = $earthRadius * $c; // Distance in kilometers
+                return $similarity;
+            }
 
-        // Normalize the distance to a similarity score
-        return 1 / (1 + $distance);
+            // If found item uses map
+            if ($foundItem->location_type === 'map' && $foundItem->location_address) {
+                $similarity = 0;
+
+                // Try to match the reported item's area with the found item's address
+                $similarity = $this->calculateTextSimilarityWithContext(
+                    $reportedItem->area,
+                    $foundItem->location_address
+                );
+
+                // Consider landmarks as additional context if available
+                if ($reportedItem->landmarks) {
+                    $landmarkSimilarity = $this->calculateTextSimilarityWithContext(
+                        $reportedItem->landmarks,
+                        $foundItem->location_address
+                    );
+                    $similarity = max($similarity, $landmarkSimilarity * 0.7);
+                }
+
+                // Reduce confidence due to different location types
+                return $similarity * 0.6;
+            }
+
+            return 0.1; // Return low similarity if found item has no valid location data
+        }
+
+        return 0.1; // Return low similarity for invalid location types
     }
 
     /**
@@ -396,5 +584,105 @@ class ItemMatchingService
         $embedding2 = $this->getTextEmbedding(['title' => '', 'description' => $text2]);
 
         return $this->calculateTextSimilarity($embedding1, $embedding2);
+    }
+
+    /**
+     * Calculate similarity between item attributes
+     */
+    protected function calculateAttributesSimilarity($item1, $item2)
+    {
+        $matchCount = 0;
+        $totalAttributes = 0;
+
+        // Check brand match
+        if ($item1->brand && $item2->brand) {
+            $totalAttributes++;
+            if (strtolower($item1->brand) === strtolower($item2->brand)) {
+                $matchCount++;
+            }
+        }
+
+        // Check model match
+        if ($item1->model && $item2->model) {
+            $totalAttributes++;
+            if (strtolower($item1->model) === strtolower($item2->model)) {
+                $matchCount++;
+            }
+        }
+
+        // Check color match
+        if ($item1->color && $item2->color) {
+            $totalAttributes++;
+            if (strtolower($item1->color) === strtolower($item2->color)) {
+                $matchCount++;
+            }
+        }
+
+        // Check condition match
+        if ($item1->condition && $item2->condition) {
+            $totalAttributes++;
+            if ($item1->condition === $item2->condition) {
+                $matchCount++;
+            }
+        }
+
+        return $totalAttributes > 0 ? $matchCount / $totalAttributes : 0;
+    }
+
+    /**
+     * Pre-filters potential matches based on hard criteria before detailed similarity calculation
+     * @param \App\Models\LostItem $reportedItem
+     * @param Collection $foundItems
+     * @return Collection
+     */
+    protected function preFilterCandidates($reportedItem, Collection $foundItems)
+    {
+        Log::info('Starting pre-filtering for reported item: ' . $reportedItem->id);
+
+        return $foundItems->filter(function ($foundItem) use ($reportedItem) {
+            // Don't match items from the same user
+            if ($foundItem->user_id === $reportedItem->user_id) {
+                Log::info("Filtered out item {$foundItem->id}: Same user");
+                return false;
+            }
+
+            // Don't match items of the same type (lost with lost or found with found)
+            if ($foundItem->item_type === $reportedItem->item_type) {
+                Log::info("Filtered out item {$foundItem->id}: Same type");
+                return false;
+            }
+
+            // Category matching - allow parent/child category matches
+            $categoryMatch = $foundItem->category_id === $reportedItem->category_id ||
+                            $foundItem->category->parent_id === $reportedItem->category->parent_id;
+            if (!$categoryMatch) {
+                Log::info("Filtered out item {$foundItem->id}: Category mismatch");
+                return false;
+            }
+
+            // Time window - increased to 60 days
+            $timeDiff = abs(Carbon::parse($foundItem->date)->diffInDays(Carbon::parse($reportedItem->date)));
+            if ($timeDiff > 60) {
+                Log::info("Filtered out item {$foundItem->id}: Time difference too large ({$timeDiff} days)");
+                return false;
+            }
+
+            // Location proximity - increased to 20km
+            if ($foundItem->latitude && $reportedItem->latitude) {
+                $distance = $this->calculateDistance(
+                    $reportedItem->latitude,
+                    $reportedItem->longitude,
+                    $foundItem->latitude,
+                    $foundItem->longitude
+                );
+                if ($distance > 20) {
+                    Log::info("Filtered out item {$foundItem->id}: Distance too large ({$distance}km)");
+                    return false;
+                }
+            }
+
+            Log::info("Item {$foundItem->id} passed all pre-filters");
+            return true;
+        });
     }
 }

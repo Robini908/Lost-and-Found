@@ -8,124 +8,116 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Session;
 use Usernotnull\Toast\Concerns\WireToast;
 use Exception;
+use Livewire\WithPagination;
 
 class ImpersonateUser extends Component
 {
-    use WireToast;
+    use WireToast, WithPagination;
 
-    public $search = ''; // For searching users
-    public $selectedUserId = null; // Track the selected user
+    public $search = '';
+    public $selectedUserId = null;
+    public $filterRole = '';
+    public $sortField = 'name';
+    public $sortDirection = 'asc';
 
-    // Start impersonation
+    protected $queryString = [
+        'search' => ['except' => ''],
+        'filterRole' => ['except' => ''],
+        'sortField' => ['except' => 'name'],
+        'sortDirection' => ['except' => 'asc'],
+    ];
+
     public function startImpersonation()
     {
         try {
-            // Validate if a user is selected
+            if (!auth()->user()->hasRole('superadmin')) {
+                toast()->danger('Unauthorized action.')->push();
+                return;
+            }
+
             if (!$this->selectedUserId) {
                 toast()->warning('Please select a user to impersonate.')->push();
                 return;
             }
 
-            // Find the user to impersonate
-            $user = User::where('id', $this->selectedUserId)->firstOrFail();
+            $userToImpersonate = User::findOrFail($this->selectedUserId);
 
-            if (!$user) {
-                toast()->danger('User not found.')->push();
-                return;
-            }
-
-            // Store the original user ID in the session
+            // Store current user's ID and remember URL in session
             Session::put('impersonator_id', Auth::id());
+            Session::put('impersonator_remember_url', url()->previous());
 
-            // Log in as the impersonated user
-            Auth::login($user);
+            // Login as the impersonated user
+            Auth::login($userToImpersonate);
 
-            // Redirect to the dashboard of the impersonated user
-            toast()->success("You are now impersonating {$user->name}.")->pushOnNextPage();
+            toast()->success("Now impersonating {$userToImpersonate->name}")->pushOnNextPage();
             return redirect()->route('dashboard');
-        } catch (Exception $e) {
-            // Log the error for debugging
-            logger()->error('Impersonation error: ' . $e->getMessage());
 
-            // Display a user-friendly error message
-            toast()->danger('An error occurred while starting impersonation. Please try again.')->push();
+        } catch (Exception $e) {
+            logger()->error('Impersonation error: ' . $e->getMessage());
+            toast()->danger('Failed to start impersonation.')->push();
         }
     }
 
-    // Stop impersonation
     public function stopImpersonation()
     {
         try {
-            // Retrieve the original user ID from the session
-            $impersonatorId = Session::pull('impersonator_id');
+            $impersonatorId = Session::get('impersonator_id');
+            $rememberUrl = Session::get('impersonator_remember_url');
 
             if (!$impersonatorId) {
-                toast()->danger('Unable to stop impersonation: No impersonator ID found.')->push();
+                toast()->danger('No impersonation session found.')->push();
                 return;
             }
 
-            // Find the original user
-            $impersonator = User::where('id', $impersonatorId)->firstOrFail();
+            $originalUser = User::findOrFail($impersonatorId);
 
-            if (!$impersonator) {
-                toast()->danger('Unable to stop impersonation: Original user not found.')->push();
-                return;
-            }
+            // Clear impersonation session data
+            Session::forget(['impersonator_id', 'impersonator_remember_url']);
 
-            // Log back in as the original user
-            Auth::login($impersonator);
+            // Log back in as original user
+            Auth::login($originalUser);
 
-            // Redirect to the dashboard of the original user
-            toast()->success('You have stopped impersonating the user.')->pushOnNextPage();
-            return redirect()->route('dashboard');
+            toast()->success('Impersonation ended.')->pushOnNextPage();
+            return redirect($rememberUrl ?: route('dashboard'));
+
         } catch (Exception $e) {
-            // Log the error for debugging
             logger()->error('Stop impersonation error: ' . $e->getMessage());
-
-            // Display a user-friendly error message
-            toast()->danger('An error occurred while stopping impersonation. Please try again.')->push();
+            toast()->danger('Failed to stop impersonation.')->push();
         }
     }
 
-    // Check if the current user is impersonating another user
-    public function isImpersonating()
+    public function sortBy($field)
     {
-        return Session::has('impersonator_id');
-    }
+        $this->sortDirection = $this->sortField === $field
+            ? $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc'
+            : 'asc';
 
-    // Select a user
-    public function selectUser($userId)
-    {
-        $this->selectedUserId = $userId;
+        $this->sortField = $field;
     }
 
     public function render()
     {
-        try {
-            // Filter users based on the search term
-            $users = User::query()
-                ->where('id', '!=', Auth::id()) // Exclude the current user
-                ->when($this->search, function ($query) {
-                    $query->where(function ($q) {
-                        $q->where('name', 'like', "%{$this->search}%")
-                          ->orWhere('email', 'like', "%{$this->search}%");
-                    });
-                })
-                ->get();
+        $users = User::query()
+            ->where('id', '!=', Auth::id())
+            ->when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('name', 'like', '%' . $this->search . '%')
+                      ->orWhere('email', 'like', '%' . $this->search . '%');
+                });
+            })
+            ->when($this->filterRole, function ($query) {
+                $query->whereHas('roles', function ($q) {
+                    $q->where('name', $this->filterRole);
+                });
+            })
+            ->orderBy($this->sortField, $this->sortDirection)
+            ->paginate(10);
 
-            return view('livewire.impersonate-user', [
-                'users' => $users,
-            ]);
-        } catch (Exception $e) {
-            // Log the error for debugging
-            logger()->error('Render error: ' . $e->getMessage());
+        $roles = \Spatie\Permission\Models\Role::pluck('name');
 
-            // Display a user-friendly error message
-            toast()->danger('An error occurred while loading the user list. Please try again.')->push();
-
-            return view('livewire.impersonate-user', [
-                'users' => collect(), // Return an empty collection to prevent breaking the UI
-            ]);
-        }
+        return view('livewire.impersonate-user', [
+            'users' => $users,
+            'roles' => $roles,
+        ]);
     }
 }

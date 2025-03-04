@@ -38,13 +38,13 @@
                     <x-application-mark class="block h-9 w-auto" />
                     <span class="text-xl font-bold text-gray-900">Lost & Found</span>
                 </a>
-                <button @click="open = false" class="text-gray-500 hover:text-gray-900 transition-colors duration-200">
+                <button @click="open = false" class="text-gray-900 hover:text-gray-900 transition-colors duration-200">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
 
             <!-- User Profile Section -->
-            <div class="p-4 border-b border-gray-200/50 bg-white/50">
+            <div class="p-4 border-b border-gray-200/50 bg-gray-100">
                 <div class="flex items-center space-x-3">
                     @if (Laravel\Jetstream\Jetstream::managesProfilePhotos())
                         <img class="h-10 w-10 rounded-full object-cover border-2 border-blue-200"
@@ -141,8 +141,8 @@
                 </div>
 
                 <!-- Rewards Section -->
-                <x-nav-link href="{{ route('rewards.index') }}" :active="request()->routeIs('rewards.index')"
-                    class="flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 {{ request()->routeIs('rewards.index') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
+                <x-nav-link href="{{ route('rewards') }}" :active="request()->routeIs('rewards')"
+                    class="flex items-center justify-between px-4 py-3 rounded-lg transition-colors duration-200 {{ request()->routeIs('rewards') ? 'bg-white/60 text-gray-900' : 'text-gray-600 hover:bg-white/60 hover:text-gray-900' }}">
                     <div class="flex items-center space-x-3">
                         <i class="fas fa-gift text-lg text-yellow-200"></i>
                         <span>Rewards</span>

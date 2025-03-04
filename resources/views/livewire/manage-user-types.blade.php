@@ -56,8 +56,16 @@
                             <x-table.cell>{{ $role->name }}</x-table.cell>
                             <x-table.cell>{{ implode(', ', $role->permissions->pluck('name')->toArray()) }}</x-table.cell>
                             <x-table.cell class="text-right">
-                                <x-button wire:click="editRole({{ $role->id }})" class="text-indigo-600 hover:text-indigo-900"><i class="fas fa-edit"></i></x-button>
-                                <x-button wire:click="deleteRole({{ $role->id }})" class="text-red-600 hover:text-red-900 ml-2"><i class="fas fa-trash"></i></x-button>
+                                @if(RolePermission::canManageContent(auth()->user(), 'roles', 'edit'))
+                                    <x-button wire:click="editRole({{ $role->id }})" class="text-indigo-600 hover:text-indigo-900">
+                                        <i class="fas fa-edit"></i>
+                                    </x-button>
+                                @endif
+                                @if(RolePermission::canManageContent(auth()->user(), 'roles', 'delete'))
+                                    <x-button wire:click="deleteRole({{ $role->id }})" class="text-red-600 hover:text-red-900 ml-2">
+                                        <i class="fas fa-trash"></i>
+                                    </x-button>
+                                @endif
                             </x-table.cell>
                         </x-table.row>
                     @endforeach

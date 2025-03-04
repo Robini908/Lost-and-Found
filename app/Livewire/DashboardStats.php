@@ -19,12 +19,12 @@ class DashboardStats extends Component
     {
         $lastMonth = Carbon::now()->subDays(30);
 
-        $totalLostItems = LostItem::where('item_type', 'reported')->count();
-        $totalFoundItems = LostItem::where('item_type', 'found')->count();
-        $lastMonthLostItems = LostItem::where('item_type', 'reported')
+        $totalLostItems = LostItem::whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])->count();
+        $totalFoundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)->count();
+        $lastMonthLostItems = LostItem::whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])
             ->where('created_at', '>=', $lastMonth)
             ->count();
-        $lastMonthFoundItems = LostItem::where('item_type', 'found')
+        $lastMonthFoundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)
             ->where('created_at', '>=', $lastMonth)
             ->count();
 

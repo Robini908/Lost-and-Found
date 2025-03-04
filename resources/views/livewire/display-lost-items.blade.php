@@ -1,674 +1,439 @@
-<div class="min-h-screen bg-gray-100" x-data="{ isFilterOpen: true }">
-    <!-- Filter Toggle Button for Mobile -->
-    <div class="md:hidden p-4 bg-white shadow-md">
-        <button @click="isFilterOpen = !isFilterOpen" class="flex items-center space-x-2">
-            <span class="text-gray-700">Filters</span>
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-            </svg>
-        </button>
-    </div>
+<div class="min-h-screen bg-gray-50 py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Lost & Found Items</h1>
+                <p class="mt-2 text-sm text-gray-600">Browse through reported items or search for specific ones</p>
+            </div>
 
-    <!-- Main Grid -->
-    <div class="container mx-auto px-4 py-6 flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6">
-        <!-- Filters Section (Left) -->
-        <div class="w-full md:w-64 lg:w-80" :class="{ 'hidden md:block': !isFilterOpen }">
-            <div class="bg-white rounded-lg shadow-lg p-6 sticky top-6">
-                <h2 class="text-xl font-semibold mb-6 text-gray-800">Filters</h2>
-
-                <!-- Search Input -->
-                <div class="space-y-4">
-                    <div class="relative">
-                        <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                        <div class="relative rounded-md shadow-sm">
-                            <input type="text"
-                                id="search"
-                                wire:model.debounce.300ms="search"
-                                class="block w-full rounded-md border-gray-300 pl-10 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                                placeholder="Search items...">
-                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Category Filter -->
-                    <div>
-                        <label for="category" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                        <select id="category"
-                            wire:model="category"
-                            class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                            <option value="">All Categories</option>
-                            @foreach($categories as $cat)
-                                <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Date Filter -->
-                    <div>
-                        <label for="date" class="block text-sm font-medium text-gray-700 mb-1">Date Lost</label>
-                        <input type="date"
-                            id="date"
-                            wire:model="date_lost"
-                            class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                    </div>
-
-                    <!-- View Filter -->
-                    <div>
-                        <label for="filter" class="block text-sm font-medium text-gray-700 mb-1">View</label>
-                        <select id="filter"
-                            wire:model="filter"
-                            class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                            <option value="all">All Items</option>
-                            <option value="mine">My Items</option>
-                            <option value="others">Others' Items</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Active Filters -->
-                @if($search || $category || $location || $date_lost || $condition)
-                    <div class="mt-6 pt-4 border-t border-gray-200">
-                        <h3 class="text-sm font-medium text-gray-700 mb-3">Active Filters</h3>
-                        <div class="flex flex-wrap gap-2">
-                            <button wire:click="clearAllFilters"
-                                class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-full hover:bg-red-200 transition duration-150 ease-in-out">
-                                Clear All Filters
-                                <svg class="ml-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                            </button>
-                            @if($search)
-                                <span class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-full">
-                                    Search: {{ $search }}
-                                    <button wire:click="clearFilter('search')" class="ml-1 text-blue-500 hover:text-blue-700">×</button>
-                                </span>
-                            @endif
-                            @if($category)
-                                <span class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-green-700 bg-green-100 rounded-full">
-                                    Category: {{ $categories->find($category)->name }}
-                                    <button wire:click="clearFilter('category')" class="ml-1 text-green-500 hover:text-green-700">×</button>
-                                </span>
-                            @endif
-                        </div>
-                    </div>
-                @endif
+            <!-- View Toggle Buttons -->
+            <div class="mt-4 md:mt-0 flex space-x-2">
+                <button wire:click="toggleView('grid')"
+                    class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-th-large mr-2"></i>
+                    Grid
+                </button>
+                <button wire:click="toggleView('list')"
+                    class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-list mr-2"></i>
+                    List
+                </button>
+                <button wire:click="toggleView('map')"
+                    class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'map' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    <i class="fas fa-map-marker-alt mr-2"></i>
+                    Map
+                </button>
             </div>
         </div>
 
-        <!-- Lost Items Section (Right) -->
-        <div class="flex-1">
-            <!-- Lost Items Grid -->
-            @if ($lostItems->isEmpty())
-                <div class="text-center text-gray-600 py-8">
-                    No results found for
-                    @if ($search)
-                        search term "{{ $search }}"
-                    @endif
-                    @if ($category)
-                        in category "{{ $categories->find($category)->name }}"
-                    @endif
-                    @if ($location)
-                        at location "{{ $location }}"
-                    @endif
-                    @if ($date_lost)
-                        on date "{{ $date_lost }}"
-                    @endif
-                    @if ($condition)
-                        with condition "{{ $condition }}"
-                    @endif
+        <!-- Search and Filters -->
+        <div class="mb-8">
+            <div class="flex flex-col md:flex-row md:items-center md:space-x-4">
+                <!-- Search -->
+                <div class="flex-1 min-w-0">
+                    <div class="relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-search text-gray-400"></i>
+                        </div>
+                        <input type="text" wire:model.live.debounce.300ms="search"
+                            class="block w-full pl-10 pr-12 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                            placeholder="Search for items...">
+                    </div>
                 </div>
-            @else
-                @if ($selectedItem)
-                    <!-- Detailed View -->
-                    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                        <div class="bg-white rounded-lg shadow-lg w-full max-w-4xl p-6 overflow-y-auto max-h-[90vh]">
-                            <!-- Sticky Header -->
-                            <div class="sticky top-0 bg-white py-4 z-10 border-b border-gray-200">
-                                <div class="flex justify-between items-center">
-                                    <h2 class="text-2xl font-bold text-gray-900">{{ $selectedItem->title }}</h2>
-                                    <div class="flex items-center space-x-4">
-                                        <!-- Dropdown Menu Trigger -->
-                                        <x-dropdown-menu>
-                                            <x-slot name="trigger">
-                                                <button
-                                                    class="p-2 text-gray-500 hover:text-gray-700 transition-colors duration-200">
-                                                    <svg class="w-6 h-6" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-                                                    </svg>
-                                                </button>
-                                            </x-slot>
-                                            <x-slot name="items">
-                                                <button wire:click="confirmDownload('pdf')"
-                                                    class="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                    Download PDF
-                                                </button>
-                                                <button wire:click="confirmDownload('qr')"
-                                                    class="block w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                    Download QR Code (JPG)
-                                                </button>
-                                            </x-slot>
-                                        </x-dropdown-menu>
-                                        <!-- Close Button -->
-                                        <button wire:click="closeItemDetails"
-                                            class="text-gray-500 hover:text-gray-700 transition-colors duration-200">
-                                            <svg class="w-6 h-6" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M6 18L18 6M6 6l12 12"></path>
+
+                <!-- Status Filter -->
+                <div class="mt-4 md:mt-0">
+                    <select wire:model.live="status"
+                        class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                        <option value="">All Status</option>
+                        <option value="lost">Lost</option>
+                        <option value="found">Found</option>
+                        <option value="claimed">Claimed</option>
+                        <option value="returned">Returned</option>
+                    </select>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="mt-4 md:mt-0">
+                    <select wire:model.live="category"
+                        class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                        <option value="">All Categories</option>
+                        @foreach($categories as $category)
+                            <option value="{{ $category->id }}">{{ $category->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Advanced Filters Toggle -->
+                <div class="mt-4 md:mt-0">
+                    <button wire:click="toggleAdvancedFilters"
+                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-filter mr-2"></i>
+                        Filters
+                        @if($showAdvancedFilters)
+                            <i class="fas fa-chevron-up ml-2"></i>
+                        @else
+                            <i class="fas fa-chevron-down ml-2"></i>
+                        @endif
+                    </button>
+                </div>
+            </div>
+
+            <!-- Advanced Filters Panel -->
+            <div class="{{ $showAdvancedFilters ? 'block' : 'hidden' }} relative mt-4">
+                <div class="bg-white rounded-lg shadow-lg border border-gray-200 p-4 transform transition-all duration-200 ease-in-out">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Condition -->
+                        <div>
+                            <label for="condition" class="block text-sm font-medium text-gray-700">Condition</label>
+                            <select wire:model.live="condition" id="condition"
+                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                <option value="">Any Condition</option>
+                                <option value="new">New</option>
+                                <option value="like_new">Like New</option>
+                                <option value="good">Good</option>
+                                <option value="fair">Fair</option>
+                                <option value="poor">Poor</option>
+                            </select>
+                        </div>
+
+                        <!-- Brand -->
+                        <div>
+                            <label for="brand" class="block text-sm font-medium text-gray-700">Brand</label>
+                            <input type="text" wire:model.live.debounce.300ms="brand" id="brand"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="Enter brand name">
+                        </div>
+
+                        <!-- Color -->
+                        <div>
+                            <label for="color" class="block text-sm font-medium text-gray-700">Color</label>
+                            <input type="text" wire:model.live.debounce.300ms="color" id="color"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="Enter color">
+                        </div>
+
+                        <!-- Location -->
+                        <div>
+                            <label for="location" class="block text-sm font-medium text-gray-700">Location</label>
+                            <input type="text" wire:model.live.debounce.500ms="location" id="location"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="Enter location">
+                        </div>
+
+                        <!-- Radius -->
+                        <div>
+                            <label for="radius" class="block text-sm font-medium text-gray-700">Radius (km)</label>
+                            <input type="number" wire:model.live.debounce.300ms="radius" id="radius"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="Search radius">
+                        </div>
+
+                        <!-- Date Range -->
+                        <div>
+                            <label for="dateRange" class="block text-sm font-medium text-gray-700">Date Range</label>
+                            <input type="text" wire:model.live="dateRange" id="dateRange"
+                                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                placeholder="Select date range">
+                        </div>
+                    </div>
+
+                    <!-- Reset Filters -->
+                    <div class="mt-4 flex justify-end">
+                        <button wire:click="resetFilters"
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i class="fas fa-undo mr-2"></i>
+                            Reset Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="bg-white rounded-lg shadow">
+            <!-- Map View -->
+            @if($view === 'map')
+                <div class="h-[600px] relative rounded-lg overflow-hidden" wire:ignore>
+                    <div id="map" class="w-full h-full"></div>
+                </div>
+
+                <script>
+                    document.addEventListener('livewire:initialized', function () {
+                        const map = new google.maps.Map(document.getElementById('map'), {
+                            center: { lat: @json($mapCenter['lat']), lng: @json($mapCenter['lng']) },
+                            zoom: @json($mapZoom),
+                            styles: [
+                                {
+                                    featureType: "poi",
+                                    elementType: "labels",
+                                    stylers: [{ visibility: "off" }]
+                                }
+                            ]
+                        });
+
+                        const markers = @json($markers);
+                        const bounds = new google.maps.LatLngBounds();
+                        const infoWindow = new google.maps.InfoWindow();
+
+                        markers.forEach(marker => {
+                            if (marker.lat && marker.lng) {
+                                const position = new google.maps.LatLng(marker.lat, marker.lng);
+                                bounds.extend(position);
+
+                                const mapMarker = new google.maps.Marker({
+                                    position: position,
+                                    map: map,
+                                    title: marker.title,
+                                    icon: {
+                                        url: marker.status === 'found' ? '/images/marker-found.png' : '/images/marker-lost.png',
+                                        scaledSize: new google.maps.Size(32, 32)
+                                    }
+                                });
+
+                                mapMarker.addListener('click', () => {
+                                    const content = `
+                                        <div class="p-2">
+                                            <h3 class="font-semibold">${marker.title}</h3>
+                                            ${marker.image ? `<img src="${marker.image}" class="w-32 h-32 object-cover mt-2">` : ''}
+                                            <button onclick="Livewire.dispatch('viewDetails', { itemId: ${marker.id} })"
+                                                class="mt-2 px-3 py-1 bg-blue-600 text-white rounded-md text-sm">
+                                                View Details
+                                            </button>
+                                        </div>
+                                    `;
+                                    infoWindow.setContent(content);
+                                    infoWindow.open(map, mapMarker);
+                                });
+                            }
+                        });
+
+                        if (!bounds.isEmpty()) {
+                            map.fitBounds(bounds);
+                        }
+                    });
+                </script>
+            @elseif($view === 'list')
+                <!-- List View -->
+                <div class="divide-y divide-gray-200">
+                    @foreach($items as $item)
+                        <div class="p-4 hover:bg-gray-50 transition-colors duration-200">
+                            <div class="flex items-start space-x-4">
+                                <!-- Fixed size image container -->
+                                <div class="relative flex-shrink-0 w-32 h-32 bg-gray-100 rounded-lg overflow-hidden">
+                                    @if($item->images->first())
+                                        <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
+                                             alt="{{ $item->title }}"
+                                             class="absolute inset-0 w-full h-full object-cover">
+                                    @else
+                                        <div class="flex items-center justify-center h-full">
+                                            <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                             </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Content -->
-                            <div class="mt-6">
-                                <!-- Images Collage -->
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                                    @foreach ($selectedItem->images as $index => $image)
-                                        <div x-data="{ zoomed: false }" @mouseenter="zoomed = true"
-                                            @mouseleave="zoomed = false"
-                                            class="relative overflow-hidden rounded-lg transition-transform duration-300"
-                                            :class="{ 'scale-105': zoomed }"
-                                            :style="'aspect-ratio: {{ $index === 0 ? '2 / 1' : '1 / 1' }}'">
-                                            <img src="{{ asset('storage/' . $image->image_path) }}"
-                                                alt="{{ $selectedItem->title }}"
-                                                class="absolute inset-0 w-full h-full object-cover" loading="lazy">
-                                        </div>
-                                    @endforeach
-                                </div>
-
-                                <!-- Details Section -->
-                                <div class="space-y-8">
-                                    <!-- Description (Bold Paragraph) -->
-                                    <div>
-                                        <h3 class="text-xl font-semibold text-gray-900 mb-3">About the Item</h3>
-                                        <p class="text-gray-600 leading-relaxed">
-                                            {{ $selectedItem->description }}
-                                        </p>
-                                    </div>
-
-                                    <!-- Conditional Sections Based on Item Type -->
-                                    @if ($selectedItem->item_type === 'reported' || $selectedItem->item_type === 'searched')
-                                        <!-- Emotional Context for Reported/Searched Items -->
-                                        <div>
-                                            <h3 class="text-xl font-semibold text-gray-900 mb-3">Last Seen</h3>
-                                            <p class="text-gray-600 leading-relaxed">
-                                                This item holds significant value to its owner. It was last seen at
-                                                <span class="font-medium">{{ $selectedItem->location }}</span> on
-                                                <span
-                                                    class="font-medium">{{ $selectedItem->date_lost ? \Carbon\Carbon::parse($date_lost)->format('F j, Y') : 'Not provided' }}</span>.
-                                                The owner is deeply concerned and hopes for its safe return.
-                                            </p>
-                                        </div>
-
-                                        <!-- Additional Details for Reported/Searched Items -->
-                                        <div>
-                                            <h3 class="text-xl font-semibold text-gray-900 mb-3">Reported By</h3>
-                                            <p class="text-gray-600 leading-relaxed">
-                                                The item was in <span
-                                                    class="font-medium">{{ $selectedItem->condition }}</span>
-                                                condition
-                                                when it was lost. It was reported by <span class="font-medium">
-                                                    @if ($selectedItem->is_anonymous)
-                                                        an anonymous individual
-                                                    @else
-                                                        {{ $selectedItem->user->name }}
-                                                    @endif
-                                                </span>, who is eagerly awaiting any information that could help recover
-                                                it.
-                                            </p>
-                                        </div>
-                                    @elseif ($selectedItem->item_type === 'found')
-                                        <!-- Found Item Details -->
-                                        <div>
-                                            <h3 class="text-xl font-semibold text-gray-900 mb-3">Found Details</h3>
-                                            <p class="text-gray-600 leading-relaxed">
-                                                This item was found at <span
-                                                    class="font-medium">{{ $selectedItem->location }}</span> on
-                                                <span
-                                                    class="font-medium">{{ $selectedItem->date_found ? \Carbon\Carbon::parse($date_lost)->format('F j, Y') : 'Not provided' }}</span>.
-                                                It is currently in <span
-                                                    class="font-medium">{{ $selectedItem->condition }}</span>
-                                                condition.
-                                            </p>
-                                        </div>
-
-                                        <!-- Found By Information -->
-                                        <div>
-                                            <h3 class="text-xl font-semibold text-gray-900 mb-3">Found By</h3>
-                                            <p class="text-gray-600 leading-relaxed">
-                                                The item was found by <span
-                                                    class="font-medium">{{ $selectedItem->user->name ?? 'Unknown' }}</span>.
-                                                If this item belongs to you, please contact the finder or the platform
-                                                administrator to
-                                                claim it.
-                                            </p>
                                         </div>
                                     @endif
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Preview Modal -->
-                    <x-dialog-modal wire:model.live="previewContent">
-                        <x-slot name="title">
-                            Preview
-                        </x-slot>
-                        <x-slot name="content">
-                            <div class="flex justify-center">
-                                {!! $previewContent !!}
-                            </div>
-                        </x-slot>
-                        <x-slot name="footer">
-                            <x-secondary-button wire:click="$set('previewContent', '')">
-                                Close
-                            </x-secondary-button>
-                        </x-slot>
-                    </x-dialog-modal>
-
-                    <!-- Download Confirmation Modal -->
-                    <x-dialog-modal wire:model.live="confirmingDownload">
-                        <x-slot name="title">
-                            Confirm Download
-                        </x-slot>
-                        <x-slot name="content">
-                            Are you sure you want to download this {{ $downloadType }}?
-                        </x-slot>
-                        <x-slot name="footer">
-                            <x-secondary-button wire:click="$set('confirmingDownload', false)">
-                                Cancel
-                            </x-secondary-button>
-                            <x-button wire:click="downloadItem">
-                                Download
-                            </x-button>
-                        </x-slot>
-                    </x-dialog-modal>
-                @endif
-                <div>
-                   <div wire:poll.5s>
-                        <!-- Section for All Items -->
-                        <div wire:ignore class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-                            @foreach ($lostItems as $item)
-                                <div class="rounded-xl shadow-lg overflow-hidden transition-all duration-500 ease-in-out transform hover:scale-105 hover:shadow-2xl relative"
-                                    style="background: linear-gradient(145deg, {{ $item->claimed_by ? '#f0f0f0' : ($item->user_id === Auth::id() ? '#e0f7fa' : '#ffffff') }}, {{ $item->claimed_by ? '#e0e0e0' : ($item->user_id === Auth::id() ? '#b2ebf2' : '#f5f5f5') }});">
-
-                                    <!-- Header Section for Badges -->
-                                    <div class="p-4 bg-white bg-opacity-90 flex justify-between items-start">
-                                        <!-- Item Type Badge -->
-                                        <div class="flex items-center space-x-2">
-                                            @php
-                                                $itemTypeColor =
-                                                    [
-                                                        'reported' => 'bg-purple-500 text-white',
-                                                        'searched' => 'bg-yellow-500 text-white',
-                                                        'found' => 'bg-green-500 text-white',
-                                                    ][$item->item_type] ?? 'bg-gray-500 text-white';
-                                            @endphp
-                                            <span
-                                                class="{{ $itemTypeColor }} px-3 py-1 rounded-full text-xs font-semibold shadow-md">
-                                                {{ ucfirst($item->item_type) }}
-                                            </span>
-
-                                            <!-- Image Matching Percentage (Displayed only for "Found" items) -->
-                                            @if ($item->item_type === 'found' && Auth::check())
-                                                @php
-                                                    $userReportedItems = \App\Models\LostItem::where('user_id', Auth::id())
-                                                        ->whereIn('item_type', ['reported', 'searched'])
-                                                        ->with('images')
-                                                        ->get();
-
-                                                    $imageSimilarityScore = null;
-                                                    if ($userReportedItems->isNotEmpty()) {
-                                                        $imageSimilarityScore = $this->calculateImageSimilarity(
-                                                            $userReportedItems->first(),
-                                                            $item
-                                                        );
-                                                    }
-                                                @endphp
-                                                @if ($imageSimilarityScore !== null)
-                                                    <div class="relative group">
-                                                        <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-md">
-                                                            {{ number_format($imageSimilarityScore * 100, 2) }}%
-                                                        </span>
-                                                    </div>
-                                                @endif
-                                            @endif
-                                        </div>
+                                <!-- Item Details -->
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between">
+                                        <span class="px-2.5 py-0.5 text-xs font-medium rounded-full
+                                            @if($item->status === 'found') bg-green-100 text-green-800
+                                            @elseif($item->status === 'claimed') bg-blue-100 text-blue-800
+                                            @else bg-yellow-100 text-yellow-800 @endif">
+                                            {{ ucfirst($item->status) }}
+                                        </span>
+                                        <span class="text-sm text-gray-500">{{ $item->created_at->diffForHumans() }}</span>
                                     </div>
-
-                                    <!-- Image Section -->
-                                    <div class="relative w-full h-48 overflow-hidden">
-                                        @if ($item->images->isNotEmpty())
-                                            <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
-                                                alt="{{ $item->title }}"
-                                                class="w-full h-full object-cover transition-transform duration-500 ease-in-out hover:scale-110">
-                                        @else
-                                            <div class="w-full h-full bg-gray-100 flex items-center justify-center">
-                                                <span class="text-gray-500 text-xs">No Image Available</span>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    <!-- Content Section -->
-                                    <div class="p-4">
-                                        <!-- Title with Eye Icon -->
-                                        <div class="flex justify-between items-center mb-3">
-                                            <h3 class="text-xl font-bold text-gray-900">{{ $item->title }}</h3>
-                                            <button wire:click="showItemDetails({{ $item->id }})"
-                                                class="text-gray-500 hover:text-blue-600 transition-colors duration-500 ease-in-out"
-                                                data-tippy-content="View Item Details">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                        </div>
-
-                                        <!-- Reported By -->
-                                        <div class="flex items-center space-x-2 text-sm text-gray-600 mb-3">
-                                            <i class="fas fa-user"></i>
-                                            <span class="text-gray-700">{{ $item->user->name }}</span>
-                                        </div>
-
-                                        <!-- Location Badge -->
-                                        <div class="flex items-center space-x-2 mb-3">
-                                            <i class="fas fa-map-marker-alt text-blue-500 animate-pulse"></i>
-                                            <span
-                                                class="text-sm text-gray-700 bg-blue-50 px-3 py-1 rounded-full">{{ $item->location }}</span>
-                                        </div>
-
-                                        <!-- Matched Item Information (For Reported and Searched Items) -->
-                                        @if (in_array($item->item_type, ['reported', 'searched']) && $item->matchedFoundItem)
-                                            <div class="mt-4 p-3 bg-gray-50 rounded-lg">
-                                                <h4 class="text-sm font-semibold text-gray-700 mb-2">Matched Found Item
-                                                </h4>
-                                                <div class="space-y-2">
-                                                    <div class="flex items-center space-x-2">
-                                                        <i class="fas fa-check-circle text-green-500"></i>
-                                                        <span class="text-sm text-gray-700">
-                                                            Found by: {{ $item->matchedFoundItem->user->name }}
-                                                        </span>
-                                                    </div>
-                                                    <div class="flex items-center space-x-2">
-                                                        <i class="fas fa-map-marker-alt text-blue-500"></i>
-                                                        <span class="text-sm text-gray-700">
-                                                            Found at: {{ $item->matchedFoundItem->location }}
-                                                        </span>
-                                                    </div>
-                                                    <div class="flex items-center space-x-2">
-                                                        <i class="fas fa-calendar-alt text-gray-500"></i>
-                                                        <span class="text-sm text-gray-700">
-                                                            Found on: {{ $item->matchedFoundItem->date_found->format('M d, Y') }}
-                                                        </span>
-                                                    </div>
-                                                    @if ($item->matchedFoundItem->claimed_by)
-                                                        <div class="flex items-center space-x-2">
-                                                            <i class="fas fa-user-check text-purple-500"></i>
-                                                            <span class="text-sm text-gray-700">
-                                                                Claimed by:
-                                                                {{ $item->matchedFoundItem->claimedByUser->name }}
-                                                            </span>
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        @endif
-
-                                        <!-- Claim Button (Centered at the Bottom) -->
-                                        @if ($item->item_type === 'found' && $item->user_id !== Auth::id() && !$item->claimed_by && $imageSimilarityScore > 0.5)
-                                            <div
-                                                class="absolute bottom-0 left-0 right-0 flex justify-center p-3 bg-white bg-opacity-90">
-                                                <button wire:click="confirmClaim({{ $item->id }})"
-                                                    class="bg-green-500 text-white hover:bg-green-600 transition-colors duration-500 ease-in-out rounded-full px-6 py-2 text-sm shadow-sm hover:shadow-md flex items-center space-x-2"
-                                                    data-tippy-content="Claim Item">
-                                                    <i class="fas fa-hand-holding-heart"></i>
-                                                    <span>Claim</span>
-                                                </button>
-                                            </div>
-                                        @endif
-
-                                        <!-- Claimed Message -->
-                                        @if ($item->claimed_by)
-                                            <div
-                                                class="absolute bottom-0 left-0 right-0 flex justify-center p-3 bg-gray-200 bg-opacity-90">
-                                                <span class="text-sm text-gray-700 font-semibold">
-                                                    Found and Claimed by {{ $item->claimedByUser->name }}
-                                                </span>
-                                            </div>
-                                        @endif
-
-                                        <!-- Reset Claim Button (For Admins/Superadmins) -->
-                                        @if ($item->claimed_by && (auth()->user()->hasRole('admin') || auth()->user()->hasRole('superadmin')))
-                                            <div
-                                                class="absolute bottom-0 left-0 right-0 flex justify-center p-3 bg-white bg-opacity-90">
-                                                <button wire:click="confirmResetClaim({{ $item->id }})"
-                                                    class="bg-red-500 text-white hover:bg-red-600 transition-colors duration-500 ease-in-out rounded-full px-6 py-2 text-sm shadow-sm hover:shadow-md flex items-center space-x-2"
-                                                    data-tippy-content="Reset Claim">
-                                                    <i class="fas fa-undo"></i>
-                                                    <span>Reset Claim</span>
-                                                </button>
-                                            </div>
+                                    <h3 class="mt-1 text-lg font-semibold text-gray-900">{{ $item->title }}</h3>
+                                    <p class="mt-1 text-sm text-gray-600">{{ $item->description }}</p>
+                                    <div class="mt-2 flex items-center justify-between">
+                                        <button wire:click="viewDetails({{ $item->id }})"
+                                                class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                                            View Details
+                                        </button>
+                                        @if($item->category)
+                                            <span class="text-sm text-gray-500">{{ $item->category->name }}</span>
                                         @endif
                                     </div>
                                 </div>
-                            @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <!-- Grid View -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-4">
+                    @foreach($items as $item)
+                    <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 border border-gray-100 overflow-hidden">
+                        <!-- Fixed height image container -->
+                        <div class="relative w-full h-48 bg-gray-100">
+                            @if($item->images->first())
+                            <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
+                                 alt="{{ $item->title }}"
+                                 class="absolute inset-0 w-full h-full object-cover">
+                            @else
+                            <div class="flex items-center justify-center h-full bg-gray-50">
+                                <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            @endif
+                        </div>
+                        <!-- Item Details -->
+                        <div class="p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="px-2.5 py-0.5 text-xs font-medium rounded-full
+                                    @if($item->status === 'found') bg-green-100 text-green-800
+                                    @elseif($item->status === 'claimed') bg-blue-100 text-blue-800
+                                    @else bg-yellow-100 text-yellow-800 @endif">
+                                    {{ ucfirst($item->status) }}
+                                </span>
+                                <span class="text-sm text-gray-500">{{ $item->created_at->diffForHumans() }}</span>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-1">{{ $item->title }}</h3>
+                            <p class="text-sm text-gray-600 line-clamp-2 mb-3">{{ $item->description }}</p>
+                            <div class="flex items-center justify-between">
+                                <button wire:click="viewDetails({{ $item->id }})"
+                                        class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                                    View Details
+                                </button>
+                                @if($item->category)
+                                <span class="text-sm text-gray-500">{{ $item->category->name }}</span>
+                                @endif
+                            </div>
                         </div>
                     </div>
+                    @endforeach
+                </div>
+            @endif
 
-
-                    <!-- Pagination -->
-                    <div class="mt-6">
-                        {{ $lostItems->links() }}
-                    </div>
+            <!-- Pagination -->
+            @if($items->hasPages())
+                <div class="px-6 py-4 border-t border-gray-200">
+                    {{ $items->links() }}
                 </div>
             @endif
         </div>
-        <!-- Delete Confirmation Modal -->
-        <x-dialog-modal wire:model.live="confirmingDelete">
-            <x-slot name="title">
-                {{ __('Delete Item') }}
-            </x-slot>
-
-            <x-slot name="content">
-                {{ __('Are you sure you want to delete this item? This action cannot be undone.') }}
-            </x-slot>
-
-            <x-slot name="footer">
-                <x-secondary-button wire:click="$toggle('confirmingDelete')" wire:loading.attr="disabled">
-                    {{ __('Cancel') }}
-                </x-secondary-button>
-
-                <x-button class="ms-3 bg-red-600 hover:bg-red-700" wire:click="deleteItem"
-                    wire:loading.attr="disabled">
-                    {{ __('Delete') }}
-                </x-button>
-            </x-slot>
-        </x-dialog-modal>
-
-       <!-- Claim Confirmation Modal -->
-<x-dialog-modal wire:model.live="confirmingClaim">
-    <x-slot name="title">
-        {{ __('Claim Item') }}
-    </x-slot>
-
-    <x-slot name="content">
-        <div class="space-y-6">
-            <!-- Confirmation Message -->
-            <p class="text-gray-700 text-sm leading-relaxed">
-                {{ __('Are you sure you want to claim this item? Please review the following checks to ensure it matches your lost item.') }}
-            </p>
-
-            <!-- Similarity Scores Section -->
-            <div class="space-y-4">
-                <!-- Text Similarity Score -->
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-700 font-medium">Description Match:</span>
-                    <div class="flex items-center space-x-2">
-                        <span class="text-sm font-semibold text-gray-700">
-                            {{ number_format($textSimilarityScore * 100, 2) }}%
-                        </span>
-                        <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div class="h-full bg-blue-500 rounded-full"
-                                style="width: {{ $textSimilarityScore * 100 }}%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Image Similarity Score -->
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-700 font-medium">Image Match:</span>
-                    <div class="flex items-center space-x-2">
-                        <span class="text-sm font-semibold text-gray-700">
-                            {{ number_format($imageSimilarityScore * 100, 2) }}%
-                        </span>
-                        <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div class="h-full bg-green-500 rounded-full"
-                                style="width: {{ $imageSimilarityScore * 100 }}%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Location Similarity Score -->
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-700 font-medium">Location Match:</span>
-                    <div class="flex items-center space-x-2">
-                        <span class="text-sm font-semibold text-gray-700">
-                            {{ number_format($locationSimilarityScore * 100, 2) }}%
-                        </span>
-                        <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div class="h-full bg-purple-500 rounded-full"
-                                style="width: {{ $locationSimilarityScore * 100 }}%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Time Similarity Score -->
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-700 font-medium">Time Match:</span>
-                    <div class="flex items-center space-x-2">
-                        <span class="text-sm font-semibold text-gray-700">
-                            {{ number_format($timeSimilarityScore * 100, 2) }}%
-                        </span>
-                        <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div class="h-full bg-yellow-500 rounded-full"
-                                style="width: {{ $timeSimilarityScore * 100 }}%;"></div>
-                        </div>
-                    </div>
-                </div>
-
-
-            </div>
-
-            <!-- Total Similarity Score Display -->
-            <div class="text-center">
-                <span class="text-2xl font-bold text-gray-800">
-                    Total Similarity Score: {{ number_format($totalSimilarityScore * 100, 2) }}%
-                </span>
-            </div>
-
-            <!-- Checks List -->
-            <div class="space-y-3">
-                <!-- Description Matches -->
-                <div class="flex items-center space-x-3">
-                    <div class="flex-shrink-0">
-                        @if ($checks['description_matches'] ?? false)
-                            <i class="fas fa-check-circle text-green-500"></i>
-                        @else
-                            <i class="fas fa-times-circle text-red-500"></i>
-                        @endif
-                    </div>
-                    <span class="text-gray-700 text-sm">
-                        The description matches the item you were looking for.
-                    </span>
-                </div>
-
-                <!-- Images Match -->
-                <div class="flex items-center space-x-3">
-                    <div class="flex-shrink-0">
-                        @if ($checks['images_match'] ?? false)
-                            <i class="fas fa-check-circle text-green-500"></i>
-                        @else
-                            <i class="fas fa-times-circle text-red-500"></i>
-                        @endif
-                    </div>
-                    <span class="text-gray-700 text-sm">
-                        The images match the item you were looking for.
-                    </span>
-                </div>
-
-                <!-- Location Matches -->
-                <div class="flex items-center space-x-3">
-                    <div class="flex-shrink-0">
-                        @if ($checks['location_matches'] ?? false)
-                            <i class="fas fa-check-circle text-green-500"></i>
-                        @else
-                            <i class="fas fa-times-circle text-red-500"></i>
-                        @endif
-                    </div>
-                    <span class="text-gray-700 text-sm">
-                        The location matches where you lost the item.
-                    </span>
-                </div>
-
-                <!-- Time Matches -->
-                <div class="flex items-center space-x-3">
-                    <div class="flex-shrink-0">
-                        @if ($checks['time_matches'] ?? false)
-                            <i class="fas fa-check-circle text-green-500"></i>
-                        @else
-                            <i class="fas fa-times-circle text-red-500"></i>
-                        @endif
-                    </div>
-                    <span class="text-gray-700 text-sm">
-                        The time matches when you lost the item.
-                    </span>
-                </div>
-            </div>
-        </div>
-    </x-slot>
-
-    <x-slot name="footer">
-        <x-secondary-button wire:click="closeClaimModal" wire:loading.attr="disabled">
-            {{ __('Cancel') }}
-        </x-secondary-button>
-
-        <x-button class="ms-3 bg-green-600 hover:bg-green-700" wire:click="processClaim"
-            wire:loading.attr="disabled">
-            {{ __('Claim') }}
-        </x-button>
-    </x-slot>
-</x-dialog-modal>
-
-
-
-        <!-- Reset Claim Modal -->
-        <x-dialog-modal wire:model.live="confirmingResetClaim">
-            <x-slot name="title">
-                {{ __('Reset Claim') }}
-            </x-slot>
-
-            <x-slot name="content">
-                <p class="text-gray-700">
-                    {{ __('Are you sure you want to reset the claim for this item?') }}
-                </p>
-            </x-slot>
-
-            <x-slot name="footer">
-                <div class="flex justify-end space-x-4">
-                    <x-secondary-button wire:click="closeResetClaimModal">
-                        {{ __('Cancel') }}
-                    </x-secondary-button>
-                    <x-button wire:click="resetClaim" class="bg-red-500 hover:bg-red-600">
-                        {{ __('Reset Claim') }}
-                    </x-button>
-                </div>
-            </x-slot>
-        </x-dialog-modal>
-
     </div>
+
+    <!-- Item Details Modal -->
+    <x-item-details-modal wire:model.live="showModal">
+        @if($selectedItem)
+            <x-slot:gallery>
+                <div class="h-full flex items-center justify-center p-4">
+                    @if($selectedItem->images->count() > 0)
+                    <div class="grid grid-cols-2 gap-2 h-full w-full">
+                        @foreach($selectedItem->images as $index => $image)
+                        <div class="relative group {{ $index === 0 ? 'col-span-2 row-span-2' : '' }} rounded-lg overflow-hidden">
+                            <img src="{{ asset('storage/' . $image->image_path) }}"
+                                 alt="Item image {{ $index + 1 }}"
+                                 class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity duration-200"></div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @else
+                    <div class="flex items-center justify-center h-full w-full bg-gray-800">
+                        <svg class="w-24 h-24 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    @endif
+                </div>
+            </x-slot:gallery>
+
+            <x-slot:header>
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <span class="px-3 py-1 text-sm font-medium rounded-full
+                            @if($selectedItem->status === 'found') bg-green-100 text-green-800
+                            @elseif($selectedItem->status === 'claimed') bg-blue-100 text-blue-800
+                            @else bg-yellow-100 text-yellow-800 @endif">
+                            {{ ucfirst($selectedItem->status) }}
+                        </span>
+                        @if($selectedItem->category)
+                        <span class="text-sm text-gray-600">{{ $selectedItem->category->name }}</span>
+                        @endif
+                    </div>
+                    <button wire:click="closeModal" class="text-gray-400 hover:text-gray-500">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-900 mt-4">{{ $selectedItem->title }}</h2>
+            </x-slot:header>
+
+            <x-slot:content>
+                <div class="space-y-6">
+                    <!-- Basic Info -->
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
+                        <dl class="grid grid-cols-2 gap-4">
+                            @if($selectedItem->brand)
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500">Brand</dt>
+                                <dd class="text-sm text-gray-900">{{ $selectedItem->brand }}</dd>
+                            </div>
+                            @endif
+                            @if($selectedItem->color)
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500">Color</dt>
+                                <dd class="text-sm text-gray-900">{{ $selectedItem->color }}</dd>
+                            </div>
+                            @endif
+                            @if($selectedItem->condition)
+                            <div>
+                                <dt class="text-sm font-medium text-gray-500">Condition</dt>
+                                <dd class="text-sm text-gray-900">{{ ucfirst($selectedItem->condition) }}</dd>
+                            </div>
+                            @endif
+                        </dl>
+                    </div>
+
+                    <!-- Description -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Description</h3>
+                        <p class="text-gray-600">{{ $selectedItem->description }}</p>
+                    </div>
+
+                    <!-- Location Info -->
+                    @if($selectedItem->location_address || $selectedItem->area)
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Location Information</h3>
+                        @if($selectedItem->location_address)
+                        <p class="text-sm text-gray-600">{{ $selectedItem->location_address }}</p>
+                        @endif
+                        @if($selectedItem->area)
+                        <p class="text-sm text-gray-600 mt-2">Area: {{ $selectedItem->area }}</p>
+                        @endif
+                        @if($selectedItem->landmarks)
+                        <p class="text-sm text-gray-600 mt-2">Landmarks: {{ $selectedItem->landmarks }}</p>
+                        @endif
+                    </div>
+                    @endif
+                </div>
+            </x-slot:content>
+
+            <x-slot:footer>
+                <div class="flex justify-end space-x-3">
+                    @if($selectedItem->status === 'lost')
+                    <button wire:click="reportMatch({{ $selectedItem->id }})"
+                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition-all duration-200">
+                        Report Match
+                    </button>
+                    @endif
+                    <button wire:click="closeModal"
+                        class="inline-flex items-center px-4 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition-all duration-200">
+                        Close
+                    </button>
+                </div>
+            </x-slot:footer>
+        @endif
+    </x-item-details-modal>
+
+    @push('scripts')
+    <script src="https://maps.googleapis.com/maps/api/js?key={{ config('services.google.maps_api_key') }}&libraries=places"></script>
+    @endpush
 </div>

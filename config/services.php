@@ -38,6 +38,7 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
+        'maps_api_key' => env('GOOGLE_MAPS_API_KEY'),
     ],
 
     'twitter' => [
@@ -54,6 +55,23 @@ return [
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'assistant_id' => env('OPENAI_ASSISTANT_ID'),
+    ],
+
+    'huggingface' => [
+        'key' => env('HUGGINGFACE_API_KEY'),
+        'model' => env('HUGGINGFACE_MODEL', 'facebook/blenderbot-400M-distill'),
+    ],
+
+    'recaptcha' => [
+        'site_key' => env('RECAPTCHA_SITE_KEY'),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+    ],
+
+    'mailgun' => [
+        'domain' => env('MAILGUN_DOMAIN'),
+        'secret' => env('MAILGUN_SECRET'),
+        'endpoint' => env('MAILGUN_ENDPOINT', 'api.mailgun.net'),
+        'scheme' => 'https',
     ],
 
 ];

@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->integer('reward_points')->default(0);
+        Schema::table('reward_histories', function (Blueprint $table) {
+            $table->dropColumn(['type', 'category']);
         });
     }
 
@@ -21,8 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('reward_points');
+        Schema::table('reward_histories', function (Blueprint $table) {
+            $table->string('type', 20)->after('user_id');
+            $table->string('category', 20)->after('description');
         });
     }
 };

@@ -3,192 +3,204 @@
 namespace App\Livewire;
 
 use Livewire\Component;
-use App\Models\Category;
-use App\Models\LostItem;
-use App\Models\LostItemImage;
 use Livewire\WithFileUploads;
-use Illuminate\Support\Facades\Log;
+use App\Models\LostItem;
+use App\Models\Category;
+use App\Models\LostItemImage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Spatie\LivewireFilepond\WithFilePond;
 use Usernotnull\Toast\Concerns\WireToast;
 
 class EditLostItem extends Component
 {
-    use WithFileUploads, WithFilePond, WireToast;
+    use WithFileUploads;
+    use WireToast;
 
+    public $item;
+    public $title;
+    public $description;
+    public $category_id;
+    public $status;
+    public $condition;
+    public $brand;
+    public $color;
+    public $date;
+    public $notes;
+    public $is_anonymous;
+    public $images = [];
+    public $existingImages = [];
+    public $categories;
+    public $locationType;
+    public $location_address;
+    public $location_lat;
+    public $location_lng;
+    public $area;
+    public $landmarks;
 
-    public $editingItem = false; // Controls whether the edit form is visible
-    public $item; // The item being edited
+    protected $rules = [
+        'title' => 'required|min:5',
+        'description' => 'required|min:10',
+        'category_id' => 'required|exists:categories,id',
+        'condition' => 'required|in:new,like_new,excellent,good,fair,poor,damaged',
+        'brand' => 'nullable|string|max:100',
+        'color' => 'nullable|string|max:50',
+        'date' => 'required|date|before_or_equal:today',
+        'notes' => 'nullable|string',
+        'is_anonymous' => 'boolean',
+        'images.*' => 'nullable|image|max:5120', // 5MB max
+        'locationType' => 'required|in:specific,area',
+        'location_address' => 'required_if:locationType,specific',
+        'location_lat' => 'required_if:locationType,specific|nullable|numeric',
+        'location_lng' => 'required_if:locationType,specific|nullable|numeric',
+        'area' => 'required_if:locationType,area|nullable|string',
+        'landmarks' => 'nullable|string',
+    ];
 
-    // Item Properties
-    public $title, $description, $category_id, $condition, $value, $is_anonymous, $location, $date_lost;
-
-    // Image Upload
-    public $images = []; // For new image uploads
-    public $existingImages = []; // For existing images
-    public $userItems;
-    public $confirmingDelete = false;
-    public $itemIdToDelete;
-
-   
-    public function mount()
+    public function mount($itemId)
     {
-        $this->userItems = LostItem::where('user_id', Auth::id())->get();
-        if (auth()->user()->hasRole('admin') || auth()->user()->hasRole('superadmin')) {
-            $this->userItems = LostItem::all();
+        $this->item = LostItem::with('images')->findOrFail($itemId);
+
+        // Check if user owns the item
+        if ($this->item->user_id !== Auth::id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        // Load categories
+        $this->categories = Category::all();
+
+        // Populate fields
+        $this->title = $this->item->title;
+        $this->description = $this->item->description;
+        $this->category_id = $this->item->category_id;
+        $this->status = $this->item->status;
+        $this->condition = $this->item->condition;
+        $this->brand = $this->item->brand;
+        $this->color = $this->item->color;
+        $this->date = $this->item->date_lost ?? $this->item->date_found;
+        $this->notes = $this->item->notes;
+        $this->is_anonymous = $this->item->is_anonymous;
+        $this->locationType = $this->item->location_type;
+        $this->location_address = $this->item->location_address;
+        $this->location_lat = $this->item->location_lat;
+        $this->location_lng = $this->item->location_lng;
+        $this->area = $this->item->area;
+        $this->landmarks = $this->item->landmarks;
+
+        // Load existing images
+        $this->existingImages = $this->item->images->toArray();
+    }
+
+    public function removeExistingImage($imageId)
+    {
+        $image = LostItemImage::find($imageId);
+        if ($image && $image->lost_item_id === $this->item->id) {
+            Storage::disk('public')->delete($image->image_path);
+            $image->delete();
+            $this->existingImages = array_filter($this->existingImages, fn($img) => $img['id'] !== $imageId);
+            toast()->success('Image removed successfully')->push();
         }
     }
 
-    public function updatedImages($value)
+    protected function handleImageUploads()
     {
-        // Ensure new images are unique
-        foreach ($value as $file) {
-            if (!in_array($file, $this->images)) {
-                $this->images[] = $file;
-            }
-        }
-    }
-    public function loadItem($itemId)
-    {
-        $this->item = LostItem::find($itemId);
+        if (!empty($this->images)) {
+            foreach ($this->images as $image) {
+                $path = $image->store('lost-items', 'public');
 
-        if ($this->item) {
-            $this->title = $this->item->title;
-            $this->description = $this->item->description;
-            $this->category_id = $this->item->category_id;
-            $this->condition = $this->item->condition;
-            $this->value = $this->item->value;
-            $this->is_anonymous = $this->item->is_anonymous;
-            $this->location = $this->item->location;
-            $this->date_lost = $this->item->date_lost;
-            $this->existingImages = $this->item->images; // Load existing images
-            $this->editingItem = true; // Show the edit form
-        }
-    }
-
-    public function saveItem()
-    {
-        // Validate the input fields
-        $this->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'location' => 'required|string',
-            'condition' => 'required|string',
-            'date_lost' => 'nullable|date',
-            'value' => 'nullable|numeric',
-            'is_anonymous' => 'nullable|boolean',
-            'category_id' => 'required|exists:categories,id',
-            'images.*' => 'nullable|image|max:2048', // Validate uploaded images
-            'images' => 'max:5', // Ensure no more than 5 images are uploaded
-        ]);
-
-        try {
-            if ($this->item) {
-                // Update item details
-                $this->item->update([
-                    'title' => $this->title,
-                    'description' => $this->description,
-                    'location' => $this->location,
-                    'condition' => $this->condition,
-                    'date_lost' => $this->date_lost,
-                    'value' => $this->value,
-                    'is_anonymous' => $this->is_anonymous,
-                    'category_id' => $this->category_id,
+                LostItemImage::create([
+                    'lost_item_id' => $this->item->id,
+                    'image_path' => $path
                 ]);
-
-                // Save new images
-                foreach ($this->images as $image) {
-                    // Store the image and get the path
-                    $path = $image->store('lost-items', 'public');
-
-                    // Create a new LostItemImage record
-                    LostItemImage::create([
-                        'lost_item_id' => $this->item->id,
-                        'image_path' => $path,
-                    ]);
-                }
-
-                // Refresh the existing images
-                $this->existingImages = $this->item->fresh()->images;
-
-                // Reset the images array
-                $this->images = [];
-                $this->cancelEdit();
-
-                // Show success toast
-                toast()
-                    ->success('Item updated successfully.')
-                    ->push();
             }
-        } catch (\Exception $e) {
-            // Log the error for debugging
-            Log::error('Error saving item: ' . $e->getMessage());
-
-            // Show error toast
-            toast()
-                ->danger('An error occurred while saving the item. Please try again.')
-                ->push();
         }
-    }
-
-    public function confirmDelete($itemId)
-    {
-        $this->itemIdToDelete = $itemId;
-        $this->confirmingDelete = true;
-    }
-
-    public function cancelDelete()
-    {
-        $this->confirmingDelete = false;
-        $this->itemIdToDelete = null;
     }
 
     public function deleteItem()
     {
-        $item = LostItem::find($this->itemIdToDelete);
-        if ($item) {
-            foreach ($item->images as $image) {
-                Storage::disk('public')->delete($image->image_path);
+        try {
+            DB::beginTransaction();
+
+            // Delete associated images
+            foreach ($this->item->images as $image) {
+                Storage::delete('public/' . $image->image_path);
                 $image->delete();
             }
-            $item->delete();
-            $this->cancelDelete();
-            toast()->success('Item deleted successfully.')->push();
+
+            // Delete the item
+            $this->item->delete();
+
+            DB::commit();
+
+            toast()->success('Item deleted successfully')->push();
+            $this->dispatch('itemDeleted')->to('my-reported-items');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error deleting item', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+            toast()->danger('Failed to delete item: ' . $e->getMessage())->push();
         }
     }
 
-
-    public function deleteImage($imageId)
+    public function cancel()
     {
-        $image = LostItemImage::find($imageId);
-        if ($image) {
-            // Delete the image file from storage
-            Storage::disk('public')->delete($image->image_path);
-            // Delete the image record from the database
-            $image->delete();
-            // Refresh the existing images
-            $this->existingImages = $this->item->fresh()->images;
-
-            // Show success toast
-            toast()
-                ->success('Image deleted successfully.')
-                ->push();
-        }
+        $this->dispatch('closeEdit')->to('my-reported-items');
     }
 
-
-    public function cancelEdit()
+    public function submit()
     {
-        $this->editingItem = false; // Hide the edit form
-        $this->reset(['title', 'description', 'location', 'condition', 'date_lost', 'value', 'is_anonymous', 'category_id', 'images']);
+        $this->validate();
+
+        try {
+            DB::beginTransaction();
+
+            // Update the item with the new values
+            $this->item->update([
+                'title' => $this->title,
+                'description' => $this->description,
+                'category_id' => $this->category_id,
+                'brand' => $this->brand,
+                'color' => $this->color,
+                'condition' => $this->condition,
+                'date' => $this->date,
+                'notes' => $this->notes,
+                'is_anonymous' => $this->is_anonymous,
+                'location_type' => $this->locationType,
+                'location_address' => $this->location_address,
+                'location_lat' => $this->location_lat,
+                'location_lng' => $this->location_lng,
+                'area' => $this->area,
+                'landmarks' => $this->landmarks,
+            ]);
+
+            // Handle image uploads
+            if ($this->images) {
+                $this->handleImageUploads();
+            }
+
+            DB::commit();
+
+            toast()->success('Item updated successfully')->push();
+            $this->dispatch('itemUpdated')->to('my-reported-items');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error updating item', [
+                'error' => $e->getMessage(),
+                'user_id' => Auth::id()
+            ]);
+            toast()->danger('Failed to update item: ' . $e->getMessage())->push();
+        }
     }
 
     public function render()
     {
-        $categories = Category::all(); // Fetch all categories for the dropdown
         return view('livewire.edit-lost-item', [
-            'categories' => $categories,
+            'categories' => $this->categories
         ]);
     }
 }

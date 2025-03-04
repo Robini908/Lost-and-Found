@@ -11,6 +11,13 @@ class LostItem extends Model
     use HasFactory;
 
     /**
+     * Constants for item types
+     */
+    const TYPE_REPORTED = 'reported';
+    const TYPE_SEARCHED = 'searched';
+    const TYPE_FOUND = 'found';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array
@@ -21,7 +28,14 @@ class LostItem extends Model
         'description',
         'category_id',
         'status',
-        'location',
+        'location_type',
+        'location_address',
+        'location_lat',
+        'location_lng',
+        'area',
+        'landmarks',
+        'location_lost',
+        'location_found',
         'date_lost',
         'date_found',
         'found_by',
@@ -33,7 +47,26 @@ class LostItem extends Model
         'is_verified',
         'expiry_date',
         'geolocation',
-        'matched_found_item_id', // Add this
+        'matched_found_item_id',
+        'brand',
+        'model',
+        'color',
+        'serial_number',
+        'estimated_value',
+        'currency',
+        'found_at',
+        'claimed_at',
+        'returned_at',
+        'expires_at',
+        'additional_details'
+    ];
+
+    protected $attributes = [
+        'status' => 'lost',
+        'is_verified' => false,
+        'is_anonymous' => false,
+        'currency' => 'USD',
+        'item_type' => self::TYPE_REPORTED,
     ];
 
     /**
@@ -46,6 +79,17 @@ class LostItem extends Model
         'date_lost' => 'date',
         'date_found' => 'date',
         'expiry_date' => 'date',
+        'expires_at' => 'datetime',
+        'found_at' => 'datetime',
+        'claimed_at' => 'datetime',
+        'returned_at' => 'datetime',
+        'is_verified' => 'boolean',
+        'is_anonymous' => 'boolean',
+        'value' => 'float',
+        'estimated_value' => 'decimal:2',
+        'location_lat' => 'decimal:8',
+        'location_lng' => 'decimal:8',
+        'additional_details' => 'json'
     ];
 
     /**

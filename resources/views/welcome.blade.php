@@ -19,21 +19,31 @@
 
 <body class="font-sans antialiased bg-gray-50">
     <!-- Navbar -->
-    <nav class="bg-white shadow-sm fixed w-full z-50">
+    <nav class="bg-white/80 backdrop-blur-md shadow-sm fixed w-full z-50 transition-all duration-300"
+         x-data="{ scrolled: false }"
+         @scroll.window="scrolled = (window.pageYOffset > 20)">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
-                    <img src="https://via.placeholder.com/40" alt="Logo" class="h-8 w-8 mr-2">
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo" class="h-8 w-8 mr-2">
                     <span class="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">Lost & Found Hub</span>
                 </div>
                 @if (Route::has('login'))
                     <div class="flex items-center space-x-4">
                         @auth
-                            <a href="{{ url('/dashboard') }}" class="text-gray-700 hover:text-blue-600 font-medium transition duration-150">Dashboard</a>
+                            <a href="{{ url('/dashboard') }}"
+                               class="group relative inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-all duration-150">
+                                <span class="absolute -inset-0.5 bg-blue-600 blur opacity-0 group-hover:opacity-30 transition-all duration-300 rounded-lg"></span>
+                                <span class="relative">Dashboard</span>
+                            </a>
                         @else
                             <a href="{{ route('login') }}" class="text-gray-700 hover:text-blue-600 font-medium transition duration-150">Log in</a>
                             @if (Route::has('register'))
-                                <a href="{{ route('register') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition duration-150">Register</a>
+                                <a href="{{ route('register') }}"
+                                   class="group relative inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                                    <span class="absolute -inset-0.5 bg-blue-600 blur opacity-0 group-hover:opacity-30 transition-all duration-300 rounded-lg"></span>
+                                    <span class="relative">Register</span>
+                                </a>
                             @endif
                         @endauth
                     </div>
@@ -42,12 +52,18 @@
         </div>
     </nav>
 
-                <!-- Hero Section -->
-    <section class="pt-24 pb-12 bg-gradient-to-b from-blue-50 to-white">
+    <!-- Hero Section with Animation -->
+    <section class="pt-24 pb-12 bg-gradient-to-b from-blue-50 to-white overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-                    <div class="text-center lg:text-left">
-                    <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight mb-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="text-center lg:text-left"
+                     x-data="{ shown: false }"
+                     x-intersect="shown = true">
+                    <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight mb-6"
+                        x-show="shown"
+                        x-transition:enter="transition ease-out duration-500"
+                        x-transition:enter-start="opacity-0 transform -translate-x-8"
+                        x-transition:enter-end="opacity-100 transform translate-x-0">
                         Find What's Lost, <br>
                         <span class="bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">Return What's Found</span>
                     </h1>
@@ -63,30 +79,19 @@
                         </a>
                     </div>
                 </div>
-                <div class="hidden lg:block">
-                    <img src="https://via.placeholder.com/600x400" alt="Hero" class="rounded-lg shadow-2xl">
+                <div class="hidden lg:block relative">
+                    <div class="absolute inset-0 bg-blue-500 rounded-lg transform rotate-3 scale-105 opacity-10"></div>
+                    <img src="{{ asset('images/hero.jpg') }}" alt="Hero"
+                         class="relative rounded-lg shadow-2xl transform transition-all duration-500 hover:-translate-y-2 hover:shadow-3xl">
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Stats Section -->
+    <!-- Stats Section with Dynamic Data -->
     <section class="py-12 bg-white">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <div class="bg-blue-50 rounded-xl p-6 text-center">
-                    <div class="text-4xl font-bold text-blue-600 mb-2">95%</div>
-                    <div class="text-gray-600">Success Rate</div>
-                </div>
-                <div class="bg-green-50 rounded-xl p-6 text-center">
-                    <div class="text-4xl font-bold text-green-600 mb-2">24h</div>
-                    <div class="text-gray-600">Average Recovery Time</div>
-                </div>
-                <div class="bg-purple-50 rounded-xl p-6 text-center">
-                    <div class="text-4xl font-bold text-purple-600 mb-2">5000+</div>
-                    <div class="text-gray-600">Items Recovered</div>
-                </div>
-            </div>
+            <livewire:landing-page-stats />
         </div>
     </section>
 
@@ -209,10 +214,30 @@
                 <div>
                     <h3 class="text-lg font-semibold mb-4">Quick Links</h3>
                     <ul class="space-y-2">
-                        <li><a href="#" class="hover:text-white transition duration-150">How It Works</a></li>
-                        <li><a href="#" class="hover:text-white transition duration-150">Report Item</a></li>
-                        <li><a href="#" class="hover:text-white transition duration-150">Success Stories</a></li>
-                        <li><a href="#" class="hover:text-white transition duration-150">FAQs</a></li>
+                        <li>
+                            <a href="{{ route('how-it-works') }}"
+                               class="hover:text-white transition duration-150">
+                                How It Works
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('report-item') }}"
+                               class="hover:text-white transition duration-150">
+                                Report Item
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('success-stories') }}"
+                               class="hover:text-white transition duration-150">
+                                Success Stories
+                            </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('faqs') }}"
+                               class="hover:text-white transition duration-150">
+                                FAQs
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 <div>

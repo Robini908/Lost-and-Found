@@ -15,7 +15,7 @@ class GlobalSearch extends Component
     public $isSearching = false;
     public $showResults = false;
 
-    #[Debounce(300)]
+
     public function updatedQuery()
     {
         if (strlen($this->query) < 2) {

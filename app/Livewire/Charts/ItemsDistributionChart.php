@@ -20,9 +20,9 @@ class ItemsDistributionChart extends Component
 
         $pieChartModel = (new PieChartModel())
             ->setTitle('Item Status Distribution')
-            ->addSlice('Reported', $itemCounts['reported'] ?? 0, '#EF4444')
-            ->addSlice('Searched', $itemCounts['searched'] ?? 0, '#3B82F6')
-            ->addSlice('Found', $itemCounts['found'] ?? 0, '#10B981')
+            ->addSlice('Reported', $itemCounts[LostItem::TYPE_REPORTED] ?? 0, '#EF4444')
+            ->addSlice('Searched', $itemCounts[LostItem::TYPE_SEARCHED] ?? 0, '#3B82F6')
+            ->addSlice('Found', $itemCounts[LostItem::TYPE_FOUND] ?? 0, '#10B981')
             ->setAnimated(true)
             ->setType('donut')
             ->withOnSliceClickEvent('onSliceClick')

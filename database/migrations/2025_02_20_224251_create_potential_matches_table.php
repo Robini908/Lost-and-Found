@@ -10,14 +10,19 @@ return new class extends Migration
     {
         Schema::create('potential_matches', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('lost_item_id')->constrained('lost_items')->onDelete('cascade');
+            $table->foreignId('lost_item_id')->constrained()->onDelete('cascade');
             $table->foreignId('found_item_id')->constrained('lost_items')->onDelete('cascade');
             $table->decimal('similarity_score', 5, 2);
-            $table->boolean('viewed')->default(false);
-            $table->boolean('confirmed')->default(false);
+            $table->json('match_details')->nullable();
+            $table->boolean('is_viewed')->default(false);
+            $table->boolean('is_confirmed')->default(false);
+            $table->timestamp('viewed_at')->nullable();
+            $table->timestamp('confirmed_at')->nullable();
             $table->timestamps();
 
-            // Prevent duplicate matches
+            // Add indexes for better performance
+            $table->index('similarity_score');
+            $table->index(['is_viewed', 'is_confirmed']);
             $table->unique(['lost_item_id', 'found_item_id']);
         });
     }

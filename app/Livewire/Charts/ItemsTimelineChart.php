@@ -32,9 +32,9 @@ class ItemsTimelineChart extends Component
 
                 $dates = $items->pluck('date')->unique()->values();
                 foreach ($dates as $date) {
-                    $reportedCount = $items->where('date', $date)->where('item_type', 'reported')->first()?->count ?? 0;
-                    $searchedCount = $items->where('date', $date)->where('item_type', 'searched')->first()?->count ?? 0;
-                    $foundCount = $items->where('date', $date)->where('item_type', 'found')->first()?->count ?? 0;
+                    $reportedCount = $items->where('date', $date)->where('item_type', LostItem::TYPE_REPORTED)->first()?->count ?? 0;
+                    $searchedCount = $items->where('date', $date)->where('item_type', LostItem::TYPE_SEARCHED)->first()?->count ?? 0;
+                    $foundCount = $items->where('date', $date)->where('item_type', LostItem::TYPE_FOUND)->first()?->count ?? 0;
 
                     $formattedDate = Carbon::parse($date)->format('M d');
                     $lineChartModel->addPoint($formattedDate, $reportedCount, '#EF4444', ['date' => $date, 'type' => 'reported'])

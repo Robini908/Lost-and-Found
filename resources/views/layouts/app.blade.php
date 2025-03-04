@@ -9,30 +9,54 @@
 
     <title>{{ config('app.name', 'Laravel') }}</title>
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    <!-- Enhanced Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Your existing scripts and styles -->
     <script type="text/javascript" src="../node_modules/tw-elements/dist/js/tw-elements.umd.min.js"></script>
-    <!-- Include Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <!-- Include Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <link rel="stylesheet" href="app.css" />
-
-    <!-- Apexcharts -->
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"></script>
 
-    <!-- Livewire Charts Assets -->
+    <!-- reCAPTCHA Script -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    @filepondScripts
+
     @livewireChartsScripts
-
-    <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-
-    <!-- Styles -->
     @livewireStyles
 
+    <!-- Custom Font Styles -->
+    <style>
+        :root {
+            --font-primary: 'Poppins', sans-serif;
+            --font-secondary: 'Inter', sans-serif;
+            --font-accent: 'Montserrat', sans-serif;
+        }
 
+        body {
+            font-family: var(--font-primary);
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-accent);
+        }
+
+        .font-secondary {
+            font-family: var(--font-secondary);
+        }
+
+        .font-accent {
+            font-family: var(--font-accent);
+        }
+    </style>
 </head>
 
 <body class="font-sans antialiased">
@@ -87,7 +111,6 @@
     @stack('modals')
     @livewireScripts
     @stack('scripts')
-    @filepondScripts
 
 </body>
 

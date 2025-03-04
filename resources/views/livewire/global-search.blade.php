@@ -1,3 +1,7 @@
+@php
+    use App\Models\LostItem;
+@endphp
+
 <div x-data="{
     focused: false,
     query: @entangle('query'),
@@ -16,7 +20,7 @@
         <input
             wire:model.live="query"
             type="search"
-            placeholder="Search items, locations..."
+            placeholder="Search by title, description, location..."
             class="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:bg-white focus:border-blue-300 transition duration-150"
             @focus="focused = true"
             @keydown.escape.window="focused = false"
@@ -56,7 +60,7 @@
             <div class="max-h-96 overflow-y-auto">
                 @foreach($searchResults as $result)
                     <button
-                        wire:click="navigateToResult('{{ $result['url'] }}')"
+                        wire:click="navigateToResult('{{ route('lost-items.show', $result['id']) }}')"
                         class="w-full px-4 py-3 hover:bg-gray-50 flex items-center space-x-4 text-left transition duration-150">
                         <!-- Item Image -->
                         <div class="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
@@ -77,24 +81,47 @@
                                 <p class="text-sm font-medium text-gray-900 truncate">
                                     {!! $result['highlight'] !!}
                                 </p>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $result['type'] === 'found' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800' }}">
-                                    {{ ucfirst($result['type']) }}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{
+                                    $result['item_type'] === LostItem::TYPE_FOUND ? 'bg-green-100 text-green-800' :
+                                    ($result['item_type'] === LostItem::TYPE_SEARCHED ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')
+                                }}">
+                                    {{ ucfirst($result['item_type']) }}
                                 </span>
                             </div>
-                            <div class="mt-1 flex items-center text-xs text-gray-500">
-                                <span class="truncate">{{ $result['category'] }}</span>
-                                <span class="mx-1">•</span>
-                                <span>{{ $result['location'] }}</span>
+                            <div class="mt-1 flex items-center text-xs text-gray-500 space-x-2">
+                                @if($result['category'])
+                                    <span class="truncate">{{ $result['category'] }}</span>
+                                @endif
+
+                                @if($result['location_address'] || $result['area'])
+                                    <span class="text-gray-400">•</span>
+                                    <span class="truncate">
+                                        {{ $result['location_address'] ?? $result['area'] }}
+                                    </span>
+                                @endif
+
+                                @if($result['value'])
+                                    <span class="text-gray-400">•</span>
+                                    <span>{{ number_format($result['value'], 2) }} {{ $result['currency'] ?? 'USD' }}</span>
+                                @endif
                             </div>
-                            <div class="mt-1 text-xs text-gray-400">
-                                {{ $result['date'] }}
+                            <div class="mt-1 flex items-center text-xs space-x-2">
+                                <span class="text-gray-400">
+                                    {{ $result['created_at']->diffForHumans() }}
+                                </span>
+                                @if($result['is_verified'])
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                                        <i class="fas fa-check-circle mr-1"></i>
+                                        Verified
+                                    </span>
+                                @endif
                             </div>
                         </div>
                     </button>
                 @endforeach
             </div>
 
-            @if(count($searchResults) === 5)
+            @if(count($searchResults) >= 5)
                 <div class="px-4 py-3 bg-gray-50 text-xs text-gray-500">
                     Showing top 5 results. Type more to refine your search.
                 </div>
@@ -108,7 +135,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p class="mt-4 text-sm text-gray-900">No results found for "{{ $query }}"</p>
-                <p class="mt-2 text-xs text-gray-500">Try adjusting your search or filter to find what you're looking for.</p>
+                <p class="mt-2 text-xs text-gray-500">Try adjusting your search terms or filters.</p>
             </div>
         </div>
     </div>
