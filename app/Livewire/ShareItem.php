@@ -57,6 +57,19 @@ class ShareItem extends Component
         ]);
     }
 
+    public function downloadQrCode()
+    {
+        $filename = 'qr-code-' . $this->item->id . '.svg';
+        $qrCodeSvg = base64_decode($this->qrCode);
+
+        return response()->streamDownload(function () use ($qrCodeSvg) {
+            echo $qrCodeSvg;
+        }, $filename, [
+            'Content-Type' => 'image/svg+xml',
+            'Content-Disposition' => 'attachment; filename=' . $filename,
+        ]);
+    }
+
     public function render()
     {
         return view('livewire.share-item');

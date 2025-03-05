@@ -17,6 +17,7 @@ class ContactReporter extends Component
     public $subject = '';
     public $contactMethod = 'in_app';
     public $isSubmitting = false;
+    public $messageLength = 0;
 
     protected $rules = [
         'subject' => 'required|min:5|max:100',
@@ -27,10 +28,22 @@ class ContactReporter extends Component
     protected $messages = [
         'subject.required' => 'Please provide a subject for your message.',
         'subject.min' => 'Subject should be at least 5 characters.',
+        'subject.max' => 'Subject should not exceed 100 characters.',
         'message.required' => 'Please write your message to the reporter.',
         'message.min' => 'Message should be at least 20 characters to be meaningful.',
         'message.max' => 'Message should not exceed 1000 characters.'
     ];
+
+    public function updatedMessage($value)
+    {
+        $this->messageLength = strlen($value);
+        $this->validateOnly('message');
+    }
+
+    public function updatedSubject($value)
+    {
+        $this->validateOnly('subject');
+    }
 
     public function mount(LostItem $item)
     {

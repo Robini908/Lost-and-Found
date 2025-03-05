@@ -4,120 +4,152 @@ namespace App\Livewire;
 
 use App\Models\User;
 use Livewire\Component;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Session;
-use Usernotnull\Toast\Concerns\WireToast;
-use Exception;
 use Livewire\WithPagination;
+use Livewire\Attributes\Rule;
+use Livewire\Attributes\Computed;
+use Illuminate\Support\Facades\Auth;
+use Lab404\Impersonate\Services\ImpersonateManager;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Session;
 
 class ImpersonateUser extends Component
 {
-    use WireToast, WithPagination;
+    use WithPagination;
 
-    public $search = '';
-    public $selectedUserId = null;
-    public $filterRole = '';
-    public $sortField = 'name';
-    public $sortDirection = 'asc';
+    #[Rule('nullable|string|min:3')]
+    public string $search = '';
 
-    protected $queryString = [
-        'search' => ['except' => ''],
-        'filterRole' => ['except' => ''],
-        'sortField' => ['except' => 'name'],
-        'sortDirection' => ['except' => 'asc'],
-    ];
+    public bool $isImpersonating = false;
+    public bool $showModal = false;
 
-    public function startImpersonation()
+    protected $queryString = ['search'];
+
+    protected $listeners = ['refreshComponent' => '$refresh'];
+
+    public function mount(): void
+    {
+        if (!Auth::check() || !Auth::user()?->canImpersonate()) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $this->isImpersonating = app(ImpersonateManager::class)->isImpersonating();
+    }
+
+    public function openModal(): void
+    {
+        $this->showModal = true;
+    }
+
+    public function closeModal(): void
+    {
+        $this->showModal = false;
+        $this->search = '';
+        $this->resetPage();
+    }
+
+    public function impersonate(int $userId): mixed
     {
         try {
-            if (!auth()->user()->hasRole('superadmin')) {
-                toast()->danger('Unauthorized action.')->push();
-                return;
+            $user = User::findOrFail($userId);
+            $currentUser = Auth::user();
+
+            if (!$currentUser || !$currentUser->canImpersonate()) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'You are not authorized to impersonate users.'
+                ]);
+                return null;
             }
 
-            if (!$this->selectedUserId) {
-                toast()->warning('Please select a user to impersonate.')->push();
-                return;
+            if ($user->isImpersonated()) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'This user is already being impersonated.'
+                ]);
+                return null;
             }
 
-            $userToImpersonate = User::findOrFail($this->selectedUserId);
+            // Store the current session ID before impersonating
+            $originalSession = Session::getId();
+            Session::put('impersonator_session', $originalSession);
 
-            // Store current user's ID and remember URL in session
-            Session::put('impersonator_id', Auth::id());
-            Session::put('impersonator_remember_url', url()->previous());
+            // Take impersonation
+            app(ImpersonateManager::class)->take(
+                $currentUser,
+                $user,
+                config('impersonate.guard', 'sanctum')
+            );
 
-            // Login as the impersonated user
-            Auth::login($userToImpersonate);
+            $this->closeModal();
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Successfully impersonating ' . $user->name
+            ]);
 
-            toast()->success("Now impersonating {$userToImpersonate->name}")->pushOnNextPage();
-            return redirect()->route('dashboard');
-
-        } catch (Exception $e) {
-            logger()->error('Impersonation error: ' . $e->getMessage());
-            toast()->danger('Failed to start impersonation.')->push();
+            return redirect()->to(config('impersonate.take_redirect_to', '/dashboard'));
+        } catch (\Exception $e) {
+            report($e);
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Failed to impersonate user. Please try again.'
+            ]);
+            return null;
         }
     }
 
-    public function stopImpersonation()
+    public function stopImpersonating(): mixed
     {
-        try {
-            $impersonatorId = Session::get('impersonator_id');
-            $rememberUrl = Session::get('impersonator_remember_url');
+        if (!app(ImpersonateManager::class)->isImpersonating()) {
+            return null;
+        }
 
-            if (!$impersonatorId) {
-                toast()->danger('No impersonation session found.')->push();
-                return;
+        try {
+            // Get the original session ID
+            $originalSession = Session::get('impersonator_session');
+
+            app(ImpersonateManager::class)->leave();
+
+            // Restore the original session if available
+            if ($originalSession) {
+                Session::setId($originalSession);
+                Session::start();
             }
 
-            $originalUser = User::findOrFail($impersonatorId);
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Stopped impersonating user.'
+            ]);
 
-            // Clear impersonation session data
-            Session::forget(['impersonator_id', 'impersonator_remember_url']);
-
-            // Log back in as original user
-            Auth::login($originalUser);
-
-            toast()->success('Impersonation ended.')->pushOnNextPage();
-            return redirect($rememberUrl ?: route('dashboard'));
-
-        } catch (Exception $e) {
-            logger()->error('Stop impersonation error: ' . $e->getMessage());
-            toast()->danger('Failed to stop impersonation.')->push();
+            $this->closeModal();
+            return redirect()->to(config('impersonate.leave_redirect_to', '/dashboard'));
+        } catch (\Exception $e) {
+            report($e);
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Failed to stop impersonating. Please try again.'
+            ]);
+            return null;
         }
     }
 
-    public function sortBy($field)
+    #[Computed]
+    public function users(): mixed
     {
-        $this->sortDirection = $this->sortField === $field
-            ? $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc'
-            : 'asc';
-
-        $this->sortField = $field;
+        return User::where('id', '!=', Auth::id())
+            ->when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('name', 'like', '%' . $this->search . '%')
+                        ->orWhere('email', 'like', '%' . $this->search . '%');
+                });
+            })
+            ->orderBy('name')
+            ->paginate(5);
     }
 
     public function render()
     {
-        $users = User::query()
-            ->where('id', '!=', Auth::id())
-            ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('name', 'like', '%' . $this->search . '%')
-                      ->orWhere('email', 'like', '%' . $this->search . '%');
-                });
-            })
-            ->when($this->filterRole, function ($query) {
-                $query->whereHas('roles', function ($q) {
-                    $q->where('name', $this->filterRole);
-                });
-            })
-            ->orderBy($this->sortField, $this->sortDirection)
-            ->paginate(10);
-
-        $roles = \Spatie\Permission\Models\Role::pluck('name');
-
         return view('livewire.impersonate-user', [
-            'users' => $users,
-            'roles' => $roles,
+            'users' => $this->users
         ]);
     }
 }

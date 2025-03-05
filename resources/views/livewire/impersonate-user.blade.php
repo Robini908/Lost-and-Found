@@ -1,71 +1,87 @@
-<div x-data="{ open: false }" class="relative">
-    <!-- Toggle Button -->
-    <button @click="open = !open" class="bg-gray-500 text-white p-2 rounded-full hover:bg-gray-600 transition" data-tippy-content="Impersonate User">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
+<div>
+    <button
+        wire:click="openModal"
+        class="text-gray-500 hover:text-gray-700 transition-colors duration-200"
+        title="Impersonate User">
+        <i class="fas fa-user-secret text-lg"></i>
     </button>
 
-    <!-- Card -->
-    <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-80 bg-white border border-gray-300 rounded-md shadow-lg overflow-hidden z-10">
-        @if (Auth::user()->isImpersonating())
-            <!-- Only show Stop Impersonation Button -->
-            <div class="sticky bottom-0 bg-white p-4 border-t border-gray-200">
-                <button
-                    wire:click="stopImpersonation"
-                    class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition w-full"
-                >
-                    Stop Impersonation
+    <x-modal name="impersonate-modal" :show="$showModal" focusable>
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-medium text-gray-900">
+                    {{ __('Impersonate User') }}
+                </h2>
+                <button wire:click="closeModal" class="text-gray-400 hover:text-gray-500">
+                    <i class="fas fa-times"></i>
                 </button>
             </div>
-        @else
-            <!-- Show the rest of the card content when not impersonating -->
-            <div class="sticky top-0 bg-white p-4 border-b border-gray-200">
-                <h3 class="text-lg font-medium text-gray-900">Impersonate User</h3>
-            </div>
 
-            <!-- Search Box -->
-            <div class="p-4 border-b border-gray-200">
-                <input
-                    type="text"
-                    wire:model.live="search"
-                    placeholder="Search by name or email..."
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                >
-            </div>
-
-            <!-- User List -->
-            <div class="max-h-96 overflow-y-auto p-4">
-                @if ($users->isEmpty())
-                    <p class="text-gray-500 text-center">No users found.</p>
-                @else
-                    @foreach ($users as $user)
-                        <div
-                            wire:click="selectUser({{ $user->id }})"
-                            class="cursor-pointer p-3 hover:bg-gray-100 rounded-md transition flex items-center justify-between {{ $selectedUserId === $user->id ? 'bg-green-50' : '' }}"
-                        >
-                            <div>
-                                <div class="font-medium text-gray-900">{{ $user->name }}</div>
-                                <div class="text-sm text-gray-500">{{ $user->email }}</div>
-                            </div>
-                            @if ($selectedUserId === $user->id)
-                                <i class="fas fa-check text-green-500"></i>
-                            @endif
+            @if($isImpersonating)
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-triangle text-yellow-400"></i>
                         </div>
-                    @endforeach
-                @endif
-            </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                {{ __('You are currently impersonating another user.') }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Impersonate Button -->
-            <div class="sticky bottom-0 bg-white p-4 border-t border-gray-200">
-                <button
-                    wire:click="startImpersonation"
-                    class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition w-full"
-                >
-                    Impersonate
+                <button wire:click="stopImpersonating" class="w-full inline-flex justify-center items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-500 active:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                    <i class="fas fa-user-times mr-2"></i>
+                    {{ __('Stop Impersonating') }}
                 </button>
-            </div>
-        @endif
-    </div>
+            @else
+                <div class="mb-4">
+                    <x-input
+                        type="text"
+                        class="w-full"
+                        placeholder="{{ __('Search users...') }}"
+                        wire:model.live="search"
+                    />
+                </div>
+
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                    @forelse($this->users as $user)
+                        <div class="flex items-center justify-between p-3 bg-white border rounded-lg hover:bg-gray-50 transition-colors duration-150">
+                            <div class="flex items-center space-x-3">
+                                @if($user->profile_photo_url)
+                                    <img src="{{ $user->profile_photo_url }}" class="h-8 w-8 rounded-full object-cover" alt="{{ $user->name }}">
+                                @else
+                                    <div class="h-8 w-8 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 flex items-center justify-center text-white font-medium">
+                                        {{ substr($user->name, 0, 1) }}
+                                    </div>
+                                @endif
+                                <div>
+                                    <div class="font-medium text-gray-900">{{ $user->name }}</div>
+                                    <div class="text-sm text-gray-500">{{ $user->email }}</div>
+                                </div>
+                            </div>
+                            <button
+                                wire:click="impersonate({{ $user->id }})"
+                                class="inline-flex items-center px-3 py-1 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-500 active:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150"
+                            >
+                                <i class="fas fa-user-secret mr-2"></i>
+                                {{ __('Impersonate') }}
+                            </button>
+                        </div>
+                    @empty
+                        <div class="text-center py-4 text-gray-500">
+                            {{ __('No users found.') }}
+                        </div>
+                    @endforelse
+                </div>
+
+                @if($this->users->hasPages())
+                    <div class="mt-4">
+                        {{ $this->users->links() }}
+                    </div>
+                @endif
+            @endif
+        </div>
+    </x-modal>
 </div>

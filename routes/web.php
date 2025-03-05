@@ -111,10 +111,6 @@ Route::middleware(['auth'])->group(function () {
 
 // Moderator routes
 Route::middleware(['auth'])->group(function () {
-    Route::get('/claims/verify/{id}', function ($id) {
-        return view('claims.verify', ['id' => $id]);
-    })->name('claims.verify');
-
     Route::get('/analytics', function () {
         return view('admin.analytics');
     })->name('analytics');

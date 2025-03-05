@@ -26,6 +26,7 @@ use App\Http\Middleware\CustomRateLimiter;
 use App\Http\Middleware\DataEncryption;
 use App\Livewire\MyReportedItems;
 use App\Services\HashIdService;
+use App\Livewire\ImpersonateUser;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -84,13 +85,13 @@ class AppServiceProvider extends ServiceProvider
             if (!auth()->check()) return false;
 
             return RolePermission::hasHigherOrEqualPriority(
-                RolePermission::getHighestRole(auth()->user()),
+                RolePermission::getHighestRole(Auth()->user()),
                 $role
             );
         });
 
         Blade::if('can', function ($permission) {
-            if (!auth()->check()) return false;
+            if (!Auth()->check()) return false;
 
             return RolePermission::hasAnyPermission(
                 auth()->user(),
@@ -98,12 +99,6 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        // Register Livewire Components
-        Livewire::component('manage-users', ManageUsers::class);
-        Livewire::component('settings', Settings::class);
-        Livewire::component('verify-claim', VerifyClaim::class);
-        Livewire::component('analytics', Analytics::class);
-        Livewire::component('management-settings', ManagementSettings::class);
-        Livewire::component('my-reported-items', MyReportedItems::class);
+
     }
 }

@@ -48,59 +48,78 @@
                             <!-- Subject -->
                             <div class="mb-4">
                                 <label for="subject" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Subject
+                                    Subject <span class="text-red-500">*</span>
                                 </label>
                                 <input type="text"
                                        id="subject"
-                                       wire:model="subject"
-                                       class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500">
+                                       wire:model.live="subject"
+                                       class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 @error('subject') border-red-300 @enderror"
+                                       placeholder="Enter subject...">
                                 @error('subject')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                    <p class="mt-1 text-sm text-red-600">
+                                        <i class="fas fa-exclamation-circle mr-1"></i>
+                                        {{ $message }}
+                                    </p>
                                 @enderror
+                                <div class="mt-1 text-xs text-gray-500">
+                                    5-100 characters
+                                </div>
                             </div>
 
                             <!-- Contact Method -->
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    Contact Method
+                                    Contact Method <span class="text-red-500">*</span>
                                 </label>
                                 <div class="flex space-x-4">
                                     <label class="flex items-center">
                                         <input type="radio"
-                                               wire:model="contactMethod"
+                                               wire:model.live="contactMethod"
                                                value="in_app"
                                                class="text-green-600 focus:ring-green-500">
                                         <span class="ml-2 text-sm text-gray-700">In-App Message</span>
                                     </label>
                                     <label class="flex items-center">
                                         <input type="radio"
-                                               wire:model="contactMethod"
+                                               wire:model.live="contactMethod"
                                                value="email"
                                                class="text-green-600 focus:ring-green-500">
                                         <span class="ml-2 text-sm text-gray-700">Email</span>
                                     </label>
                                 </div>
                                 @error('contactMethod')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                    <p class="mt-1 text-sm text-red-600">
+                                        <i class="fas fa-exclamation-circle mr-1"></i>
+                                        {{ $message }}
+                                    </p>
                                 @enderror
                             </div>
 
                             <!-- Message -->
                             <div class="mb-4">
                                 <label for="message" class="block text-sm font-medium text-gray-700 mb-1">
-                                    Your Message
+                                    Your Message <span class="text-red-500">*</span>
                                 </label>
-                                <textarea id="message"
-                                          wire:model="message"
-                                          rows="4"
-                                          class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500"
-                                          placeholder="Write your message here..."></textarea>
-                                <div class="mt-1 text-sm text-gray-500">
-                                    Please be clear and concise in your message.
+                                <div class="relative">
+                                    <textarea id="message"
+                                              wire:model.live="message"
+                                              rows="4"
+                                              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-green-500 focus:ring-green-500 @error('message') border-red-300 @enderror"
+                                              placeholder="Write your message here..."></textarea>
+                                    <div class="absolute bottom-2 right-2 text-xs text-gray-500">
+                                        {{ $messageLength }}/1000
+                                    </div>
                                 </div>
                                 @error('message')
-                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                    <p class="mt-1 text-sm text-red-600">
+                                        <i class="fas fa-exclamation-circle mr-1"></i>
+                                        {{ $message }}
+                                    </p>
                                 @enderror
+                                <div class="mt-1 text-xs text-gray-500 flex items-center">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    Minimum 20 characters required for a meaningful message
+                                </div>
                             </div>
                         </form>
                     </div>

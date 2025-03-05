@@ -71,6 +71,8 @@
                         <x-nav-link href="{{ route('analytics') }}" :active="request()->routeIs('analytics')" data-tippy-content="Analytics">
                             <i class="fas fa-chart-bar"></i>
                         </x-nav-link>
+
+
                     @endif
                 </div>
             </div>
@@ -79,7 +81,11 @@
                 <!-- Search Icon -->
                 <button @click="searchOpen = true" class="text-gray-500 hover:text-gray-700">
                     <i class="fas fa-search text-lg"></i>
-                                    </button>
+                </button>
+
+                {{-- @if(app('role-permission')->isSuperAdmin(auth()->user()))
+                    <livewire:impersonate-user />
+                @endif --}}
 
                 <!-- Settings Dropdown -->
                 <div class="relative">
@@ -191,13 +197,6 @@
                 <i class="fas fa-list mr-2"></i>
                 {{ __('My Reported Items') }}
             </x-responsive-nav-link>
-
-            @if(app('role-permission')->isAtLeastModerator(auth()->user()))
-                <x-responsive-nav-link href="{{ route('claims.verify', ['id' => 'pending']) }}" :active="request()->routeIs('claims.verify')">
-                    <i class="fas fa-clipboard-check mr-2"></i>
-                    {{ __('Verify Claims') }}
-            </x-responsive-nav-link>
-            @endif
 
             @if(app('role-permission')->isAtLeastAdmin(auth()->user()))
                 <x-responsive-nav-link href="{{ route('admin.manage-users') }}" :active="request()->routeIs('admin.manage-users')">

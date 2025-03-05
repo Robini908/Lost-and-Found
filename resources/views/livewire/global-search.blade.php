@@ -47,7 +47,7 @@
     <!-- Search Results Dropdown -->
     <div
         x-show="focused && $wire.showResults && $wire.query"
-        class="absolute mt-2 w-full bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50"
+        class="absolute mt-10 w-full bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0 transform scale-95"
         x-transition:enter-end="opacity-100 transform scale-100"

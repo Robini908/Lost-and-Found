@@ -13,10 +13,12 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Log;
+use Lab404\Impersonate\Models\Impersonate;
+use App\Notifications\CustomVerifyEmail;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, HasProfilePhoto, HasTeams, Notifiable, TwoFactorAuthenticatable, HasRoles;
+    use HasApiTokens, HasFactory, HasProfilePhoto, HasTeams, Notifiable, TwoFactorAuthenticatable, HasRoles, Impersonate;
 
     protected $fillable = [
         'name',
@@ -89,8 +91,28 @@ class User extends Authenticatable
         return $this->hasMany(LostItem::class, 'claimed_by');
     }
 
-    // Check if the current user is impersonating another user
-    public function isImpersonating()
+    /**
+     * Check if the user can impersonate other users.
+     * Only superadmins can impersonate other users.
+     */
+    public function canImpersonate(): bool
+    {
+        return $this->hasRole('superadmin');
+    }
+
+    /**
+     * Check if the user can be impersonated.
+     * Superadmins cannot be impersonated.
+     */
+    public function canBeImpersonated(): bool
+    {
+        return !$this->hasRole('superadmin');
+    }
+
+    /**
+     * Check if the current user is impersonating another user.
+     */
+    public function isImpersonating(): bool
     {
         return session()->has('impersonator_id');
     }
@@ -152,5 +174,15 @@ class User extends Authenticatable
         ]);
 
         return true;
+    }
+
+    /**
+     * Send the email verification notification.
+     *
+     * @return void
+     */
+    public function sendEmailVerificationNotification()
+    {
+        $this->notify(new CustomVerifyEmail);
     }
 }
