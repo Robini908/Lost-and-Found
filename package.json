@@ -2,8 +2,10 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "dev": "vite",
         "build": "vite build",
-        "dev": "vite"
+        "postbuild": "powershell -Command \"if (!(Test-Path dist)) { New-Item -ItemType Directory -Force -Path dist }; Copy-Item -Path public/* -Destination dist -Recurse -Force\"",
+        "postinstall": "npm run build"
     },
     "devDependencies": {
         "@fortawesome/fontawesome-free": "^6.7.2",
@@ -11,7 +13,7 @@
         "@tailwindcss/forms": "^0.5.7",
         "@tailwindcss/typography": "^0.5.10",
         "autoprefixer": "^10.4.16",
-        "axios": "^1.7.4",
+        "axios": "^1.8.2",
         "concurrently": "^9.0.1",
         "laravel-echo": "^2.0.2",
         "laravel-vite-plugin": "^1.2.0",
