@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Spatie\LivewireFilepond\WithFilePond;
 use Usernotnull\Toast\Concerns\WireToast;
 use App\Services\ItemMatchingService;
+use Illuminate\Support\Facades\Cache;
 
 class ReportLostItem extends Component
 {
@@ -25,6 +26,9 @@ class ReportLostItem extends Component
     // Form steps
     public $currentStep = 1;
     public $totalSteps = 5;
+
+    // Modal state
+    public $showCategoryModal = false;
 
     // Common fields
     public $reportType = ''; // reported, searched, found
@@ -62,6 +66,9 @@ class ReportLostItem extends Component
 
     // Categories
     public $categories = [];
+    public $newCategoryName = '';
+    public $newCategoryIcon = '';
+    public $newCategoryDescription = '';
 
     // Add this property for Livewire file upload validation
     protected $rules = [
@@ -99,7 +106,17 @@ class ReportLostItem extends Component
     // Keep the existing rules() method for step validation
     protected function rules()
     {
-        return $this->rules;
+        return array_merge($this->rules, [
+            'category_id' => [
+                'required',
+                'exists:categories,id',
+                function ($attribute, $value, $fail) {
+                    if (!empty($this->suggestedCategories) && !in_array($value, $this->suggestedCategories)) {
+                        $fail('Please select one of the suggested categories or create a new one.');
+                    }
+                },
+            ],
+        ]);
     }
 
     public function boot(ItemMatchingService $itemMatchingService)
@@ -154,14 +171,24 @@ class ReportLostItem extends Component
             $this->reportType = 'found';
         }
 
-        // Load settings
+        // Load settings and categories
         $this->currency = Setting::get('currency', 'USD');
         $this->loadCategories();
+
+        // Initialize empty suggestions
+        $this->suggestedCategories = [];
     }
 
     protected function loadCategories()
     {
-        $this->categories = Category::select('id', 'name')->orderBy('name')->get();
+        try {
+            $this->categories = collect(Cache::remember('categories', now()->addHour(), function () {
+                return Category::orderBy('name')->get()->keyBy('id');
+            }));
+        } catch (\Exception $e) {
+            $this->categories = collect();
+            toast()->danger('Failed to load categories')->push();
+        }
     }
 
     public function nextStep()
@@ -211,29 +238,243 @@ class ReportLostItem extends Component
         }
     }
 
+    /**
+     * Handle title updates and trigger category suggestions
+     */
     public function updated($propertyName)
     {
-        // Validate images immediately when they're uploaded
-        if (str_starts_with($propertyName, 'images.')) {
-            $this->validateOnly($propertyName);
+        // Handle title updates with quick category suggestions
+        if ($propertyName === 'title') {
+            if (empty($this->title) || strlen($this->title) < 3) {
+                $this->reset('category_id', 'suggestedCategories');
+                return;
+            }
+
+                    $this->updateSuggestedCategories();
             return;
         }
 
-        // When title is updated, suggest categories
-        if ($propertyName === 'title' && !empty($this->title)) {
-            $this->updateSuggestedCategories();
-        }
-
-        // Clear validation errors when a field is updated
+        // Handle other field updates as before
         $this->validateOnly($propertyName);
 
-        // Special handling for reportType changes
-        if ($propertyName === 'reportType') {
-            $this->date = null;
+        switch ($propertyName) {
+            case 'reportType':
+                $this->date = null;
+                break;
+            case 'locationType':
+                $this->handleLocationTypeChange();
+                break;
+            case 'date':
+                $this->handleDateUpdate();
+                break;
+            case 'showCategoryModal':
+                if ($this->showCategoryModal) {
+                    $this->loadCategories();
+                }
+                break;
+        }
+    }
+
+    /**
+     * Update suggested categories using quick local matching
+     */
+    protected function updateSuggestedCategories()
+    {
+        try {
+            $titleWords = array_filter(
+                explode(' ', strtolower($this->title)),
+                fn($word) => strlen($word) >= 3
+            );
+
+            // Try AI-based matching first
+            if ($this->itemMatchingService) {
+                $aiSuggestions = $this->itemMatchingService->getCategorySuggestions(
+                $this->title,
+                $this->categories
+            );
+
+                if (!empty($aiSuggestions)) {
+                    $this->suggestedCategories = $aiSuggestions;
+                    $this->dispatch('suggestionsUpdated');
+                    return;
+                }
+            }
+
+            // Define category keywords mapping for fallback matching
+            $categoryKeywords = [
+                'phone' => ['phone', 'mobile', 'iphone', 'android', 'smartphone', 'cell'],
+                'laptop' => ['laptop', 'computer', 'pc', 'macbook', 'notebook'],
+                'tablet' => ['tablet', 'ipad', 'surface'],
+                'accessories' => ['accessory', 'accessories', 'charger', 'case', 'cover', 'headphone', 'earphone', 'airpod'],
+                'wallet' => ['wallet', 'purse', 'money', 'card holder'],
+                'document' => ['document', 'id', 'passport', 'license', 'certificate'],
+                'jewelry' => ['jewelry', 'ring', 'necklace', 'bracelet', 'watch'],
+                'bag' => ['bag', 'backpack', 'luggage', 'suitcase', 'handbag'],
+            ];
+
+            // Fallback to exact category name matches
+            $exactMatches = $this->categories->filter(function ($category) use ($titleWords) {
+                $categoryNameWords = explode(' ', strtolower($category->name));
+                return count(array_intersect($titleWords, $categoryNameWords)) > 0;
+            });
+
+            if ($exactMatches->isNotEmpty()) {
+                $this->suggestedCategories = $exactMatches->take(3)->keys()->all();
+                $this->dispatch('suggestionsUpdated');
+                return;
+            }
+
+            // Last resort: keyword-based matching
+            $keywordMatches = $this->categories->filter(function ($category) use ($titleWords, $categoryKeywords) {
+                $categoryText = strtolower($category->name . ' ' . $category->description);
+
+                foreach ($titleWords as $word) {
+                    foreach ($categoryKeywords as $type => $keywords) {
+                        if (in_array($word, $keywords) && str_contains($categoryText, $type)) {
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            });
+
+            if ($keywordMatches->isNotEmpty()) {
+                $this->suggestedCategories = $keywordMatches->take(3)->keys()->all();
+                $this->dispatch('suggestionsUpdated');
+                return;
+            }
+
+            // If no matches found at all, reset suggestions
+            $this->suggestedCategories = [];
+            $this->dispatch('suggestionsUpdated');
+
+        } catch (\Exception $e) {
+            Log::error('Failed to update category suggestions', [
+                'error' => $e->getMessage(),
+                'title' => $this->title
+            ]);
+            $this->suggestedCategories = [];
+        }
+    }
+
+    /**
+     * Prepare new category details based on the title
+     */
+    protected function prepareNewCategoryFromTitle()
+    {
+        $words = explode(' ', strtolower($this->title));
+        $commonWords = ['the', 'a', 'an', 'my', 'our', 'their', 'his', 'her', 'its'];
+        $words = array_diff($words, $commonWords);
+
+        // Generate a meaningful category name from the title
+        $this->newCategoryName = ucwords(implode(' ', array_slice($words, 0, 2)));
+
+        // Set a descriptive category description
+        $this->newCategoryDescription = "Category for items similar to: {$this->title}";
+
+        // Suggest an appropriate icon based on the title
+        $this->suggestCategoryIcon();
+    }
+
+    /**
+     * Suggest an appropriate icon based on the title
+     */
+    protected function suggestCategoryIcon()
+    {
+        $iconMappings = [
+            'phone|mobile|iphone|android|smartphone' => 'mobile',
+            'wallet|purse|money' => 'wallet',
+            'key|keys|access' => 'key',
+            'card|id|credit|debit|pass' => 'credit-card',
+            'bag|backpack|luggage|suitcase' => 'suitcase',
+            'book|notebook|diary' => 'book',
+            'laptop|computer|pc|mac' => 'laptop',
+            'watch|clock|time' => 'clock',
+            'glasses|sunglasses' => 'glasses',
+            'document|paper|certificate' => 'file-alt',
+            'jewelry|ring|necklace' => 'gem',
+            'umbrella|parasol' => 'umbrella'
+        ];
+
+        $titleLower = strtolower($this->title);
+        foreach ($iconMappings as $pattern => $icon) {
+            if (preg_match("/($pattern)/i", $titleLower)) {
+                $this->newCategoryIcon = $icon;
+                return;
+            }
         }
 
-        // Special handling for locationType changes
-        if ($propertyName === 'locationType') {
+        // Default icon if no match found
+        $this->newCategoryIcon = 'box';
+    }
+
+    /**
+     * Create a new category with AI-enhanced context
+     *
+     * @return \stdClass
+     */
+    public function createCategory()
+    {
+        try {
+            $validatedData = $this->validate([
+                'newCategoryName' => 'required|min:3|unique:categories,name',
+                'newCategoryIcon' => 'required',
+                'newCategoryDescription' => 'nullable|string|max:255',
+            ]);
+
+            DB::beginTransaction();
+
+            $category = Category::create([
+                'name' => $this->newCategoryName,
+                'icon' => $this->newCategoryIcon,
+                'description' => $this->newCategoryDescription,
+            ]);
+
+            // Update suggestions to include the new category
+            $this->suggestedCategories = !empty($this->suggestedCategories)
+                ? array_merge($this->suggestedCategories, [$category->id])
+                : [$category->id];
+
+            // Set the new category as selected
+            $this->category_id = $category->id;
+
+            // Clear the cache and refresh categories
+            Cache::forget('categories');
+            $this->loadCategories();
+
+            DB::commit();
+
+            // Close modal and show success message
+            $this->showCategoryModal = false;
+            toast()
+                ->success("Category '{$category->name}' created successfully!")
+                ->push();
+
+            // Reset form
+            $this->reset(['newCategoryName', 'newCategoryIcon', 'newCategoryDescription']);
+
+            return (object)[
+                'success' => true,
+                'category' => $category
+            ];
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            toast()->warning('Please check the form for errors.')->push();
+            throw $e;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to create category', [
+                'error' => $e->getMessage(),
+                'category_name' => $this->newCategoryName
+            ]);
+            toast()->danger('Failed to create category')->push();
+            return (object)['success' => false];
+        }
+    }
+
+    private function handleLocationTypeChange()
+    {
             if ($this->locationType === 'specific') {
                 $this->area = '';
                 $this->landmarks = '';
@@ -245,56 +486,12 @@ class ReportLostItem extends Component
             $this->validateOnly('locationType');
         }
 
-        // Update date_found or date_lost when date is updated
-        if ($propertyName === 'date') {
+    private function handleDateUpdate()
+    {
             if ($this->reportType === 'found') {
                 $this->date_found = $this->date;
             } else {
                 $this->date_lost = $this->date;
-            }
-        }
-    }
-
-    protected function updateSuggestedCategories()
-    {
-        try {
-            // Get text embedding for the title
-            $titleEmbedding = $this->itemMatchingService->getTextEmbedding((object)[
-                'title' => $this->title,
-                'description' => '',
-            ]);
-
-            // Get all categories
-            $allCategories = Category::all();
-            $suggestedCategories = collect();
-
-            foreach ($allCategories as $category) {
-                // Calculate similarity between title and category
-                $similarity = $this->itemMatchingService->calculateTextSimilarityWithContext(
-                    $this->title,
-                    $category->name . ' ' . ($category->description ?? '')
-                );
-
-                if ($similarity >= 0.3) { // 30% similarity threshold
-                    $suggestedCategories->push([
-                        'id' => $category->id,
-                        'name' => $category->name,
-                        'similarity' => $similarity
-                    ]);
-                }
-            }
-
-            // Sort by similarity and get top matches
-            $this->suggestedCategories = $suggestedCategories
-                ->sortByDesc('similarity')
-                ->take(5)
-                ->pluck('id')
-                ->toArray();
-
-        } catch (\Exception $e) {
-            Log::error('Error updating suggested categories: ' . $e->getMessage());
-            // Don't throw the error to avoid breaking the UI
-            $this->suggestedCategories = [];
         }
     }
 
@@ -470,10 +667,22 @@ class ReportLostItem extends Component
             Log::info('Transaction committed successfully');
 
             toast()
-                ->success('Item reported successfully! ' . ($this->reportType === 'found' ? 'Check your rewards for points earned.' : ''))
+                ->success('Item reported successfully!' . ($this->reportType === 'found' ? ' Check your rewards for points earned.' : ''))
                 ->push();
 
             return redirect()->route('products.view-items');
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Form validation failed', [
+                'errors' => $e->errors(),
+                'current_step' => $this->currentStep
+            ]);
+
+            toast()
+                ->warning('Please check the form for errors.')
+                ->push();
+
+            throw $e;
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -481,7 +690,8 @@ class ReportLostItem extends Component
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => Auth::id(),
-                'report_type' => $this->reportType
+                'report_type' => $this->reportType,
+                'current_step' => $this->currentStep
             ]);
 
             toast()
@@ -495,5 +705,29 @@ class ReportLostItem extends Component
         return view('livewire.report-lost-item', [
             'categories' => $this->categories
         ]);
+    }
+
+    /**
+     * Get category suggestions using AI embeddings
+     *
+     * @param string $title
+     * @param \Illuminate\Database\Eloquent\Collection<int, \App\Models\Category> $categories
+     * @return array<int, mixed>
+     */
+    protected function getAIBasedCategorySuggestions($title, $categories)
+    {
+        return $this->itemMatchingService->getAIBasedCategorySuggestions($title, $categories);
+    }
+
+    /**
+     * Fallback category suggestion method
+     *
+     * @param string $title
+     * @param \Illuminate\Database\Eloquent\Collection<int, \App\Models\Category> $categories
+     * @return array<int, mixed>
+     */
+    protected function getFallbackCategorySuggestions($title, $categories)
+    {
+        return $this->itemMatchingService->getFallbackCategorySuggestions($title, $categories);
     }
 }

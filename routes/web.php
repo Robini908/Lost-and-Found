@@ -70,7 +70,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/products/my-reported-items', function () {
         return view('products.my-lost-items');
-    })->name('products.my-reported-items');
+    })->name('products.my-items');
 
     Route::get('/match-items', function () {
         return view('match-items');
@@ -168,3 +168,4 @@ Route::middleware('guest')->group(function () {
     Route::post('register', [\Laravel\Fortify\Http\Controllers\RegisteredUserController::class, 'store'])
         ->middleware(['recaptcha']);
 });
+Route::get('/items/{item}/edit', \App\Livewire\EditLostItem::class)->name('items.edit');

@@ -43,7 +43,7 @@
                                     <i class="fas fa-eye mr-2"></i>
                                     {{ __('View All Items') }}
                                 </x-dropdown-link>
-                                <x-dropdown-link href="{{ route('products.my-reported-items') }}">
+                                <x-dropdown-link href="{{ route('products.my-items') }}">
                                     <i class="fas fa-list mr-2"></i>
                                     {{ __('My Reported Items') }}
                                 </x-dropdown-link>
@@ -78,6 +78,9 @@
             </div>
 
             <div class="hidden sm:flex sm:items-center sm:ml-6 space-x-4">
+                <!-- Language Selector -->
+                <livewire:language-switcher />
+
                 <!-- Search Icon -->
                 <button @click="searchOpen = true" class="text-gray-500 hover:text-gray-700">
                     <i class="fas fa-search text-lg"></i>
@@ -193,7 +196,7 @@
                 {{ __('View All Items') }}
             </x-responsive-nav-link>
 
-            <x-responsive-nav-link href="{{ route('products.my-reported-items') }}" :active="request()->routeIs('products.my-reported-items')">
+            <x-responsive-nav-link href="{{ route('products.my-items') }}" :active="request()->routeIs('products.my-items')">
                 <i class="fas fa-list mr-2"></i>
                 {{ __('My Reported Items') }}
             </x-responsive-nav-link>

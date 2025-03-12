@@ -58,8 +58,11 @@ return [
     ],
 
     'huggingface' => [
-        'key' => env('HUGGINGFACE_API_KEY'),
-        'model' => env('HUGGINGFACE_MODEL', 'facebook/blenderbot-400M-distill'),
+        'token' => env('HUGGINGFACE_API_TOKEN'),
+        'text_model_endpoint' => env('HUGGINGFACE_TEXT_MODEL_ENDPOINT', 'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2'),
+        'image_model_endpoint' => env('HUGGINGFACE_IMAGE_MODEL_ENDPOINT', 'https://api-inference.huggingface.co/pipeline/feature-extraction/clip-vit-base-patch32'),
+        'max_retries' => env('HUGGINGFACE_MAX_RETRIES', 3),
+        'retry_delay' => env('HUGGINGFACE_RETRY_DELAY', 1000), // milliseconds
     ],
 
     'recaptcha' => [

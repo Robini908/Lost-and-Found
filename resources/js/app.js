@@ -1,11 +1,10 @@
-import "./bootstrap";
+import './bootstrap';
+import '../css/app.css';
 import "swiper/css/bundle";
 import tippy from "tippy.js";
 import "tippy.js/dist/tippy.css";
 import "tippy.js/animations/scale.css";
-
 import DataTable from 'datatables.net-dt';
-
 
 import {
     Livewire,

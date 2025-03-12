@@ -27,7 +27,7 @@
 
     <!-- reCAPTCHA Script -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-    @filepondScripts
+
 
     @livewireChartsScripts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -56,7 +56,16 @@
         .font-accent {
             font-family: var(--font-accent);
         }
+
+        [x-cloak] { display: none !important; }
     </style>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+
+    <!-- Flag Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@6.6.6/css/flag-icons.min.css"/>
 </head>
 
 <body class="font-sans antialiased">
@@ -109,6 +118,7 @@
     </div>
 
     @stack('modals')
+    @filepondScripts
     @livewireScripts
     @stack('scripts')
 

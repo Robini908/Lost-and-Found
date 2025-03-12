@@ -9,7 +9,10 @@ export default defineConfig({
         //     jQuery: 'jquery',
         // }),
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js'],
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+            ],
             refresh: true,
         }),
     ],
@@ -17,6 +20,17 @@ export default defineConfig({
         host: 'localhost',
         hmr: {
             host: 'localhost',
+        },
+    },
+    resolve: {
+        alias: {
+            '$': 'jQuery',
+            '~bootstrap': 'bootstrap',
+        },
+    },
+    build: {
+        rollupOptions: {
+            external: ['bootstrap'],
         },
     },
 });

@@ -10,10 +10,15 @@ use App\Models\Setting;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use App\Services\RoleService;
+use Usernotnull\Toast\Concerns\WireToast;
 
 class DisplayLostItems extends Component
 {
     use WithPagination;
+    use WireToast;
 
     // Filters
     public $search = '';
@@ -46,6 +51,10 @@ class DisplayLostItems extends Component
     public $mapZoom = 12;
     public $markers = [];
 
+    // Delete functionality
+    public $canDelete = false;
+    protected $roleService;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'status' => ['except' => ''],
@@ -66,6 +75,14 @@ class DisplayLostItems extends Component
     {
         $this->categories = Category::all();
         $this->initializeMapCenter();
+        $this->roleService = new RoleService();
+
+        $user = Auth::user();
+        if ($user instanceof \App\Models\User) {
+            $this->canDelete = $this->roleService->userHasRole($user, ['admin', 'superadmin']);
+        } else {
+            $this->canDelete = false;
+        }
     }
 
     protected function initializeMapCenter()
@@ -110,9 +127,17 @@ class DisplayLostItems extends Component
 
     public function viewDetails($itemId)
     {
-        $this->selectedItem = LostItem::with(['images', 'category', 'user'])->find($itemId);
-        $this->activeImageIndex = 0;
-        $this->showModal = true;
+        try {
+            $this->selectedItem = LostItem::with(['images', 'category', 'user'])
+                ->findOrFail($itemId);
+            $this->activeImageIndex = 0;
+            $this->showModal = true;
+        } catch (\Exception $e) {
+            Log::error('Error viewing item details: ' . $e->getMessage());
+            toast()
+                ->danger('Unable to load item details. Please try again.')
+                ->push();
+        }
     }
 
     public function nextImage()
@@ -141,6 +166,7 @@ class DisplayLostItems extends Component
         $this->showModal = false;
         $this->selectedItem = null;
         $this->activeImageIndex = 0;
+        $this->resetErrorBag();
     }
 
     public function toggleAdvancedFilters()
@@ -155,6 +181,22 @@ class DisplayLostItems extends Component
             'condition', 'brand', 'color', 'location',
             'radius'
         ]);
+    }
+
+    /**
+     * Check if any filters are currently active
+     */
+    public function hasActiveFilters(): bool
+    {
+        return !empty($this->search) ||
+               !empty($this->status) ||
+               !empty($this->category) ||
+               !empty($this->dateRange) ||
+               !empty($this->condition) ||
+               !empty($this->brand) ||
+               !empty($this->color) ||
+               !empty($this->location) ||
+               !empty($this->radius);
     }
 
     public function updatingSearch()
@@ -271,6 +313,101 @@ class DisplayLostItems extends Component
         $this->dispatch('show-match-form', $itemId);
     }
 
+    /**
+     * Delete a single item
+     */
+    public function deleteItem($itemId)
+    {
+        if (!$this->canDelete) {
+            $this->addError('permission', 'You do not have permission to delete items.');
+            return;
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $item = LostItem::with('images')->findOrFail($itemId);
+
+            // Delete associated images first
+            foreach ($item->images as $image) {
+                if (Storage::disk('public')->exists($image->image_path)) {
+                    Storage::disk('public')->delete($image->image_path);
+                }
+                $image->delete();
+            }
+
+            $item->delete();
+            DB::commit();
+
+            $this->dispatch('item-deleted');
+            $this->resetPage();
+            toast()
+                ->success('Item deleted successfully.')
+                ->push();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error deleting item: ' . $e->getMessage());
+            toast()
+                ->danger('Failed to delete item. Please try again.')
+                ->push();
+        }
+    }
+
+    /**
+     * Delete multiple selected items
+     */
+    public function deleteSelected()
+    {
+        if (!$this->canDelete) {
+            $this->addError('permission', 'You do not have permission to delete items.');
+            return;
+        }
+
+        if (empty($this->selectedItems)) {
+            toast()
+                ->info('Please select items to delete.')
+                ->push();
+            return;
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $items = LostItem::whereIn('id', $this->selectedItems)->with('images')->get();
+            $deletedCount = 0;
+
+            foreach ($items as $item) {
+                // Delete associated images
+                foreach ($item->images as $image) {
+                    if (Storage::disk('public')->exists($image->image_path)) {
+                        Storage::disk('public')->delete($image->image_path);
+                    }
+                    $image->delete();
+                }
+                $item->delete();
+                $deletedCount++;
+            }
+
+            DB::commit();
+
+            $this->selectedItems = [];
+            $this->dispatch('items-deleted');
+            $this->resetPage();
+
+            toast()
+                ->success($deletedCount . ' items deleted successfully.')
+                ->push();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error deleting selected items: ' . $e->getMessage());
+            toast()
+                ->danger('Failed to delete selected items. Please try again.')
+                ->push();
+        }
+    }
+
     protected function getFilteredQuery()
     {
         return LostItem::query()
@@ -302,25 +439,13 @@ class DisplayLostItems extends Component
     {
         $query = $this->getFilteredQuery();
 
-        // Cache the results for better performance
-        $cacheKey = 'lost_items_' . md5(json_encode([
-            $this->search,
-            $this->status,
-            $this->category,
-            $this->dateRange,
-            $this->sortField,
-            $this->sortDirection,
-            $this->page ?? 1
-        ]));
-
-        $items = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($query) {
-            return $query->paginate($this->perPage);
-        });
+        $items = $query->paginate($this->perPage);
 
         return view('livewire.display-lost-items', [
             'items' => $items,
             'categories' => $this->categories,
-            'totalSelected' => count($this->selectedItems)
+            'totalSelected' => count($this->selectedItems),
+            'canDelete' => $this->canDelete
         ]);
     }
 }

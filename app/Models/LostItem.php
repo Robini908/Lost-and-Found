@@ -215,4 +215,13 @@ class LostItem extends Model
     {
         return $this->potentialMatches->merge($this->foundMatches);
     }
+
+    /**
+     * Get all matches for this item through the ItemMatch model.
+     */
+    public function matches()
+    {
+        return $this->hasMany(ItemMatch::class, 'lost_item_id')
+            ->orWhere('found_item_id', $this->id);
+    }
 }

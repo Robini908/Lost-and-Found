@@ -1,4 +1,12 @@
-<div class="min-h-screen bg-gray-50 py-8" x-data="{ loading: false }">
+<div class="min-h-screen bg-gray-50 py-8" x-data="{
+    loading: false,
+    showNewCategoryModal: false,
+    init() {
+        window.addEventListener('close-category-modal', () => {
+            this.showNewCategoryModal = false;
+        });
+    }
+}">
     <!-- Loading State -->
     <x-loading-state :message="$reportType === 'found' ? 'Submitting found item report...' : ($reportType === 'reported' ? 'Submitting lost item report...' : 'Submitting searched item report...')" />
 

@@ -11,8 +11,9 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('reward_histories', function (Blueprint $table) {
-            $table->dropColumn(['type', 'category']);
+        Schema::create('embeddings_cache', function (Blueprint $table) {
+            $table->id();
+            $table->timestamps();
         });
     }
 
@@ -21,9 +22,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('reward_histories', function (Blueprint $table) {
-            $table->string('type', 20)->after('user_id');
-            $table->string('category', 20)->after('description');
-        });
+        Schema::dropIfExists('embeddings_cache');
     }
 };

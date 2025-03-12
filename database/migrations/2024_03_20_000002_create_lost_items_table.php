@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('color')->nullable();
             $table->string('serial_number')->nullable();
             $table->decimal('estimated_value', 10, 2)->nullable();
-            $table->string('currency')->default('USD');
+            $table->string('currency')->default('KSH');
             $table->string('location_type')->nullable();
             $table->string('location_address')->nullable();
             $table->decimal('location_lat', 10, 8)->nullable();

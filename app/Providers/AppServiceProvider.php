@@ -27,6 +27,8 @@ use App\Http\Middleware\DataEncryption;
 use App\Livewire\MyReportedItems;
 use App\Services\HashIdService;
 use App\Livewire\ImpersonateUser;
+use App\Services\SettingsService;
+use Illuminate\Support\Facades\Log;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -69,6 +71,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(HashIdService::class, function ($app) {
             return new HashIdService();
         });
+
+        $this->app->singleton(SettingsService::class, function ($app) {
+            return new \App\Services\SettingsService();
+        });
     }
 
     /**
@@ -99,6 +105,12 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-
+        // Apply global settings on application boot
+        try {
+            $settingsService = app(SettingsService::class);
+            $settingsService->applyGlobalSettings();
+        } catch (\Exception $e) {
+            Log::error('Failed to apply global settings: ' . $e->getMessage());
+        }
     }
 }

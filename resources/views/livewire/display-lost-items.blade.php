@@ -1,4 +1,56 @@
 <div class="min-h-screen bg-gray-50 py-8">
+    <!-- Floating Action Bar for Bulk Actions -->
+    @if($canDelete && $totalSelected > 0)
+        <div class="fixed bottom-0 inset-x-0 pb-6 z-50"
+             x-data="{ show: true }"
+             x-show="show"
+             x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
+             x-transition:enter-start="translate-y-full"
+             x-transition:enter-end="translate-y-0"
+             x-transition:leave="transform transition ease-in-out duration-500 sm:duration-700"
+             x-transition:leave-start="translate-y-0"
+             x-transition:leave-end="translate-y-full">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg border border-gray-200/80 px-6 py-4">
+                    <div class="flex items-center justify-between flex-wrap gap-4">
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center gap-2">
+                                <span class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-blue-100 text-blue-600">
+                                    <i class="fas fa-check-square text-lg"></i>
+                                </span>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">{{ $totalSelected }} items selected</p>
+                                    <p class="text-xs text-gray-500">from {{ $items->total() }} total items</p>
+                                </div>
+                            </div>
+                            <div class="h-8 w-px bg-gray-200"></div>
+                            <div class="flex items-center gap-3">
+                                <button wire:click="selectAll"
+                                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
+                                    <i class="fas fa-check-double mr-2 text-blue-500"></i>
+                                    Select All
+                                </button>
+                                <button wire:click="deselectAll"
+                                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
+                                    <i class="fas fa-times mr-2 text-gray-500"></i>
+                                    Deselect All
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button wire:click="deleteSelected"
+                                wire:confirm="Are you sure you want to delete {{ $totalSelected }} selected items? This action cannot be undone."
+                                class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-medium rounded-lg transition-all duration-200 transform hover:-translate-y-0.5">
+                                <i class="fas fa-trash-alt mr-2"></i>
+                                Delete Selected
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <!-- Header -->
         <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
@@ -7,8 +59,9 @@
                 <p class="mt-2 text-sm text-gray-600">Browse through reported items or search for specific ones</p>
             </div>
 
+            <div class="mt-4 md:mt-0 flex items-center space-x-3">
             <!-- View Toggle Buttons -->
-            <div class="mt-4 md:mt-0 flex space-x-2">
+                <div class="flex items-center space-x-2">
                 <button wire:click="toggleView('grid')"
                     class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                     <i class="fas fa-th-large mr-2"></i>
@@ -24,6 +77,7 @@
                     <i class="fas fa-map-marker-alt mr-2"></i>
                     Map
                 </button>
+                </div>
             </div>
         </div>
 
@@ -153,6 +207,49 @@
 
         <!-- Content Area -->
         <div class="bg-white rounded-lg shadow">
+            @if($items->isEmpty())
+                <div class="flex flex-col items-center justify-center min-h-[400px] p-8 bg-white/50 backdrop-blur-sm rounded-xl shadow-sm border border-gray-100">
+                    <!-- Animated Icon -->
+                    <div class="mb-6 text-gray-400 animate-bounce">
+                        <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+
+                    <!-- Title with gradient text -->
+                    <h3 class="text-2xl font-semibold mb-3 bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+                        No Items Found
+                    </h3>
+
+                    <!-- Context-aware message -->
+                    <p class="text-gray-600 text-center max-w-md mb-6">
+                        @if($this->hasActiveFilters())
+                            It seems there are no items matching your current filters. Try adjusting your search criteria to find what you're looking for.
+                        @else
+                            There are currently no lost items in the system. Check back later or be the first to report a lost item.
+                        @endif
+                    </p>
+
+                    <!-- Action buttons -->
+                    <div class="flex gap-4">
+                        @if($this->hasActiveFilters())
+                            <button wire:click="resetFilters" class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-md font-semibold text-sm text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all duration-200">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Clear Filters
+                            </button>
+                        @endif
+
+                        <a href="{{ route('products.report-item') }}" class="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold text-sm rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-all duration-200">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Report Lost Item
+                        </a>
+                    </div>
+                </div>
+            @else
             <!-- Map View -->
             @if($view === 'map')
                 <div class="h-[600px] relative rounded-lg overflow-hidden" wire:ignore>
@@ -218,44 +315,135 @@
                 <!-- List View -->
                 <div class="divide-y divide-gray-200">
                     @foreach($items as $item)
-                        <div class="p-4 hover:bg-gray-50 transition-colors duration-200">
-                            <div class="flex items-start space-x-4">
-                                <!-- Fixed size image container -->
-                                <div class="relative flex-shrink-0 w-32 h-32 bg-gray-100 rounded-lg overflow-hidden">
+                            <div class="group hover:bg-gray-50/50 transition-all duration-300">
+                                <div class="p-6">
+                                    <div class="flex items-start gap-6">
+                                        <!-- Selection & Image Column -->
+                                        <div class="flex-shrink-0 flex flex-col items-center gap-4">
+                                            @if($canDelete)
+                                                <label class="inline-flex items-center">
+                                                    <input type="checkbox"
+                                                           wire:model.live="selectedItems"
+                                                           value="{{ $item->id }}"
+                                                           class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 transition-colors duration-200">
+                                                    <span class="sr-only">Select item</span>
+                                                </label>
+                                            @endif
+
+                                            <!-- Image Container with Aspect Ratio -->
+                                            <div class="relative w-40 aspect-[4/3] bg-gray-100 rounded-xl overflow-hidden shadow-sm border border-gray-200/80">
                                     @if($item->images->first())
                                         <img src="{{ asset('storage/' . $item->images->first()->image_path) }}"
                                              alt="{{ $item->title }}"
                                              class="absolute inset-0 w-full h-full object-cover">
+                                                    @if($item->images->count() > 1)
+                                                        <div class="absolute top-2 right-2">
+                                                            <span class="px-2 py-1 text-xs font-medium text-white bg-black/50 rounded-full backdrop-blur-sm">
+                                                                <i class="fas fa-images mr-1"></i>
+                                                                {{ $item->images->count() }}
+                                                            </span>
+                                                        </div>
+                                                    @endif
                                     @else
-                                        <div class="flex items-center justify-center h-full">
-                                            <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
+                                                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                                        <i class="fas fa-image text-gray-400 text-3xl mb-2"></i>
+                                                        <span class="text-xs text-gray-400">No image</span>
                                         </div>
                                     @endif
                                 </div>
-                                <!-- Item Details -->
+                                        </div>
+
+                                        <!-- Content Column -->
                                 <div class="flex-1 min-w-0">
-                                    <div class="flex items-center justify-between">
-                                        <span class="px-2.5 py-0.5 text-xs font-medium rounded-full
-                                            @if($item->status === 'found') bg-green-100 text-green-800
-                                            @elseif($item->status === 'claimed') bg-blue-100 text-blue-800
-                                            @else bg-yellow-100 text-yellow-800 @endif">
+                                            <div class="flex items-start justify-between gap-4">
+                                                <div class="flex-1">
+                                                    <!-- Title and Status -->
+                                                    <div class="flex items-center gap-3 mb-2">
+                                                        <h3 class="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">
+                                                            {{ $item->title }}
+                                                        </h3>
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                                            {{ $item->status === 'found' ? 'bg-green-100 text-green-800' : '' }}
+                                                            {{ $item->status === 'lost' ? 'bg-red-100 text-red-800' : '' }}
+                                                            {{ $item->status === 'claimed' ? 'bg-blue-100 text-blue-800' : '' }}">
+                                                            <i class="fas fa-circle text-[8px] mr-1.5"></i>
                                             {{ ucfirst($item->status) }}
                                         </span>
-                                        <span class="text-sm text-gray-500">{{ $item->created_at->diffForHumans() }}</span>
+                                                    </div>
+
+                                                    <!-- Description -->
+                                                    <p class="text-sm text-gray-600 line-clamp-2 mb-4">{{ $item->description }}</p>
+
+                                                    <!-- Item Details -->
+                                                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                                        <!-- Category -->
+                                                        <div class="flex items-center text-sm text-gray-600">
+                                                            <i class="fas fa-folder text-blue-500 mr-2"></i>
+                                                            <span class="truncate">{{ $item->category->name }}</span>
+                                                        </div>
+                                                        <!-- Location -->
+                                                        <div class="flex items-center text-sm text-gray-600">
+                                                            <i class="fas fa-map-marker-alt text-red-500 mr-2"></i>
+                                                            <span class="truncate">{{ $item->location_address ?: $item->area ?: 'Location not specified' }}</span>
+                                                        </div>
+                                                        <!-- Date -->
+                                                        <div class="flex items-center text-sm text-gray-600">
+                                                            <i class="fas fa-calendar-alt text-purple-500 mr-2"></i>
+                                                            <span>{{ $item->created_at->format('M d, Y') }}</span>
+                                                        </div>
+                                                        <!-- Time -->
+                                                        <div class="flex items-center text-sm text-gray-600">
+                                                            <i class="fas fa-clock text-amber-500 mr-2"></i>
+                                                            <span>{{ $item->created_at->format('h:i A') }}</span>
+                                                        </div>
+                                                    </div>
                                     </div>
-                                    <h3 class="mt-1 text-lg font-semibold text-gray-900">{{ $item->title }}</h3>
-                                    <p class="mt-1 text-sm text-gray-600">{{ $item->description }}</p>
-                                    <div class="mt-2 flex items-center justify-between">
+
+                                                <!-- Actions Column -->
+                                                <div class="flex flex-col items-end gap-3">
+                                                    @if($canDelete)
+                                                        <button
+                                                            wire:click="deleteItem({{ $item->id }})"
+                                                            wire:confirm="Are you sure you want to delete this item?"
+                                                            class="inline-flex items-center p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-full transition-colors duration-200">
+                                                            <i class="fas fa-trash-alt"></i>
+                                                        </button>
+                                                    @endif
+
                                         <button wire:click="viewDetails({{ $item->id }})"
-                                                class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200">
+                                                            class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:border-blue-500 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 group">
+                                                        <i class="fas fa-eye mr-2 text-gray-400 group-hover:text-blue-500"></i>
                                             View Details
                                         </button>
-                                        @if($item->category)
-                                            <span class="text-sm text-gray-500">{{ $item->category->name }}</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Additional Details -->
+                                            @if($item->brand || $item->color || $item->condition)
+                                                <div class="mt-4 pt-4 border-t border-gray-100">
+                                                    <div class="flex items-center gap-4 text-sm text-gray-600">
+                                                        @if($item->brand)
+                                                            <span class="inline-flex items-center">
+                                                                <i class="fas fa-tag text-gray-400 mr-1.5"></i>
+                                                                {{ $item->brand }}
+                                                            </span>
+                                                        @endif
+                                                        @if($item->color)
+                                                            <span class="inline-flex items-center">
+                                                                <i class="fas fa-palette text-gray-400 mr-1.5"></i>
+                                                                {{ $item->color }}
+                                                            </span>
+                                                        @endif
+                                                        @if($item->condition)
+                                                            <span class="inline-flex items-center">
+                                                                <i class="fas fa-star text-gray-400 mr-1.5"></i>
+                                                                {{ ucfirst($item->condition) }} Condition
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                </div>
                                         @endif
-                                    </div>
+                                        </div>
                                 </div>
                             </div>
                         </div>
@@ -265,7 +453,30 @@
                 <!-- Grid View -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
                     @foreach($items as $item)
-                    <div class="group bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 overflow-hidden">
+                        <div class="group relative bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 overflow-hidden">
+                            <!-- Admin Controls Bar - Fixed at top -->
+                            @if($canDelete)
+                                <div class="absolute top-0 inset-x-0 z-20 p-3 bg-gradient-to-b from-black/50 to-transparent">
+                                    <div class="flex items-center justify-between">
+                                        <label class="inline-flex items-center">
+                                            <input type="checkbox"
+                                                   wire:model.live="selectedItems"
+                                                   value="{{ $item->id }}"
+                                                   class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 transition-colors duration-200">
+                                            <span class="sr-only">Select item</span>
+                                        </label>
+                                        <button
+                                            wire:click="deleteItem({{ $item->id }})"
+                                            wire:confirm="Are you sure you want to delete this item?"
+                                            class="inline-flex items-center p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors duration-200">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            @endif
+
+                            <!-- Main Content Area - Clickable for View Details -->
+                            <button wire:click="viewDetails({{ $item->id }})" class="w-full text-left">
                         <!-- Image Container -->
                         <div class="relative aspect-[4/3] bg-gray-100 overflow-hidden">
                             <div class="absolute inset-0 flex items-center justify-center">
@@ -289,15 +500,7 @@
                                 @endif
                             </div>
                             <!-- Hover Overlay -->
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300">
-                                <div class="absolute bottom-0 left-0 right-0 p-4">
-                                    <button wire:click="viewDetails({{ $item->id }})"
-                                            class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-white/90 backdrop-blur-sm text-sm font-medium rounded-lg text-gray-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-                                        <i class="fas fa-search mr-2"></i>
-                                        View Details
-                                    </button>
-                                </div>
-                            </div>
+                                    <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
                         </div>
 
                         <!-- Content -->
@@ -340,6 +543,23 @@
                                 </div>
                             </div>
                         </div>
+
+                                <!-- View Details Indicator -->
+                                <div class="absolute bottom-4 right-4 bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center transform translate-y-12 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                                    <i class="fas fa-eye"></i>
+                                </div>
+                            </button>
+
+                            <!-- Selection Indicator -->
+                            @if(in_array($item->id, $selectedItems))
+                                <div class="absolute inset-0 bg-blue-50/50 pointer-events-none">
+                                    <div class="absolute top-2 right-2">
+                                        <span class="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white">
+                                            <i class="fas fa-check text-sm"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                            @endif
                     </div>
                     @endforeach
                 </div>
@@ -350,6 +570,7 @@
                 <div class="px-6 py-4 border-t border-gray-200">
                     {{ $items->links() }}
                 </div>
+                @endif
             @endif
         </div>
     </div>

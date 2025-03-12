@@ -11,11 +11,18 @@
                 </div>
                 <!-- Quick Actions -->
                 <div class="flex items-center space-x-3">
-                    <button wire:click="resetToDefault" class="inline-flex items-center px-4 py-2 text-sm text-gray-700 bg-white rounded-lg border border-gray-300 hover:bg-gray-50">
+                    <button 
+                        x-data=""
+                        x-on:click="if (confirm('Are you sure you want to reset all settings to their default values? This action cannot be undone.')) { $wire.resetToDefault() }"
+                        class="inline-flex items-center px-4 py-2 text-sm text-gray-700 bg-white rounded-lg border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
+                    >
                         <i class="fas fa-undo mr-2"></i>
                         Reset to Default
                     </button>
-                    <button wire:click="saveSettings" class="inline-flex items-center px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                    <button 
+                        wire:click="saveSettings" 
+                        class="inline-flex items-center px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
+                    >
                         <i class="fas fa-save mr-2"></i>
                         Save Changes
                     </button>
@@ -33,17 +40,21 @@
                             <i class="fas fa-cog w-5 h-5 mr-3"></i>
                             General
                         </a>
-                        <a href="#rewards" class="flex items-center px-4 py-3 text-sm font-medium text-gray-900 rounded-lg transition-colors hover:bg-blue-50 hover:text-blue-700">
-                            <i class="fas fa-gift w-5 h-5 mr-3"></i>
-                            Rewards
+                        <a href="#contact" class="flex items-center px-4 py-3 text-sm font-medium text-gray-900 rounded-lg transition-colors hover:bg-blue-50 hover:text-blue-700">
+                            <i class="fas fa-address-card w-5 h-5 mr-3"></i>
+                            Contact & Support
+                        </a>
+                        <a href="#security" class="flex items-center px-4 py-3 text-sm font-medium text-gray-900 rounded-lg transition-colors hover:bg-blue-50 hover:text-blue-700">
+                            <i class="fas fa-shield-alt w-5 h-5 mr-3"></i>
+                            Security
                         </a>
                         <a href="#notifications" class="flex items-center px-4 py-3 text-sm font-medium text-gray-900 rounded-lg transition-colors hover:bg-blue-50 hover:text-blue-700">
                             <i class="fas fa-bell w-5 h-5 mr-3"></i>
                             Notifications
                         </a>
-                        <a href="#security" class="flex items-center px-4 py-3 text-sm font-medium text-gray-900 rounded-lg transition-colors hover:bg-blue-50 hover:text-blue-700">
-                            <i class="fas fa-shield-alt w-5 h-5 mr-3"></i>
-                            Security
+                        <a href="#rewards" class="flex items-center px-4 py-3 text-sm font-medium text-gray-900 rounded-lg transition-colors hover:bg-blue-50 hover:text-blue-700">
+                            <i class="fas fa-gift w-5 h-5 mr-3"></i>
+                            Rewards
                         </a>
                     </nav>
                 </div>
@@ -81,6 +92,206 @@
                                         />
                                     </div>
                                     <p class="mt-2 text-sm text-gray-500">This name will appear throughout the application.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact & Support Settings -->
+                <div id="contact" class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Contact & Support</h3>
+                                <p class="mt-1 text-sm text-gray-500">Configure contact information and support details</p>
+                            </div>
+                            <span class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                                <i class="fas fa-address-card text-xl"></i>
+                            </span>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Contact Email</label>
+                                    <div class="mt-1">
+                                        <x-input type="email" wire:model="settings.contact_email" class="w-full" placeholder="support@example.com" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Support Phone</label>
+                                    <div class="mt-1">
+                                        <x-input type="tel" wire:model="settings.support_phone" class="w-full" placeholder="+1 (555) 123-4567" />
+                                    </div>
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-medium text-gray-700">Office Address</label>
+                                    <div class="mt-1">
+                                        <x-textarea wire:model="settings.office_address" class="w-full" rows="3" placeholder="Enter your office address" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Office Hours</label>
+                                    <div class="mt-1">
+                                        <x-input type="text" wire:model="settings.office_hours" class="w-full" placeholder="9:00 AM - 5:00 PM" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Security Settings -->
+                <div id="security" class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Security Settings</h3>
+                                <p class="mt-1 text-sm text-gray-500">Configure security and authentication settings</p>
+                            </div>
+                            <span class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                                <i class="fas fa-shield-alt text-xl"></i>
+                            </span>
+                        </div>
+
+                        <div class="space-y-6">
+                            <!-- Authentication Settings -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Max Login Attempts</label>
+                                    <div class="mt-1">
+                                        <x-input type="number" wire:model="settings.max_login_attempts" class="w-full" min="1" max="10" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Lockout Duration (minutes)</label>
+                                    <div class="mt-1">
+                                        <x-input type="number" wire:model="settings.lockout_duration" class="w-full" min="1" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Password Expiry (days)</label>
+                                    <div class="mt-1">
+                                        <x-input type="number" wire:model="settings.password_expires_days" class="w-full" min="0" />
+                                        <p class="mt-1 text-sm text-gray-500">Set to 0 to disable password expiry</p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Session Lifetime (minutes)</label>
+                                    <div class="mt-1">
+                                        <x-input type="number" wire:model="settings.session_lifetime" class="w-full" min="1" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Security Features -->
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                                    <div>
+                                        <label class="text-sm font-medium text-gray-900">Require Two-Factor Authentication</label>
+                                        <p class="text-sm text-gray-500">Enforce 2FA for all users</p>
+                                    </div>
+                                    <div class="ml-4">
+                                        <x-toggle wire:model="settings.require_2fa" />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                                    <div>
+                                        <label class="text-sm font-medium text-gray-900">Enable reCAPTCHA</label>
+                                        <p class="text-sm text-gray-500">Add reCAPTCHA protection to forms</p>
+                                    </div>
+                                    <div class="ml-4">
+                                        <x-toggle wire:model="settings.enable_recaptcha" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- File Upload Security -->
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Allowed File Types</label>
+                                    <div class="mt-1">
+                                        <x-input type="text" wire:model="settings.allowed_file_types" class="w-full" placeholder="jpg,jpeg,png,pdf" />
+                                        <p class="mt-1 text-sm text-gray-500">Comma-separated list of allowed file extensions</p>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Max File Size (MB)</label>
+                                    <div class="mt-1">
+                                        <x-input type="number" wire:model="settings.max_file_size" class="w-full" min="1" max="50" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notification Settings -->
+                <div id="notifications" class="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Notification Settings</h3>
+                                <p class="mt-1 text-sm text-gray-500">Configure how and when notifications are sent</p>
+                            </div>
+                            <span class="p-2 bg-blue-50 rounded-lg text-blue-600">
+                                <i class="fas fa-bell text-xl"></i>
+                            </span>
+                        </div>
+
+                        <div class="space-y-6">
+                            <!-- Notification Channels -->
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                                    <div>
+                                        <label class="text-sm font-medium text-gray-900">Email Notifications</label>
+                                        <p class="text-sm text-gray-500">Send notifications via email</p>
+                                    </div>
+                                    <div class="ml-4">
+                                        <x-toggle wire:model="settings.enable_email_notifications" />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                                    <div>
+                                        <label class="text-sm font-medium text-gray-900">SMS Notifications</label>
+                                        <p class="text-sm text-gray-500">Send notifications via SMS</p>
+                                    </div>
+                                    <div class="ml-4">
+                                        <x-toggle wire:model="settings.enable_sms_notifications" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Notification Events -->
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                                    <div>
+                                        <label class="text-sm font-medium text-gray-900">Item Match Notifications</label>
+                                        <p class="text-sm text-gray-500">Notify users when a potential match is found</p>
+                                    </div>
+                                    <div class="ml-4">
+                                        <x-toggle wire:model="settings.notify_on_item_match" />
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                                    <div>
+                                        <label class="text-sm font-medium text-gray-900">New Item Notifications</label>
+                                        <p class="text-sm text-gray-500">Notify admins when new items are added</p>
+                                    </div>
+                                    <div class="ml-4">
+                                        <x-toggle wire:model="settings.notify_admins_on_new_item" />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -194,4 +405,23 @@
             <p x-text="message"></p>
         </div>
     </div>
+
+    <!-- Add reset feedback handler -->
+    <script>
+        document.addEventListener('livewire:initialized', () => {
+            Livewire.on('settings-reset', () => {
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                
+                // Add visual feedback
+                const content = document.querySelector('.settings-content');
+                if (content) {
+                    content.classList.add('animate-pulse');
+                    setTimeout(() => {
+                        content.classList.remove('animate-pulse');
+                    }, 1000);
+                }
+            });
+        });
+    </script>
 </div>

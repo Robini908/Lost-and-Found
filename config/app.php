@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\ServiceProvider;
+
 return [
 
     /*
@@ -132,7 +134,7 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
-    'providers' => [
+    'providers' => ServiceProvider::defaultProviders()->merge([
         /*
          * Laravel Framework Service Providers...
          */
@@ -172,13 +174,15 @@ return [
          */
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
+        App\Providers\ComponentServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         App\Providers\FortifyServiceProvider::class,
         App\Providers\JetstreamServiceProvider::class,
         App\Providers\SecurityServiceProvider::class,
         App\Providers\RecaptchaServiceProvider::class,
-    ],
+        App\Providers\TranslationServiceProvider::class,
+    ])->toArray(),
 
     /*
     |--------------------------------------------------------------------------

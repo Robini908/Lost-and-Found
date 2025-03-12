@@ -2,687 +2,919 @@
 
 namespace App\Services;
 
+use GuzzleHttp\Client;
 use App\Models\LostItem;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Bus;
-use App\Jobs\ProcessImageFeatures;
-use Carbon\Carbon;
+use App\Jobs\ProcessImageEmbeddings;
 
 class ItemMatchingService
 {
-    protected $cacheKey = 'matched_items';
-    protected $cacheDuration = 1440; // 24 hours in minutes
-    protected $batchSize = 50; // Process items in batches of 50
-    protected $similarityThreshold = 0.4; // Reduced from 0.6 to 0.4 (40% similarity threshold)
-    protected $maxImagesPerItem = 5; // Maximum number of images to process per item
-    protected $weights = [
-        'text' => 0.30,      // Title and description similarity
-        'category' => 0.15,  // Category matching
-        'image' => 0.20,     // Image similarity
-        'location' => 0.20,  // Location proximity
-        'attributes' => 0.10, // Brand, model, color matching
-        'time' => 0.05       // Time difference between lost and found
-    ];
+    protected $client;
+    protected $apiToken;
 
-    /**
-     * Find matches for reported/searched items against found items.
-     */
-    public function findMatches(Collection $reportedItems, Collection $foundItems)
+    public function __construct()
     {
-        Log::info('Starting match finding process', [
-            'reported_items_count' => $reportedItems->count(),
-            'found_items_count' => $foundItems->count()
-        ]);
+        $this->client = new Client();
+        $this->apiToken = config('services.huggingface.token');
 
-        $cacheKey = $this->generateCacheKey($reportedItems, $foundItems);
-
-        if (Cache::has($cacheKey)) {
-            Log::info('Returning cached matches');
-            return Cache::get($cacheKey);
+        if (empty($this->apiToken)) {
+            throw new \RuntimeException('HuggingFace API token not configured. Please check your HUGGINGFACE_API_TOKEN in .env');
         }
-
-        $matches = collect();
-
-        foreach ($reportedItems as $reportedItem) {
-            Log::info('Processing reported item', [
-                'item_id' => $reportedItem->id,
-                'title' => $reportedItem->title,
-                'type' => $reportedItem->item_type
-            ]);
-
-            // Pre-filter candidates before detailed matching
-            $filteredFoundItems = $this->preFilterCandidates($reportedItem, $foundItems);
-
-            Log::info('Filtered found items', [
-                'original_count' => $foundItems->count(),
-                'filtered_count' => $filteredFoundItems->count()
-            ]);
-
-            // Skip detailed matching if no candidates pass pre-filtering
-            if ($filteredFoundItems->isEmpty()) {
-                Log::info('No candidates passed pre-filtering for item', ['item_id' => $reportedItem->id]);
-                continue;
-            }
-
-            // Extract features and embeddings once for the reported item
-            $reportedEmbedding = $this->getTextEmbedding($reportedItem);
-            $reportedFeatures = $this->extractImageFeatures($reportedItem->images);
-
-            $itemMatches = $this->findMatchesForItem($reportedItem, $filteredFoundItems);
-
-            Log::info('Found matches for item', [
-                'item_id' => $reportedItem->id,
-                'matches_count' => $itemMatches->count()
-            ]);
-
-            if ($itemMatches->isNotEmpty()) {
-            $matches = $matches->concat($itemMatches);
-            }
-        }
-
-        $matches = $matches->sortByDesc('similarity_score')->values();
-
-        Log::info('Completed match finding process', [
-            'total_matches' => $matches->count()
-        ]);
-
-        Cache::put($cacheKey, $matches, now()->addHours(24));
-
-        return $matches;
     }
 
     /**
-     * Find matches for a single reported item
+     * Get embeddings for a given text using Hugging Face API.
+     *
+     * @param string $text
+     * @return array|null
      */
-    protected function findMatchesForItem($reportedItem, Collection $foundItems)
+    public function getTextEmbeddings($text)
     {
-        $matches = collect();
-        $reportedItemEmbedding = $this->getTextEmbedding($reportedItem);
-        $reportedItemFeatures = $this->extractImageFeatures($reportedItem->images);
-
-        foreach ($foundItems as $foundItem) {
-            // Skip if the found item is from the same user or not marked as found
-            if ($foundItem->user_id === $reportedItem->user_id || $foundItem->item_type !== LostItem::TYPE_FOUND) {
-                continue;
-            }
-
-            // Calculate comprehensive similarity score
-            $similarityScore = $this->calculateComprehensiveSimilarity(
-                $reportedItem,
-                $foundItem,
-                $reportedItemEmbedding,
-                $reportedItemFeatures
-            );
-
-            // Only add matches that meet the minimum similarity threshold
-            if ($similarityScore !== null) {
-                $matches->push($similarityScore);
-            }
-        }
-
-        return $matches;
-    }
-
-    /**
-     * Calculate comprehensive similarity between two items
-     */
-    protected function calculateComprehensiveSimilarity($reportedItem, $foundItem, $reportedEmbedding, $reportedFeatures)
-    {
-        $weights = [
-            'text' => 0.35,
-            'category' => 0.15,
-            'image' => 0.20,
-            'location' => 0.15,
-            'time' => 0.15
-        ];
-
-        $similarities = [
-            'text' => $this->calculateTextSimilarity($reportedEmbedding, $this->getTextEmbedding($foundItem)),
-            'category' => $this->calculateCategorySimilarity($reportedItem, $foundItem),
-            'image' => $this->calculateBestImageSimilarity($reportedFeatures, $this->extractImageFeatures($foundItem->images)),
-            'location' => $this->calculateLocationSimilarity($reportedItem, $foundItem),
-            'time' => $this->calculateTimeSimilarity($reportedItem->date, $foundItem->date)
-        ];
-
-        $weightedSum = 0;
-        foreach ($weights as $key => $weight) {
-            $weightedSum += $similarities[$key] * $weight;
-        }
-
-        // Lower the threshold to 0.4 (40%)
-        if ($weightedSum < 0.4) {
-            Log::info("Match score too low: {$weightedSum} for items {$reportedItem->id} and {$foundItem->id}");
+        if (empty($text)) {
+            Log::warning('Empty text provided for embeddings');
             return null;
         }
 
-        Log::info("Found potential match with score {$weightedSum} for items {$reportedItem->id} and {$foundItem->id}");
-
-        return [
-            'similarity_score' => $weightedSum,
-            'reported_item' => $reportedItem,
-            'found_item' => $foundItem,
-            'match_details' => $this->generateMatchDetails($reportedItem, $foundItem)
-        ];
-    }
-
-    /**
-     * Calculate similarity between categories
-     */
-    protected function calculateCategorySimilarity($item1, $item2)
-    {
-        if (!$item1->category_id || !$item2->category_id) {
-            return 0;
-        }
-
-        return $item1->category_id === $item2->category_id ? 1 : 0;
-    }
-
-    /**
-     * Calculate best image similarity across all image combinations
-     */
-    public function calculateBestImageSimilarity($features1, $features2)
-    {
-        if (empty($features1) || empty($features2)) {
-            return 0;
-        }
-
-        $maxSimilarity = 0;
-
-        // Compare each image from item1 with each image from item2
-        foreach ($features1 as $feature1) {
-            foreach ($features2 as $feature2) {
-                $similarity = $this->cosineSimilarity($feature1, $feature2);
-                $maxSimilarity = max($maxSimilarity, $similarity);
-            }
-        }
-
-        return $maxSimilarity;
-    }
-
-    /**
-     * Extract features from multiple images
-     */
-    public function extractImageFeatures($images)
-    {
-        $features = [];
-        $processedCount = 0;
-
-        foreach ($images as $image) {
-            if ($processedCount >= $this->maxImagesPerItem) {
-                break;
-            }
-
-            $cacheKey = 'image_features_' . md5($image->image_path);
-            $cached = Cache::get($cacheKey);
-
-            if ($cached) {
-                $features[] = $cached;
-            } else {
-                try {
-                    $imagePath = 'lost-items/' . basename($image->image_path);
-                    if (Storage::disk('public')->exists($imagePath)) {
-                        $imageData = base64_encode(Storage::disk('public')->get($imagePath));
-
-                        $response = Http::withHeaders([
-                            'Authorization' => 'Bearer ' . env('HUGGING_FACE_API_KEY'),
-                        ])->timeout(30)->post(
-                            'https://api-inference.huggingface.co/models/google/vit-base-patch16-224',
-                            ['inputs' => $imageData]
-                        );
-
-                        if ($response->successful()) {
-                            $prediction = $response->json();
-                            $features[] = array_column($prediction, 'score');
-                            Cache::put($cacheKey, end($features), $this->cacheDuration);
-                        }
-                    }
-                } catch (\Exception $e) {
-                    Log::error("Error processing image: " . $e->getMessage());
-                }
-            }
-
-            $processedCount++;
-        }
-
-        return $features;
-    }
-
-    /**
-     * Get text embedding for item description
-     */
-    public function getTextEmbedding($item)
-    {
-        // Combine all relevant text fields for better matching
-        $text = implode(' ', array_filter([
-            $item->title,
-            $item->description,
-            $item->brand,
-            $item->model,
-            $item->color,
-            $item->condition,
-            $item->additional_details ? json_encode($item->additional_details) : null
-        ]));
-
+        // Generate cache key based on text content
         $cacheKey = 'text_embedding_' . md5($text);
 
-        return Cache::remember($cacheKey, $this->cacheDuration, function () use ($text) {
+        // Try to get from cache first
+        if (Cache::has($cacheKey)) {
+            Log::info('Retrieved text embeddings from cache', ['cache_key' => $cacheKey]);
+            return Cache::get($cacheKey);
+        }
+
+        Log::info('Starting text embedding process', [
+            'text_length' => strlen($text),
+            'model_endpoint' => config('services.huggingface.text_model_endpoint')
+        ]);
+
+        $maxRetries = config('services.huggingface.max_retries', 3);
+        $retryDelay = config('services.huggingface.retry_delay', 1000);
+
+        // Log the token format (masked)
+        $maskedToken = substr_replace($this->apiToken, '...', 10, -5);
+        Log::debug('API Token format check', [
+            'token_length' => strlen($this->apiToken),
+            'masked_token' => $maskedToken,
+            'starts_with_hf' => str_starts_with($this->apiToken, 'hf_')
+        ]);
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             try {
-                $response = Http::withHeaders([
-                    'Authorization' => 'Bearer ' . env('HUGGING_FACE_API_KEY'),
-                ])->timeout(30)->post(
-                    'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2',
-                    ['inputs' => $text]
-                );
+                Log::debug("Attempt $attempt: Sending request to HuggingFace API", [
+                    'attempt' => $attempt,
+                    'max_retries' => $maxRetries
+                ]);
 
-                if ($response->successful()) {
-                    return $response->json();
-                }
-            } catch (\Exception $e) {
-                Log::error("Error getting text embedding: " . $e->getMessage());
-            }
-
-            return [];
-        });
-    }
-
-    /**
-     * Generate detailed match information with confidence levels
-     */
-    protected function generateMatchDetails($reportedItem, $foundItem)
-    {
-        $details = [
-            'title_similarity' => $this->calculateTextSimilarityWithContext($reportedItem->title, $foundItem->title),
-            'description_similarity' => $this->calculateTextSimilarityWithContext($reportedItem->description, $foundItem->description),
-            'category_match' => $reportedItem->category_id === $foundItem->category_id,
-            'location_similarity' => $this->calculateLocationSimilarity($reportedItem, $foundItem),
-            'attribute_similarity' => $this->calculateAttributesSimilarity($reportedItem, $foundItem),
-            'time_similarity' => $this->calculateTimeSimilarity(
-                $reportedItem->date_lost ?? $reportedItem->created_at,
-                $foundItem->date_found ?? $foundItem->created_at
-            ),
-        ];
-
-        // Calculate confidence level
-        $confidenceScore = 0;
-        $confidenceScore += $details['title_similarity'] * 0.25;
-        $confidenceScore += $details['description_similarity'] * 0.20;
-        $confidenceScore += ($details['category_match'] ? 1 : 0) * 0.15;
-        $confidenceScore += $details['location_similarity'] * 0.25;
-        $confidenceScore += $details['attribute_similarity'] * 0.10;
-        $confidenceScore += $details['time_similarity'] * 0.05;
-
-        if ($confidenceScore >= 0.8) {
-            $details['confidence'] = 'high';
-        } elseif ($confidenceScore >= 0.5) {
-            $details['confidence'] = 'medium';
-        } else {
-            $details['confidence'] = 'low';
-        }
-
-        // Add location details for better user feedback
-        $details['location_details'] = [
-            'reported_location' => $reportedItem->location_lost ?? $reportedItem->location_address ?? $reportedItem->area,
-            'found_location' => $foundItem->location_found ?? $foundItem->location_address ?? $foundItem->area,
-            'distance' => ($reportedItem->location_lat && $reportedItem->location_lng &&
-                          $foundItem->location_lat && $foundItem->location_lng)
-                ? round($this->calculateDistance(
-                    $reportedItem->location_lat,
-                    $reportedItem->location_lng,
-                    $foundItem->location_lat,
-                    $foundItem->location_lng
-                ) / 1000, 2) . ' km'
-                : null
-        ];
-
-        return $details;
-    }
-
-    /**
-     * Calculate cosine similarity between two vectors.
-     *
-     * @param array $vector1
-     * @param array $vector2
-     * @return float
-     */
-    protected function cosineSimilarity($vector1, $vector2): float
-    {
-        // Check if vectors are valid
-        if (!is_array($vector1) || !is_array($vector2) || empty($vector1) || empty($vector2)) {
-            Log::warning("Invalid vectors for cosine similarity calculation.");
-            return 0; // Return 0 if vectors are invalid
-        }
-
-        // Pad the shorter vector with zeros
-        $maxLength = max(count($vector1), count($vector2));
-        $vector1 = array_pad($vector1, $maxLength, 0);
-        $vector2 = array_pad($vector2, $maxLength, 0);
-
-        $dotProduct = 0;
-        $magnitude1 = 0;
-        $magnitude2 = 0;
-
-        for ($i = 0; $i < $maxLength; $i++) {
-            $dotProduct += $vector1[$i] * $vector2[$i];
-            $magnitude1 += $vector1[$i] * $vector1[$i];
-            $magnitude2 += $vector2[$i] * $vector2[$i];
-        }
-
-        $magnitude1 = sqrt($magnitude1);
-        $magnitude2 = sqrt($magnitude2);
-
-        // Avoid division by zero
-        if ($magnitude1 === 0 || $magnitude2 === 0) {
-            Log::warning("Magnitude is zero.");
-            return 0;
-        }
-
-        return $dotProduct / ($magnitude1 * $magnitude2);
-    }
-
-    /**
-     * Calculate location similarity considering both coordinates and text
-     */
-    protected function calculateLocationSimilarity($reportedItem, $foundItem)
-    {
-        // First, determine the location type of the reported/searched item
-        $reportedLocationType = $reportedItem->location_type;
-
-        // If the reported item uses map-based location
-        if ($reportedLocationType === 'map') {
-            // Ensure we have the required coordinates for the reported item
-            if (!$reportedItem->location_lat || !$reportedItem->location_lng) {
-                return 0.1; // Return low similarity if coordinates are missing
-            }
-
-            // If found item also uses map
-            if ($foundItem->location_type === 'map' && $foundItem->location_lat && $foundItem->location_lng) {
-                $distance = $this->calculateDistance(
-                    $reportedItem->location_lat,
-                    $reportedItem->location_lng,
-                    $foundItem->location_lat,
-                    $foundItem->location_lng
-                );
-
-                // Convert distance to similarity score using exponential decay
-                // 5km is considered the threshold for good matches
-                $coordinateSimilarity = exp(-$distance / 5000);
-
-                // Compare addresses if available (as secondary factor)
-                $addressSimilarity = 0;
-                if ($reportedItem->location_address && $foundItem->location_address) {
-                    $addressSimilarity = $this->calculateTextSimilarityWithContext(
-                        $reportedItem->location_address,
-                        $foundItem->location_address
-                    );
-                }
-
-                // Weight heavily towards coordinate matching (80%) with address as supporting factor (20%)
-                return ($coordinateSimilarity * 0.8) + ($addressSimilarity * 0.2);
-            }
-
-            // If found item uses area, try to match address with area
-            if ($foundItem->location_type === 'area' && $foundItem->area) {
-                $similarity = 0;
-
-                if ($reportedItem->location_address) {
-                    $similarity = $this->calculateTextSimilarityWithContext(
-                        $reportedItem->location_address,
-                        $foundItem->area
-                    );
-
-                    // Consider landmarks if available
-                    if ($foundItem->landmarks) {
-                        $landmarkSimilarity = $this->calculateTextSimilarityWithContext(
-                            $reportedItem->location_address,
-                            $foundItem->landmarks
-                        );
-                        $similarity = max($similarity, $landmarkSimilarity * 0.7);
-                    }
-                }
-
-                // Reduce confidence due to different location types
-                return $similarity * 0.6;
-            }
-
-            return 0.1; // Return low similarity if found item has no valid location data
-        }
-
-        // If the reported item uses area-based location
-        if ($reportedLocationType === 'area') {
-            // Ensure we have the area for the reported item
-            if (!$reportedItem->area) {
-                return 0.1; // Return low similarity if area is missing
-            }
-
-            // If found item uses area
-            if ($foundItem->location_type === 'area' && $foundItem->area) {
-                $similarity = 0;
-                $weights = [
-                    'area' => 0.8,
-                    'landmarks' => 0.2
+                $requestData = [
+                    'headers' => [
+                        'Authorization' => 'Bearer hf_' . ltrim($this->apiToken, 'hf_'),
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'inputs' => $text,
+                        'options' => ['wait_for_model' => true]
+                    ]
                 ];
 
-                // Primary comparison based on area text
-                $areaSimilarity = $this->calculateTextSimilarityWithContext(
-                    $reportedItem->area,
-                    $foundItem->area
-                );
-                $similarity += $areaSimilarity * $weights['area'];
-
-                // Secondary comparison based on landmarks if available
-                if ($reportedItem->landmarks && $foundItem->landmarks) {
-                    $landmarkSimilarity = $this->calculateTextSimilarityWithContext(
-                        $reportedItem->landmarks,
-                        $foundItem->landmarks
-                    );
-                    $similarity += $landmarkSimilarity * $weights['landmarks'];
-                }
-
-                return $similarity;
-            }
-
-            // If found item uses map
-            if ($foundItem->location_type === 'map' && $foundItem->location_address) {
-                $similarity = 0;
-
-                // Try to match the reported item's area with the found item's address
-                $similarity = $this->calculateTextSimilarityWithContext(
-                    $reportedItem->area,
-                    $foundItem->location_address
+                $response = $this->client->post(
+                    config('services.huggingface.text_model_endpoint'),
+                    $requestData
                 );
 
-                // Consider landmarks as additional context if available
-                if ($reportedItem->landmarks) {
-                    $landmarkSimilarity = $this->calculateTextSimilarityWithContext(
-                        $reportedItem->landmarks,
-                        $foundItem->location_address
-                    );
-                    $similarity = max($similarity, $landmarkSimilarity * 0.7);
+                $embeddings = json_decode($response->getBody(), true);
+
+                if ($embeddings) {
+                    // Cache the embeddings for future use (1 week)
+                    Cache::put($cacheKey, $embeddings, now()->addWeek());
+                    return $embeddings;
                 }
 
-                // Reduce confidence due to different location types
-                return $similarity * 0.6;
-            }
+                return null;
 
-            return 0.1; // Return low similarity if found item has no valid location data
+            } catch (\Exception $e) {
+                Log::warning("Failed to get text embeddings (attempt $attempt)", [
+                    'error' => $e->getMessage()
+                ]);
+
+                if ($attempt < $maxRetries) {
+                    $delayMs = $retryDelay * $attempt; // Exponential backoff
+                    Log::info("Waiting {$delayMs}ms before next retry");
+                    usleep($delayMs * 1000);
+                } else {
+                    Log::error('All attempts to fetch text embeddings failed', [
+                        'total_attempts' => $maxRetries,
+                        'final_error' => $e->getMessage()
+                    ]);
+                    return null;
+                }
+            }
         }
-
-        return 0.1; // Return low similarity for invalid location types
+        return null;
     }
 
     /**
-     * Calculate time similarity using an exponential decay function.
+     * Get embeddings for multiple texts in batch
      *
-     * @param \Carbon\Carbon $dateLost
-     * @param \Carbon\Carbon $dateFound
+     * @param array $texts
+     * @return array
+     */
+    public function getBatchTextEmbeddings(array $texts)
+    {
+        $results = [];
+        $textsToProcess = [];
+        $cacheKeys = [];
+
+        // Check cache first for each text
+        foreach ($texts as $index => $text) {
+            // Clean and normalize the text
+            $text = trim($text);
+            $cacheKey = 'text_embedding_' . md5($text);
+            if (Cache::has($cacheKey)) {
+                $results[$index] = Cache::get($cacheKey);
+            } else {
+                $textsToProcess[$index] = $text;
+                $cacheKeys[$index] = $cacheKey;
+            }
+        }
+
+        // If all results were in cache, return early
+        if (empty($textsToProcess)) {
+            return $results;
+        }
+
+        try {
+            $response = $this->client->post(
+                config('services.huggingface.text_model_endpoint'),
+                [
+                    'headers' => [
+                        'Authorization' => 'Bearer hf_' . ltrim($this->apiToken, 'hf_'),
+                        'Content-Type' => 'application/json',
+                    ],
+                    'json' => [
+                        'inputs' => array_values($textsToProcess),
+                        'options' => ['wait_for_model' => true]
+                    ]
+                ]
+            );
+
+            $batchEmbeddings = json_decode($response->getBody(), true);
+
+            if ($batchEmbeddings) {
+                foreach ($textsToProcess as $index => $text) {
+                    $embedding = $batchEmbeddings[array_search($index, array_keys($textsToProcess))];
+                    $results[$index] = $embedding;
+                    Cache::put($cacheKeys[$index], $embedding, now()->addWeek());
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Batch text embeddings failed', [
+                'error' => $e->getMessage(),
+                'count' => count($textsToProcess)
+            ]);
+        }
+
+        return $results;
+    }
+
+    protected function getImageEmbeddings($imageUrl)
+    {
+        if (empty($imageUrl)) {
+            Log::warning('Empty image URL provided for embeddings');
+            return null;
+        }
+
+        // Extract image ID from URL
+        preg_match('/\/([^\/]+)\.[^\.]+$/', $imageUrl, $matches);
+        $imageId = $matches[1] ?? md5($imageUrl);
+
+        $cacheKey = 'image_embedding_' . $imageId;
+
+        // Try to get embeddings from cache first
+        if (Cache::has($cacheKey)) {
+            Log::info('Retrieved image embeddings from cache', ['image_id' => $imageId]);
+            return Cache::get($cacheKey);
+        }
+
+        // Process image embeddings
+        $job = new ProcessImageEmbeddings($imageUrl, $imageId);
+        return $job->handle(); // For now, process synchronously. Later we can switch to ->dispatch()
+    }
+
+    /**
+     * Calculate cosine similarity between two embeddings.
+     *
+     * @param array|null $embeddingA
+     * @param array|null $embeddingB
      * @return float
      */
-    public function calculateTimeSimilarity($dateLost, $dateFound)
+    public function cosineSimilarity($embeddingA, $embeddingB)
     {
-        if (!$dateLost || !$dateFound) {
-            return 0; // No date data
+        if (!is_array($embeddingA) || !is_array($embeddingB)) {
+            Log::error('Invalid embeddings provided for similarity calculation', [
+                'embeddingA' => gettype($embeddingA),
+                'embeddingB' => gettype($embeddingB)
+            ]);
+            return 0.0;
         }
 
-        $diff = abs($dateLost->diffInDays($dateFound));
+        try {
+            $dotProduct = 0;
+            $normA = 0;
+            $normB = 0;
 
-        // Use an exponential decay function to calculate similarity
-        // The similarity decreases exponentially as the difference increases
-        $timeSimilarity = exp(-0.1 * $diff);
+            foreach ($embeddingA as $i => $value) {
+                if (!isset($embeddingB[$i])) {
+                    Log::error('Embeddings have different dimensions');
+                    return 0.0;
+                }
+                $dotProduct += $value * $embeddingB[$i];
+                $normA += $value * $value;
+                $normB += $embeddingB[$i] * $embeddingB[$i];
+            }
 
-        return $timeSimilarity;
+            $normA = sqrt($normA);
+            $normB = sqrt($normB);
+
+            if ($normA == 0 || $normB == 0) {
+                return 0.0;
+            }
+
+            return $dotProduct / ($normA * $normB);
+        } catch (\Exception $e) {
+            Log::error('Error calculating cosine similarity: ' . $e->getMessage());
+            return 0.0;
+        }
     }
 
     /**
-     * Calculate text similarity between two embeddings
+     * Calculate the overall similarity score considering text, image, category, location, and date.
+     *
+     * @param LostItem $lostItem
+     * @param LostItem $foundItem
+     * @return float
      */
-    public function calculateTextSimilarity($embedding1, $embedding2)
+    protected function calculateOverallSimilarity($lostItem, $foundItem)
     {
-        if (empty($embedding1) || empty($embedding2)) {
+        Log::info('Starting similarity calculation', [
+            'lost_item_id' => $lostItem->id,
+            'found_item_id' => $foundItem->id
+        ]);
+
+        // Try Hugging Face embeddings first
+        $textEmbeddingsLost = $this->getTextEmbeddings($lostItem->description);
+        $textEmbeddingsFound = $this->getTextEmbeddings($foundItem->description);
+
+        Log::debug('Text embeddings status', [
+            'lost_item_embeddings' => $textEmbeddingsLost ? 'generated' : 'failed',
+            'found_item_embeddings' => $textEmbeddingsFound ? 'generated' : 'failed'
+        ]);
+
+        $textSimilarity = $this->cosineSimilarity($textEmbeddingsLost, $textEmbeddingsFound);
+
+        $imageSimilarity = 0;
+        if ($lostItem->images->isNotEmpty() && $foundItem->images->isNotEmpty()) {
+            Log::info('Processing image similarity', [
+                'lost_item_image' => $lostItem->images->first()->url,
+                'found_item_image' => $foundItem->images->first()->url
+            ]);
+
+            $lostImageEmbedding = $this->getImageEmbeddings($lostItem->images->first()->url);
+            $foundImageEmbedding = $this->getImageEmbeddings($foundItem->images->first()->url);
+
+            Log::debug('Image embeddings status', [
+                'lost_image_embeddings' => $lostImageEmbedding ? 'generated' : 'failed',
+                'found_image_embeddings' => $foundImageEmbedding ? 'generated' : 'failed'
+            ]);
+
+            if ($lostImageEmbedding && $foundImageEmbedding) {
+                $imageSimilarity = $this->cosineSimilarity($lostImageEmbedding, $foundImageEmbedding);
+            }
+        }
+
+        // Fallback to keyword-based similarity if embeddings fail
+        if ($textSimilarity === null || $imageSimilarity === null) {
+            Log::info('Falling back to basic similarity methods', [
+                'reason' => 'Embedding generation failed',
+                'text_similarity_failed' => $textSimilarity === null,
+                'image_similarity_failed' => $imageSimilarity === null
+            ]);
+
+            $textSimilarity = $this->fallbackTextSimilarity($lostItem->description, $foundItem->description);
+            $imageSimilarity = $this->fallbackImageSimilarity($lostItem->images, $foundItem->images);
+        }
+
+        $categorySimilarity = $lostItem->category_id === $foundItem->category_id ? 1 : 0;
+        $locationSimilarity = $this->calculateLocationSimilarity($lostItem, $foundItem);
+        $dateSimilarity = $this->calculateDateSimilarity($lostItem, $foundItem);
+
+        $overallSimilarity = (
+            $textSimilarity * 0.4 +
+            $imageSimilarity * 0.3 +
+            $categorySimilarity * 0.1 +
+            $locationSimilarity * 0.1 +
+            $dateSimilarity * 0.1
+        );
+
+        Log::info('Similarity calculation complete', [
+            'text_similarity' => $textSimilarity,
+            'image_similarity' => $imageSimilarity,
+            'category_similarity' => $categorySimilarity,
+            'location_similarity' => $locationSimilarity,
+            'date_similarity' => $dateSimilarity,
+            'overall_similarity' => $overallSimilarity
+        ]);
+
+        return $overallSimilarity;
+    }
+
+    protected function fallbackTextSimilarity($textA, $textB)
+    {
+        // Simple keyword-based similarity
+        $wordsA = array_unique(str_word_count(strtolower($textA), 1));
+        $wordsB = array_unique(str_word_count(strtolower($textB), 1));
+        $commonWords = array_intersect($wordsA, $wordsB);
+        $similarity = count($commonWords) / max(count($wordsA), count($wordsB));
+        return $similarity;
+    }
+
+    protected function fallbackImageSimilarity($imagesA, $imagesB)
+    {
+        // Compare basic metadata (e.g., file size, dimensions)
+        if ($imagesA->isEmpty() || $imagesB->isEmpty()) {
             return 0;
         }
 
-        return $this->cosineSimilarity($embedding1, $embedding2);
+        $imageA = $imagesA->first();
+        $imageB = $imagesB->first();
+
+        $similarity = 0;
+        if ($imageA->size === $imageB->size) {
+            $similarity += 0.5;
+        }
+        if ($imageA->width === $imageB->width && $imageA->height === $imageB->height) {
+            $similarity += 0.5;
+        }
+
+        return $similarity;
     }
 
     /**
-     * Calculate distance between two points
+     * Calculate location similarity based on geolocation.
+     *
+     * @param LostItem $lostItem
+     * @param LostItem $foundItem
+     * @return float
      */
-    protected function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    protected function calculateLocationSimilarity($lostItem, $foundItem)
     {
-        if (!$lat1 || !$lon1 || !$lat2 || !$lon2) {
-            return PHP_FLOAT_MAX;
+        if (!$lostItem->geolocation || !$foundItem->geolocation) {
+            return 0;
         }
 
-        $theta = $lon1 - $lon2;
-        $dist = sin(deg2rad($lat1)) * sin(deg2rad($lat2)) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * cos(deg2rad($theta));
-        $dist = acos($dist);
-        $dist = rad2deg($dist);
-        $miles = $dist * 60 * 1.1515;
-        return $miles * 1.609344; // Convert to kilometers
+        $lat1 = $lostItem->geolocation['lat'];
+        $lng1 = $lostItem->geolocation['lng'];
+        $lat2 = $foundItem->geolocation['lat'];
+        $lng2 = $foundItem->geolocation['lng'];
+
+        $distance = $this->haversineDistance($lat1, $lng1, $lat2, $lng2);
+
+        // Normalize distance to a similarity score (0-1)
+        $maxDistance = 1000; // 1 km
+        return max(0, 1 - ($distance / $maxDistance));
     }
 
     /**
-     * Generate a unique cache key based on the items' timestamps
+     * Calculate the Haversine distance between two points.
+     *
+     * @param float $lat1
+     * @param float $lng1
+     * @param float $lat2
+     * @param float $lng2
+     * @return float
      */
-    protected function generateCacheKey(Collection $reportedItems, Collection $foundItems): string
+    protected function haversineDistance($lat1, $lng1, $lat2, $lng2)
     {
-        $reportedHash = md5($reportedItems->pluck('updated_at')->max() . $reportedItems->count());
-        $foundHash = md5($foundItems->pluck('updated_at')->max() . $foundItems->count());
-        return "matched_items_{$reportedHash}_{$foundHash}";
+        $earthRadius = 6371000; // in meters
+
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+            sin($dLng / 2) * sin($dLng / 2);
+
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c;
     }
 
     /**
-     * Calculate text similarity with context between two texts
+     * Calculate date similarity based on the date lost and date found.
+     *
+     * @param LostItem $lostItem
+     * @param LostItem $foundItem
+     * @return float
      */
-    public function calculateTextSimilarityWithContext($text1, $text2)
+    protected function calculateDateSimilarity($lostItem, $foundItem)
     {
-        $embedding1 = $this->getTextEmbedding(['title' => '', 'description' => $text1]);
-        $embedding2 = $this->getTextEmbedding(['title' => '', 'description' => $text2]);
+        if (!$lostItem->date_lost || !$foundItem->date_found) {
+            return 0;
+        }
 
-        return $this->calculateTextSimilarity($embedding1, $embedding2);
+        $dateLost = $lostItem->date_lost;
+        $dateFound = $foundItem->date_found;
+
+        $daysDifference = abs($dateLost->diffInDays($dateFound));
+
+        // Normalize date difference to a similarity score (0-1)
+        $maxDays = 30; // 1 month
+        return max(0, 1 - ($daysDifference / $maxDays));
     }
 
     /**
-     * Calculate similarity between item attributes
+     * Find potential matches for a given lost item.
+     *
+     * @param LostItem $lostItem
+     * @return \Illuminate\Support\Collection
      */
-    protected function calculateAttributesSimilarity($item1, $item2)
+    public function findMatches(LostItem $lostItem)
     {
-        $matchCount = 0;
-        $totalAttributes = 0;
+        Log::info('Starting match finding process', ['item_id' => $lostItem->id]);
 
-        // Check brand match
-        if ($item1->brand && $item2->brand) {
-            $totalAttributes++;
-            if (strtolower($item1->brand) === strtolower($item2->brand)) {
-                $matchCount++;
-            }
+        $foundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)
+            ->where('user_id', '!=', $lostItem->user_id)
+            ->with(['images', 'category']) // Eager load relationships
+            ->get();
+
+        if ($foundItems->isEmpty()) {
+            return collect();
         }
 
-        // Check model match
-        if ($item1->model && $item2->model) {
-            $totalAttributes++;
-            if (strtolower($item1->model) === strtolower($item2->model)) {
-                $matchCount++;
-            }
+        // Pre-calculate text embeddings for lost item
+        $lostItemTextEmbeddings = $this->getTextEmbeddings($lostItem->description);
+        $lostItemImageEmbeddings = null;
+
+        if ($lostItem->images->isNotEmpty()) {
+            $lostItemImageEmbeddings = $this->getImageEmbeddings($lostItem->images->first()->url);
         }
 
-        // Check color match
-        if ($item1->color && $item2->color) {
-            $totalAttributes++;
-            if (strtolower($item1->color) === strtolower($item2->color)) {
-                $matchCount++;
-            }
+        // Process items in chunks for better memory management
+        $chunks = $foundItems->chunk(5);
+        $matches = collect();
+
+        foreach ($chunks as $chunk) {
+            $chunkMatches = $this->processItemChunk($chunk, $lostItem, $lostItemTextEmbeddings, $lostItemImageEmbeddings);
+            $matches = $matches->concat($chunkMatches);
         }
 
-        // Check condition match
-        if ($item1->condition && $item2->condition) {
-            $totalAttributes++;
-            if ($item1->condition === $item2->condition) {
-                $matchCount++;
-            }
-        }
-
-        return $totalAttributes > 0 ? $matchCount / $totalAttributes : 0;
+        return $matches->sortByDesc('similarity');
     }
 
-    /**
-     * Pre-filters potential matches based on hard criteria before detailed similarity calculation
-     * @param \App\Models\LostItem $reportedItem
-     * @param Collection $foundItems
-     * @return Collection
-     */
-    protected function preFilterCandidates($reportedItem, Collection $foundItems)
+    protected function processItemChunk($items, $lostItem, $lostItemTextEmbeddings, $lostItemImageEmbeddings)
     {
-        Log::info('Starting pre-filtering for reported item: ' . $reportedItem->id);
+        $matches = collect();
+        $chunkStartTime = microtime(true);
 
-        return $foundItems->filter(function ($foundItem) use ($reportedItem) {
-            // Don't match items from the same user
-            if ($foundItem->user_id === $reportedItem->user_id) {
-                Log::info("Filtered out item {$foundItem->id}: Same user");
-                return false;
-            }
+        Log::debug('Processing item chunk', [
+            'chunk_size' => $items->count(),
+            'lost_item_id' => $lostItem->id,
+            'has_text_embeddings' => !empty($lostItemTextEmbeddings),
+            'has_image_embeddings' => !empty($lostItemImageEmbeddings)
+        ]);
 
-            // Don't match items of the same type (lost with lost or found with found)
-            if ($foundItem->item_type === $reportedItem->item_type) {
-                Log::info("Filtered out item {$foundItem->id}: Same type");
-                return false;
-            }
-
-            // Category matching - allow parent/child category matches
-            $categoryMatch = $foundItem->category_id === $reportedItem->category_id ||
-                            $foundItem->category->parent_id === $reportedItem->category->parent_id;
-            if (!$categoryMatch) {
-                Log::info("Filtered out item {$foundItem->id}: Category mismatch");
-                return false;
-            }
-
-            // Time window - increased to 60 days
-            $timeDiff = abs(Carbon::parse($foundItem->date)->diffInDays(Carbon::parse($reportedItem->date)));
-            if ($timeDiff > 60) {
-                Log::info("Filtered out item {$foundItem->id}: Time difference too large ({$timeDiff} days)");
-                return false;
-            }
-
-            // Location proximity - increased to 20km
-            if ($foundItem->latitude && $reportedItem->latitude) {
-                $distance = $this->calculateDistance(
-                    $reportedItem->latitude,
-                    $reportedItem->longitude,
-                    $foundItem->latitude,
-                    $foundItem->longitude
+        foreach ($items as $foundItem) {
+            $itemStartTime = microtime(true);
+            try {
+                $similarity = $this->calculateOptimizedSimilarity(
+                    $lostItem,
+                    $foundItem,
+                    $lostItemTextEmbeddings,
+                    $lostItemImageEmbeddings
                 );
-                if ($distance > 20) {
-                    Log::info("Filtered out item {$foundItem->id}: Distance too large ({$distance}km)");
-                    return false;
+
+                $processingTime = microtime(true) - $itemStartTime;
+                Log::debug('Item matching result', [
+                    'lost_item_id' => $lostItem->id,
+                    'found_item_id' => $foundItem->id,
+                    'similarity_score' => $similarity,
+                    'processing_time_ms' => round($processingTime * 1000, 2),
+                    'matched' => $similarity > 0.7
+                ]);
+
+                if ($similarity > 0.7) {
+                    $matches->push([
+                        'found_item' => $foundItem,
+                        'similarity' => $similarity,
+                        'processing_time_ms' => round($processingTime * 1000, 2)
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Error processing item in chunk', [
+                    'lost_item_id' => $lostItem->id,
+                    'found_item_id' => $foundItem->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
+                continue;
+            }
+        }
+
+        $totalChunkTime = microtime(true) - $chunkStartTime;
+        Log::info('Chunk processing complete', [
+            'chunk_size' => $items->count(),
+            'matches_found' => $matches->count(),
+            'total_processing_time_ms' => round($totalChunkTime * 1000, 2),
+            'average_time_per_item_ms' => round(($totalChunkTime / $items->count()) * 1000, 2)
+        ]);
+
+        return $matches;
+    }
+
+    protected function calculateOptimizedSimilarity($lostItem, $foundItem, $lostItemTextEmbeddings, $lostItemImageEmbeddings)
+    {
+        Log::debug('Starting similarity calculation', [
+            'lost_item' => [
+                'id' => $lostItem->id,
+                'title' => $lostItem->title,
+                'category_id' => $lostItem->category_id,
+                'has_images' => $lostItem->images->isNotEmpty()
+            ],
+            'found_item' => [
+                'id' => $foundItem->id,
+                'title' => $foundItem->title,
+                'category_id' => $foundItem->category_id,
+                'has_images' => $foundItem->images->isNotEmpty()
+            ]
+        ]);
+
+        // Quick checks first
+        $categorySimilarity = $lostItem->category_id === $foundItem->category_id ? 1 : 0;
+        Log::debug('Category similarity check', [
+            'category_similarity' => $categorySimilarity,
+            'lost_category' => $lostItem->category_id,
+            'found_category' => $foundItem->category_id
+        ]);
+
+        // If categories don't match and it's required, return early
+        if ($categorySimilarity === 0 && config('matching.require_same_category', false)) {
+            Log::debug('Early return: Categories don\'t match and same category is required');
+            return 0;
+        }
+
+        // Calculate text similarity
+        $foundItemTextEmbeddings = $this->getTextEmbeddings($foundItem->description);
+        $textSimilarity = $this->cosineSimilarity($lostItemTextEmbeddings, $foundItemTextEmbeddings);
+
+        Log::debug('Text similarity calculation', [
+            'text_similarity' => $textSimilarity,
+            'lost_description_length' => strlen($lostItem->description),
+            'found_description_length' => strlen($foundItem->description),
+            'has_lost_embeddings' => !empty($lostItemTextEmbeddings),
+            'has_found_embeddings' => !empty($foundItemTextEmbeddings)
+        ]);
+
+        // If text similarity is too low, return early
+        if ($textSimilarity < 0.3) {
+            Log::debug('Early return: Text similarity too low', ['text_similarity' => $textSimilarity]);
+            return $textSimilarity;
+        }
+
+        // Comment out image similarity calculation
+        /*
+        $imageSimilarity = 0;
+        if ($lostItem->images->isNotEmpty() && $foundItem->images->isNotEmpty()) {
+            $foundItemImageEmbeddings = $this->getImageEmbeddings($foundItem->images->first()->url);
+            if ($lostItemImageEmbeddings && $foundItemImageEmbeddings) {
+                $imageSimilarity = $this->cosineSimilarity($lostItemImageEmbeddings, $foundItemImageEmbeddings);
+                Log::debug('Image similarity calculation', [
+                    'image_similarity' => $imageSimilarity,
+                    'lost_image_url' => $lostItem->images->first()->url,
+                    'found_image_url' => $foundItem->images->first()->url,
+                    'has_lost_image_embeddings' => !empty($lostItemImageEmbeddings),
+                    'has_found_image_embeddings' => !empty($foundItemImageEmbeddings)
+                ]);
+            }
+        }
+        */
+        $imageSimilarity = 0; // Set to 0 since we're not using image similarity
+
+        // Calculate other similarities
+        $locationSimilarity = $this->calculateLocationSimilarity($lostItem, $foundItem);
+        $dateSimilarity = $this->calculateDateSimilarity($lostItem, $foundItem);
+
+        Log::debug('Additional similarity calculations', [
+            'location_similarity' => $locationSimilarity,
+            'date_similarity' => $dateSimilarity,
+            'lost_date' => $lostItem->date_lost,
+            'found_date' => $foundItem->date_found
+        ]);
+
+        // Adjust weights since we're not using image similarity
+        $overallSimilarity = (
+            $textSimilarity * 0.6 + // Increased from 0.4
+            // imageSimilarity * 0.3 + // Commented out
+            $categorySimilarity * 0.15 + // Increased from 0.1
+            $locationSimilarity * 0.15 + // Increased from 0.1
+            $dateSimilarity * 0.1
+        );
+
+        Log::info('Final similarity score', [
+            'lost_item_id' => $lostItem->id,
+            'found_item_id' => $foundItem->id,
+            'overall_similarity' => $overallSimilarity,
+            'components' => [
+                'text' => $textSimilarity * 0.6,
+                //'image' => $imageSimilarity * 0.3, // Commented out
+                'category' => $categorySimilarity * 0.15,
+                'location' => $locationSimilarity * 0.15,
+                'date' => $dateSimilarity * 0.1
+            ]
+        ]);
+
+        return $overallSimilarity;
+    }
+
+    /**
+     * Check if a lost item has any matches.
+     *
+     * @param LostItem $lostItem
+     * @return bool
+     */
+    public function hasMatches(LostItem $lostItem)
+    {
+        try {
+            $foundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)
+                ->where('user_id', '!=', $lostItem->user_id)
+                ->where('category_id', $lostItem->category_id) // Quick filter by category first
+                ->with(['images', 'category'])
+                ->limit(10) // Limit initial search
+                ->get();
+
+            if ($foundItems->isEmpty()) {
+                return false;
+            }
+
+            // Pre-calculate embeddings
+            $lostItemTextEmbeddings = $this->getTextEmbeddings($lostItem->description);
+            $lostItemImageEmbeddings = null;
+
+            if ($lostItem->images->isNotEmpty()) {
+                $lostItemImageEmbeddings = $this->getImageEmbeddings($lostItem->images->first()->url);
+            }
+
+            foreach ($foundItems as $foundItem) {
+                try {
+                    $similarity = $this->calculateOptimizedSimilarity(
+                        $lostItem,
+                        $foundItem,
+                        $lostItemTextEmbeddings,
+                        $lostItemImageEmbeddings
+                    );
+
+                    if ($similarity > 0.7) {
+                        return true;
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Error in hasMatches similarity calculation', [
+                        'lost_item_id' => $lostItem->id,
+                        'found_item_id' => $foundItem->id,
+                        'error' => $e->getMessage()
+                    ]);
+                    continue;
                 }
             }
 
-            Log::info("Item {$foundItem->id} passed all pre-filters");
-            return true;
+            return false;
+        } catch (\Exception $e) {
+            Log::error('Error in hasMatches', [
+                'lost_item_id' => $lostItem->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Get category suggestions based on item title using AI
+     *
+     * @param string $title
+     * @param \Illuminate\Database\Eloquent\Collection $categories
+     * @return array
+     */
+    public function getCategorySuggestions($title, $categories)
+    {
+        if (strlen($title) < 3) {
+            return [];
+        }
+
+        try {
+            return $this->getAIBasedCategorySuggestions($title, $categories);
+        } catch (\Exception $e) {
+            Log::error('AI-based category matching failed, falling back to simple matching', [
+                'error' => $e->getMessage(),
+                'title' => $title
+            ]);
+            return $this->getFallbackCategorySuggestions($title, $categories);
+        }
+    }
+
+    /**
+     * Get category suggestions using AI embeddings
+     *
+     * @param string $title
+     * @param \Illuminate\Database\Eloquent\Collection $categories
+     * @return array
+     */
+    protected function getAIBasedCategorySuggestions($title, $categories)
+    {
+        // Prepare context-rich texts for embeddings
+        $textsToProcess = [
+            'search' => $this->enrichTitleContext($title)
+        ];
+
+        // Add category contexts
+        foreach ($categories as $category) {
+            $textsToProcess['category_' . $category->id] = $this->buildCategoryContext($category);
+        }
+
+        // Get embeddings for all texts
+        $embeddings = $this->getBatchTextEmbeddings($textsToProcess);
+        if (!isset($embeddings['search'])) {
+            throw new \Exception('Failed to generate embeddings for search text');
+        }
+
+        $titleEmbedding = $embeddings['search'];
+        $similarities = [];
+
+        // Calculate similarities with dynamic threshold
+        $baseThreshold = 0.3;
+        $titleLength = strlen($title);
+        $dynamicThreshold = $this->calculateDynamicThreshold($titleLength);
+
+        foreach ($categories as $category) {
+            $categoryEmbedding = $embeddings['category_' . $category->id] ?? null;
+            if ($categoryEmbedding) {
+                $similarity = $this->cosineSimilarity($titleEmbedding, $categoryEmbedding);
+
+                // Apply semantic boosting based on keyword matches
+                $similarity = $this->applySemanticBoosting($similarity, $title, $category);
+
+                if ($similarity >= $dynamicThreshold) {
+                    $similarities[] = [
+                        'id' => $category->id,
+                        'similarity' => $similarity
+                    ];
+                }
+            }
+        }
+
+        // Sort and return top matches
+        return collect($similarities)
+            ->sortByDesc('similarity')
+            ->take(5)
+            ->pluck('id')
+            ->toArray();
+    }
+
+    /**
+     * Enrich title context for better semantic matching
+     *
+     * @param string $title
+     * @return string
+     */
+    protected function enrichTitleContext($title)
+    {
+        // Clean and normalize the title
+        $cleanTitle = trim(preg_replace('/\s+/', ' ', $title));
+
+        // Extract key terms and add context
+        $terms = explode(' ', strtolower($cleanTitle));
+        $context = "Item title: $cleanTitle. ";
+
+        // Add type context if detectable
+        $typeIndicators = [
+            'phone' => 'electronic device',
+            'wallet' => 'personal accessory',
+            'card' => 'document or payment method',
+            'key' => 'access tool',
+            'bag' => 'container or accessory',
+            'book' => 'reading material',
+            'document' => 'official paper'
+        ];
+
+        foreach ($terms as $term) {
+            if (isset($typeIndicators[$term])) {
+                $context .= "This appears to be a {$typeIndicators[$term]}. ";
+                break;
+            }
+        }
+
+        return $context;
+    }
+
+    /**
+     * Build rich context for category matching
+     *
+     * @param \App\Models\Category $category
+     * @return string
+     */
+    protected function buildCategoryContext($category)
+    {
+        $context = "Category: {$category->name}. ";
+        if ($category->description) {
+            $context .= "Description: {$category->description}. ";
+        }
+
+        // Add semantic context based on category name
+        $context .= "This category is suitable for ";
+        $context .= strtolower($category->name);
+        $context .= " type items and similar objects.";
+
+        return $context;
+    }
+
+    /**
+     * Calculate dynamic similarity threshold based on input
+     *
+     * @param int $titleLength
+     * @return float
+     */
+    protected function calculateDynamicThreshold($titleLength)
+    {
+        // Shorter titles need higher threshold to prevent false positives
+        if ($titleLength <= 5) {
+            return 0.4;
+        } elseif ($titleLength <= 10) {
+            return 0.35;
+        }
+        return 0.3;
+    }
+
+    /**
+     * Apply semantic boosting to similarity score
+     *
+     * @param float $similarity
+     * @param string $title
+     * @param \App\Models\Category $category
+     * @return float
+     */
+    protected function applySemanticBoosting($similarity, $title, $category)
+    {
+        $boost = 0;
+
+        // Direct name match boost
+        if (stripos($category->name, $title) !== false || stripos($title, $category->name) !== false) {
+            $boost += 0.1;
+        }
+
+        // Description match boost
+        if ($category->description && stripos($category->description, $title) !== false) {
+            $boost += 0.05;
+        }
+
+        // Prevent similarity from exceeding 1.0
+        return min(1.0, $similarity + $boost);
+    }
+
+    /**
+     * Fallback category suggestion method
+     *
+     * @param string $title
+     * @param \Illuminate\Database\Eloquent\Collection $categories
+     * @return array
+     */
+    protected function getFallbackCategorySuggestions($title, $categories)
+    {
+        // Simple text matching as fallback
+        $matches = $categories->filter(function ($category) use ($title) {
+            $titleLower = strtolower($title);
+            $categoryLower = strtolower($category->name);
+
+            // Direct substring match
+            if (stripos($categoryLower, $titleLower) !== false ||
+                stripos($titleLower, $categoryLower) !== false) {
+                return true;
+            }
+
+            // Word match
+            $titleWords = explode(' ', $titleLower);
+            $categoryWords = explode(' ', $categoryLower);
+            return !empty(array_intersect($titleWords, $categoryWords));
         });
+
+        if ($matches->isEmpty()) {
+            // If no direct matches, try fuzzy matching
+            $matches = $categories->filter(function ($category) use ($title) {
+                return similar_text(
+                    strtolower($title),
+                    strtolower($category->name)
+                ) / strlen($title) > 0.4;
+            });
+        }
+
+        return $matches->take(5)->pluck('id')->toArray();
     }
 }
