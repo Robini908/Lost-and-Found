@@ -58,11 +58,11 @@ return [
     ],
 
     'huggingface' => [
-        'token' => env('HUGGINGFACE_API_TOKEN'),
-        'text_model_endpoint' => env('HUGGINGFACE_TEXT_MODEL_ENDPOINT', 'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2'),
-        'image_model_endpoint' => env('HUGGINGFACE_IMAGE_MODEL_ENDPOINT', 'https://api-inference.huggingface.co/pipeline/feature-extraction/clip-vit-base-patch32'),
+        'api_token' => env('HUGGINGFACE_API_TOKEN'),
+        'text_model_endpoint' => env('HUGGINGFACE_TEXT_MODEL_ENDPOINT', 'https://api-inference.huggingface.co/models/sentence-transformers/all-MiniLM-L6-v2'),
+        'image_model_endpoint' => env('HUGGINGFACE_IMAGE_MODEL_ENDPOINT', 'https://api-inference.huggingface.co/models/microsoft/resnet-50'),
         'max_retries' => env('HUGGINGFACE_MAX_RETRIES', 3),
-        'retry_delay' => env('HUGGINGFACE_RETRY_DELAY', 1000), // milliseconds
+        'retry_delay' => env('HUGGINGFACE_RETRY_DELAY', 1000),
     ],
 
     'recaptcha' => [

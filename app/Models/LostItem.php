@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LostItem extends Model
 {
@@ -217,11 +219,68 @@ class LostItem extends Model
     }
 
     /**
-     * Get all matches for this item through the ItemMatch model.
+     * Get matches where this item is the lost item
      */
-    public function matches()
+    public function matchesAsLost(): HasMany
+    {
+        return $this->hasMany(ItemMatch::class, 'lost_item_id');
+    }
+
+    /**
+     * Get matches where this item is the found item
+     */
+    public function matchesAsFound(): HasMany
+    {
+        return $this->hasMany(ItemMatch::class, 'found_item_id');
+    }
+
+    /**
+     * Get all matches for this item (both as lost and found)
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function matches(): HasMany
     {
         return $this->hasMany(ItemMatch::class, 'lost_item_id')
-            ->orWhere('found_item_id', $this->id);
+            ->where(function($query) {
+                $query->where('lost_item_id', $this->id)
+                      ->orWhere('found_item_id', $this->id);
+            })
+            ->with(['lostItem.images', 'lostItem.category', 'lostItem.user',
+                   'foundItem.images', 'foundItem.category', 'foundItem.user'])
+            ->orderBy('similarity_score', 'desc');
+    }
+
+    /**
+     * Get all matches collection for this item
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getAllMatchesCollection()
+    {
+        return $this->matches()->get();
+    }
+
+    /**
+     * Get the best match for this item
+     *
+     * @return \App\Models\ItemMatch|null
+     */
+    public function getBestMatch()
+    {
+        return $this->matches()->first();
+    }
+
+    /**
+     * Check if this item has any matches above the threshold
+     */
+    public function hasMatches($threshold = 0.3): bool
+    {
+        return $this->matchesAsLost()
+            ->where('similarity_score', '>', $threshold)
+            ->exists() ||
+            $this->matchesAsFound()
+            ->where('similarity_score', '>', $threshold)
+            ->exists();
     }
 }

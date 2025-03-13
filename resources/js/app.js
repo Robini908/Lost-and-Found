@@ -5,6 +5,8 @@ import tippy from "tippy.js";
 import "tippy.js/dist/tippy.css";
 import "tippy.js/animations/scale.css";
 import DataTable from 'datatables.net-dt';
+import flatpickr from 'flatpickr';
+
 
 import {
     Livewire,
@@ -12,6 +14,7 @@ import {
 } from "../../vendor/livewire/livewire/dist/livewire.esm";
 import ToastComponent from "../../vendor/usernotnull/tall-toasts/resources/js/tall-toasts";
 import { Input, initTWE } from "tw-elements";
+window.flatpickr = flatpickr
 
 // Initialize Tailwind Elements
 initTWE({ Input }, { allowReinits: true });

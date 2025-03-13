@@ -1,329 +1,533 @@
-<div class="min-h-screen bg-gray-50 py-8">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- Header Section -->
-        <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Lost and Found Item Matching</h1>
-            <p class="mt-2 text-sm text-gray-600">Find potential matches for your lost or found items using our advanced matching system.</p>
+<div class="min-h-screen bg-gray-50">
+    <!-- Tabs -->
+    <div class="bg-white shadow-sm mb-6">
+        <div class="max-w-7xl mx-auto">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex" aria-label="Tabs">
+                    <button
+                        wire:click="setActiveTab('searching')"
+                        class="w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm {{ $activeTab === 'searching'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+                    >
+                        Searching Items
+                    </button>
+                    <button
+                        wire:click="setActiveTab('found')"
+                        class="w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm {{ $activeTab === 'found'
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+                    >
+                        Found Matches
+                        @if($foundMatches->isNotEmpty())
+                            <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {{ $foundMatches->count() }}
+                            </span>
+                        @endif
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </div>
 
-            <!-- Auto-matching toggle -->
-            <div class="mt-4 flex items-center space-x-2">
-                <button
-                    wire:click="toggleAutoMatch"
-                    class="inline-flex items-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 {{ $autoMatchEnabled ? 'bg-green-600 hover:bg-green-700 text-white border-transparent' : 'bg-gray-200 hover:bg-gray-300 text-gray-700 border-gray-300' }}"
-                >
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $autoMatchEnabled ? 'M5 13l4 4L19 7' : 'M6 18L18 6M6 6l12 12' }}"/>
-                    </svg>
-                    {{ $autoMatchEnabled ? 'Auto-Matching Enabled' : 'Auto-Matching Disabled' }}
-                </button>
-                <span class="text-sm text-gray-500">
-                    {{ $autoMatchEnabled ? 'System is automatically finding matches' : 'Click to enable automatic matching' }}
-                </span>
+    <!-- Search and Filters (Only show in searching tab) -->
+    @if($activeTab === 'searching')
+        <!-- Search Header -->
+        <div class="sticky top-0 z-10 bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex items-center space-x-4">
+                    <!-- Search Bar -->
+                    <div class="flex-1">
+                        <div class="relative rounded-full shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <input wire:model.live.debounce.300ms="search" type="text" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-full leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Search lost items...">
+                        </div>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="flex items-center space-x-4">
+                        <!-- Category Filter -->
+                        <select wire:model.live="selectedCategory" class="rounded-lg border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">All Categories</option>
+                            @foreach(\App\Models\Category::all() as $category)
+                                <option value="{{ $category->id }}">{{ $category->name }}</option>
+                            @endforeach
+                        </select>
+
+                        <!-- Date Range Filter -->
+                        <input wire:model.live="dateRange" type="text" class="rounded-lg border-gray-300 text-sm focus:ring-blue-500 focus:border-blue-500" placeholder="Date Range" x-data x-init="flatpickr($el, {mode: 'range', dateFormat: 'Y-m-d'})">
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Filters and Search Section -->
-        <div class="bg-white rounded-lg shadow-sm p-4 mb-6">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div class="flex-1 min-w-0">
-                    <div class="relative rounded-md shadow-sm">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                            </svg>
-                        </div>
-                        <input wire:model.live.debounce.300ms="searchQuery" type="text" class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 pr-12 sm:text-sm border-gray-300 rounded-md" placeholder="Search items...">
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-4">
-                    <select wire:model.live="selectedCategory" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                        <option value="">All Categories</option>
-                        @foreach($categories as $category)
-                            <option value="{{ $category->id }}">{{ $category->name }}</option>
+        <!-- Item Type Filter -->
+        <div class="bg-white shadow-sm mb-6">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center space-x-4">
+                        @foreach($itemTypes as $value => $label)
+                            <button
+                                wire:click="setItemTypeFilter('{{ $value }}')"
+                                class="px-3 py-2 rounded-md text-sm font-medium {{ $itemTypeFilter === $value
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100' }}"
+                            >
+                                {{ $label }}
+                            </button>
                         @endforeach
-                    </select>
-
-                    <select wire:model.live="itemsPerPage" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                        <option value="9">9 per page</option>
-                        <option value="18">18 per page</option>
-                        <option value="27">27 per page</option>
-                    </select>
+                    </div>
                 </div>
             </div>
         </div>
+    @endif
 
-        <!-- Tabs -->
-        <div class="mb-6">
-            <nav class="flex space-x-4" aria-label="Tabs">
-                <button wire:click="$set('selectedTab', 'unmatched')"
-                    class="@if($selectedTab === 'unmatched') bg-blue-100 text-blue-700 @else text-gray-500 hover:text-gray-700 @endif px-3 py-2 font-medium text-sm rounded-md">
-                    Unmatched Items
-                </button>
-                <button wire:click="$set('selectedTab', 'matched')"
-                    class="@if($selectedTab === 'matched') bg-blue-100 text-blue-700 @else text-gray-500 hover:text-gray-700 @endif px-3 py-2 font-medium text-sm rounded-md">
-                    Matched Items
-                </button>
-            </nav>
-        </div>
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        @if($activeTab === 'searching')
+            <!-- Searching View -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Lost Items List -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                Your {{ ucfirst($itemTypeFilter) }} Items
+                            </h3>
+                            <span class="text-sm text-gray-500">
+                                {{ $lostItems->total() }} items
+                            </span>
+                        </div>
+                    </div>
+                    <ul class="divide-y divide-gray-200 overflow-hidden">
+                        @forelse($lostItems as $item)
+                            <li class="relative hover:bg-gray-50 transition-colors duration-200 {{ $selectedItem === $item->id ? 'bg-blue-50' : '' }}">
+                                <div class="px-4 py-4 sm:px-6 cursor-pointer" wire:click="findMatches({{ $item->id }})">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1 min-w-0">
+                                            <h4 class="text-sm font-medium text-blue-600 truncate">{{ $item->title }}</h4>
+                                            <p class="mt-1 text-sm text-gray-500 line-clamp-2">{{ $item->description }}</p>
+                                        </div>
+                                        @if($item->images->isNotEmpty())
+                                            <img src="{{ $item->images->first()->url }}" alt="{{ $item->title }}" class="h-12 w-12 rounded-lg object-cover ml-4">
+                                        @endif
+                                    </div>
+                                    <div class="mt-2 flex items-center text-xs text-gray-500">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $item->category->color ?? 'bg-gray-100' }}">
+                                            {{ $item->category->name }}
+                                        </span>
+                                        <span class="ml-2">{{ $item->date_lost->format('M d, Y') }}</span>
+                                    </div>
+                                </div>
+                            </li>
+                        @empty
+                            <li class="px-4 py-8 text-center text-gray-500">
+                                No lost items found.
+                            </li>
+                        @endforelse
+                    </ul>
+                    <div class="px-4 py-3 border-t border-gray-200">
+                        {{ $lostItems->links() }}
+                    </div>
+                </div>
 
-        <!-- Items Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            @if($selectedTab === 'unmatched')
-                @forelse($unmatchedItems as $item)
-                    <div class="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200"
-                         x-data="{ showDetails: false }">
-                        <div class="relative">
-                            @if($item->images->isNotEmpty())
-                                <img src="{{ $item->images->first()->url }}"
-                                     alt="{{ $item->title }}"
-                                     class="w-full h-48 object-cover">
-        @else
-                                <div class="w-full h-48 bg-gray-100 flex items-center justify-center">
-                                    <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <!-- Matched Items -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                Potential Matches
+                            </h3>
+                            @if($loadingMatches)
+                                <div class="animate-pulse flex items-center text-sm text-blue-600">
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
+                                    Finding matches...
                                 </div>
                             @endif
-
-                            <!-- Processing Overlay -->
-                        @if($isLoading && $processingItemId === $item->id)
-                                <div class="absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center">
-                                    <div class="space-y-4 text-center">
-                                        <div class="relative">
-                                            <div class="w-16 h-16">
-                                                <div class="absolute top-0 left-0 w-full h-full border-4 border-blue-200 rounded-full animate-spin"></div>
-                                                <div class="absolute top-0 left-0 w-full h-full border-4 border-blue-500 rounded-full animate-spin" style="border-top-color: transparent; animation-duration: 1.5s;"></div>
-                                            </div>
-                                            <div class="mt-4">
-                                                <div class="w-48 bg-gray-200 rounded-full h-2">
-                                                    <div class="bg-blue-500 h-2 rounded-full transition-all duration-300 ease-in-out"
-                                                         style="width: {{ $progress }}%"></div>
+                        </div>
+                    </div>
+                    @if($selectedItem)
+                        <ul class="divide-y divide-gray-200 overflow-hidden" wire:poll.10s>
+                            @forelse($matchedItems as $match)
+                                <li class="relative hover:bg-gray-50">
+                                    <div class="px-4 py-4 sm:px-6">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center justify-between">
+                                                    <h4 class="text-sm font-medium text-blue-600 truncate">{{ $match['item']->title }}</h4>
+                                                    <div class="ml-2 flex-shrink-0">
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $match['similarity'] >= 0.7 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                                                            {{ number_format($match['similarity'] * 100, 0) }}% Match
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <p class="mt-2 text-sm font-medium text-gray-900">{{ $processingStage }}</p>
-                                                <p class="text-xs text-gray-500">{{ $progress }}% Complete</p>
+                                                <p class="mt-1 text-sm text-gray-500 line-clamp-2">{{ $match['item']->description }}</p>
+                                            </div>
+                                            @if($match['item']->images->isNotEmpty())
+                                                <img src="{{ $match['item']->images->first()->url }}" alt="{{ $match['item']->title }}" class="h-12 w-12 rounded-lg object-cover ml-4">
+                                            @endif
+                                        </div>
+                                        <div class="mt-2 flex items-center justify-between">
+                                            <div class="flex items-center text-xs text-gray-500">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $match['item']->category->color ?? 'bg-gray-100' }}">
+                                                    {{ $match['item']->category->name }}
+                                                </span>
+                                                <span class="ml-2">Found {{ $match['item']->date_found->format('M d, Y') }}</span>
+                                                <span class="ml-2 text-blue-600">by {{ $match['finder'] }}</span>
+                                            </div>
+                                            <button wire:click="showMatchDetails({{ $match['item']->id }})" class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                View Details
+                                            </button>
+                                        </div>
                                     </div>
-                                    </div>
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-
-                        <div class="p-4">
-                            <div class="flex items-start justify-between">
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-900">{{ $item->title }}</h3>
-                                    <p class="text-sm text-gray-500">{{ $item->category->name }}</p>
-                                </div>
-                                <button @click="showDetails = !showDetails"
-                                        class="ml-4 text-gray-400 hover:text-gray-500">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              :d="showDetails ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'"/>
-                                    </svg>
-                                </button>
-                            </div>
-
-                            <div x-show="showDetails"
-                                 x-transition:enter="transition ease-out duration-200"
-                                 x-transition:enter-start="opacity-0 transform -translate-y-2"
-                                 x-transition:enter-end="opacity-100 transform translate-y-0"
-                                 x-transition:leave="transition ease-in duration-150"
-                                 x-transition:leave-start="opacity-100 transform translate-y-0"
-                                 x-transition:leave-end="opacity-0 transform -translate-y-2"
-                                 class="mt-4">
-                        <p class="text-sm text-gray-600">{{ $item->description }}</p>
-                                <div class="mt-4 flex items-center text-sm text-gray-500">
-                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                    {{ $item->created_at->format('M d, Y') }}
-                                </div>
-                            </div>
-
-                            <div class="mt-4">
-                                <button wire:click="findMatchesForItem({{ $item->id }})"
-                                        class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
-                                        @if($isLoading) disabled @endif>
-                                    @if($isLoading && $processingItemId === $item->id)
-                                        <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        Processing...
+                                </li>
+                            @empty
+                                <li class="px-4 py-8 text-center text-gray-500">
+                                    @if($loadingMatches)
+                                        Searching for matches...
                                     @else
-                                        Find Matches
+                                        No matches found yet.
                                     @endif
-                                </button>
-                            </div>
+                                </li>
+                            @endforelse
+                        </ul>
+                    @else
+                        <div class="px-4 py-8 text-center text-gray-500">
+                            Select a lost item to find matches.
                         </div>
-                    </div>
-                @empty
-                    <div class="col-span-full">
-                        <div class="text-center py-12 bg-white rounded-lg">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No unmatched items</h3>
-                            <p class="mt-1 text-sm text-gray-500">All your items have potential matches!</p>
-                        </div>
-                    </div>
-                @endforelse
-            @else
-                @forelse($matchedItems as $item)
-                    <div class="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-200"
-                         x-data="{ showDetails: false }">
-                        <div class="relative">
-                        @if($item->images->isNotEmpty())
-                                <img src="{{ $item->images->first()->url }}"
-                                     alt="{{ $item->title }}"
-                                     class="w-full h-48 object-cover">
-                            @else
-                                <div class="w-full h-48 bg-gray-100 flex items-center justify-center">
-                                    <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                            @endif
-                            <div class="absolute top-2 right-2">
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                    Matched
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="p-4">
-                            <div class="flex items-start justify-between">
-                                <div>
-                                    <h3 class="text-lg font-semibold text-gray-900">{{ $item->title }}</h3>
-                                    <p class="text-sm text-gray-500">{{ $item->category->name }}</p>
-                                </div>
-                                <button @click="showDetails = !showDetails"
-                                        class="ml-4 text-gray-400 hover:text-gray-500">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              :d="showDetails ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'"/>
-                                    </svg>
-                        </button>
-                            </div>
-
-                            <div x-show="showDetails"
-                                 x-transition:enter="transition ease-out duration-200"
-                                 x-transition:enter-start="opacity-0 transform -translate-y-2"
-                                 x-transition:enter-end="opacity-100 transform translate-y-0"
-                                 x-transition:leave="transition ease-in duration-150"
-                                 x-transition:leave-start="opacity-100 transform translate-y-0"
-                                 x-transition:leave-end="opacity-0 transform -translate-y-2"
-                                 class="mt-4">
-                                <p class="text-sm text-gray-600">{{ $item->description }}</p>
-                                <div class="mt-4 flex items-center justify-between text-sm text-gray-500">
-                                    <div class="flex items-center">
-                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        {{ $item->created_at->format('M d, Y') }}
-                                    </div>
-                                    <div class="flex items-center">
-                                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                        </svg>
-                                        {{ $item->matches->count() }} matches
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="mt-4">
-                                <a href="{{ route('matches.show', $item) }}"
-                                   class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-150">
-                                    View Matches
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                @empty
-                    <div class="col-span-full">
-                        <div class="text-center py-12 bg-white rounded-lg">
-                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-gray-900">No matched items</h3>
-                            <p class="mt-1 text-sm text-gray-500">Try finding matches for your unmatched items!</p>
-                        </div>
+                    @endif
+                </div>
             </div>
-                @endforelse
+        @else
+            <!-- Found Matches View -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Found Matches
+                        </h3>
+                        @if($foundMatches->isNotEmpty())
+                            <button wire:click="viewAllMatchesAnalysis" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                View All Match Analysis
+                            </button>
+                        @endif
+                    </div>
+                </div>
+                <ul class="divide-y divide-gray-200">
+                    @forelse($foundMatches as $match)
+                        <li class="p-4 hover:bg-gray-50">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Lost Item -->
+                                <div class="border-r border-gray-200 pr-4">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex-1 min-w-0">
+                                            <h4 class="text-sm font-medium text-gray-900">Your Lost Item</h4>
+                                            <p class="text-sm text-blue-600 truncate">{{ $match['lost_item']->title }}</p>
+                                        </div>
+                                        <button wire:click="viewMatchAnalysis({{ $match['lost_item']->id }})" class="ml-2 inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                            </svg>
+                                            Analysis
+                                        </button>
+                                        @if($match['lost_item']->images->isNotEmpty())
+                                            <img src="{{ $match['lost_item']->images->first()->url }}" alt="{{ $match['lost_item']->title }}" class="h-12 w-12 rounded-lg object-cover ml-4">
+                                        @endif
+                                    </div>
+                                    <p class="mt-1 text-sm text-gray-500 line-clamp-2">{{ $match['lost_item']->description }}</p>
+                                    <div class="mt-2 flex items-center text-xs text-gray-500">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $match['lost_item']->category->color ?? 'bg-gray-100' }}">
+                                            {{ $match['lost_item']->category->name }}
+                                        </span>
+                                        <span class="ml-2">Lost on {{ $match['lost_item']->date_lost->format('M d, Y') }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Found Item -->
+                                <div class="pl-4">
+                                    <div class="flex items-center">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center justify-between">
+                                                <h4 class="text-sm font-medium text-gray-900">Found Match</h4>
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $match['similarity'] >= 0.7 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                                                    {{ number_format($match['similarity'] * 100, 0) }}% Match
+                                                </span>
+                                            </div>
+                                            <p class="text-sm text-blue-600 truncate">{{ $match['found_item']->title }}</p>
+                                        </div>
+                                        @if($match['found_item']->images->isNotEmpty())
+                                            <img src="{{ $match['found_item']->images->first()->url }}" alt="{{ $match['found_item']->title }}" class="h-12 w-12 rounded-lg object-cover ml-4">
+                                        @endif
+                                    </div>
+                                    <p class="mt-1 text-sm text-gray-500 line-clamp-2">{{ $match['found_item']->description }}</p>
+                                    <div class="mt-2 flex items-center justify-between">
+                                        <div class="flex items-center text-xs text-gray-500">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $match['found_item']->category->color ?? 'bg-gray-100' }}">
+                                                {{ $match['found_item']->category->name }}
+                                            </span>
+                                            <span class="ml-2">Found on {{ $match['found_item']->date_found->format('M d, Y') }}</span>
+                                            <span class="ml-2 text-blue-600">by {{ $match['finder'] }}</span>
+                                        </div>
+                                        <button wire:click="showMatchDetails({{ $match['found_item']->id }})" class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                            View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    @empty
+                        <li class="px-4 py-8 text-center text-gray-500">
+                            No matches found yet.
+                        </li>
+                    @endforelse
+                </ul>
+            </div>
         @endif
     </div>
 
-        <!-- Pagination -->
-        <div class="mt-6">
-            @if($selectedTab === 'unmatched')
-                {{ $unmatchedItems->links() }}
-        @else
-                {{ $matchedItems->links() }}
-                        @endif
+    <!-- Match Details Modal -->
+    <div x-data="{ open: false }"
+         x-show="open"
+         x-on:open-modal.window="if ($event.detail === 'match-details') open = true"
+         x-on:close-modal.window="open = false"
+         x-on:keydown.escape.window="open = false"
+         x-transition:enter="ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         style="display: none;">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                @if($matchDetailsItem)
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="sm:flex sm:items-start">
+                            @if($matchDetailsItem->images->isNotEmpty())
+                                <div class="mt-3 sm:mt-0 sm:ml-4">
+                                    <img src="{{ $matchDetailsItem->images->first()->url }}" alt="{{ $matchDetailsItem->title }}" class="w-full h-48 object-cover rounded-lg">
+                                </div>
+                            @endif
+                            <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                    {{ $matchDetailsItem->title }}
+                                </h3>
+                                <div class="mt-2">
+                                    <p class="text-sm text-gray-500">
+                                        {{ $matchDetailsItem->description }}
+                                    </p>
+                                    <div class="mt-4 space-y-2">
+                                        <p class="text-sm text-gray-500">
+                                            <span class="font-medium">Category:</span> {{ $matchDetailsItem->category->name }}
+                                        </p>
+                                        <p class="text-sm text-gray-500">
+                                            <span class="font-medium">Location:</span> {{ $matchDetailsItem->location }}
+                                        </p>
+                                        <p class="text-sm text-gray-500">
+                                            <span class="font-medium">Date Found:</span> {{ $matchDetailsItem->date_found->format('M d, Y') }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" x-on:click="open = false">
+                        Close
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Notifications -->
-    <div x-data="{ notifications: [] }"
-         @notify.window="notifications.push({
-             id: Date.now(),
-             type: $event.detail.type,
-             message: $event.detail.message
-         }); setTimeout(() => notifications.shift(), 3000)"
-         class="fixed bottom-0 right-0 p-4 space-y-4 z-50">
-        <template x-for="notification in notifications" :key="notification.id">
-            <div x-show="true"
-                 x-transition:enter="transform ease-out duration-300 transition"
-                 x-transition:enter-start="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
-                 x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
-                 x-transition:leave="transition ease-in duration-100"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 :class="{
-                     'bg-green-500': notification.type === 'success',
-                     'bg-blue-500': notification.type === 'info',
-                     'bg-red-500': notification.type === 'error'
-                 }"
-                 class="max-w-sm w-full shadow-lg rounded-lg pointer-events-auto">
-                <div class="p-4">
-                    <div class="flex items-center">
-                        <div class="flex-1 w-0">
-                            <p class="text-sm font-medium text-white" x-text="notification.message"></p>
+    <!-- Match Analysis Modal -->
+    <div x-data="{ open: false }"
+         x-show="open"
+         x-on:open-modal.window="if ($event.detail === 'match-analysis') open = true"
+         x-on:close-modal.window="open = false"
+         x-on:keydown.escape.window="open = false"
+         x-transition:enter="ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+         x-transition:leave="ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+         x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+         class="fixed inset-0 z-50 overflow-y-auto"
+         style="display: none;">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full sm:p-6">
+                @if($currentAnalysisItem)
+                    <div class="absolute top-0 right-0 pt-4 pr-4">
+                        <button wire:click="closeMatchAnalysis" class="bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <span class="sr-only">Close</span>
+                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                                Match Analysis for: {{ $currentAnalysisItem->title }}
+                            </h3>
+
+                            <!-- Your Item Details -->
+                            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                                <h4 class="text-sm font-medium text-gray-900 mb-2">Your Item Details</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div class="space-y-2">
+                                        <p class="text-sm text-gray-600"><span class="font-medium">Category:</span> {{ $currentAnalysisItem->category->name }}</p>
+                                        <p class="text-sm text-gray-600"><span class="font-medium">Location:</span> {{ $currentAnalysisItem->location }}</p>
+                                        <p class="text-sm text-gray-600"><span class="font-medium">Date:</span> {{ $currentAnalysisItem->date_lost->format('M d, Y') }}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600"><span class="font-medium">Description:</span></p>
+                                        <p class="text-sm text-gray-500 mt-1">{{ $currentAnalysisItem->description }}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Match Analysis -->
+                            <div class="space-y-6">
+                                @foreach($matchAnalysis as $analysis)
+                                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
+                                        <div class="px-4 py-5 sm:p-6">
+                                            <div class="flex items-center justify-between mb-4">
+                                                <h4 class="text-lg font-medium text-gray-900">
+                                                    Match #{{ $loop->iteration }}
+                                                </h4>
+                                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium {{ $analysis['similarity'] >= 0.7 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }}">
+                                                    {{ number_format($analysis['similarity'] * 100, 0) }}% Overall Match
+                                                </span>
+                                            </div>
+
+                                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                <!-- Found Item Details -->
+                                                <div>
+                                                    <h5 class="text-sm font-medium text-gray-900 mb-2">Found Item Details</h5>
+                                                    <div class="space-y-2">
+                                                        <p class="text-sm text-gray-600">
+                                                            <span class="font-medium">Title:</span> {{ $analysis['found_item']->title }}
+                                                        </p>
+                                                        <p class="text-sm text-gray-600">
+                                                            <span class="font-medium">Category:</span> {{ $analysis['found_item']->category->name }}
+                                                        </p>
+                                                        <p class="text-sm text-gray-600">
+                                                            <span class="font-medium">Location:</span> {{ $analysis['found_item']->location }}
+                                                        </p>
+                                                        <p class="text-sm text-gray-600">
+                                                            <span class="font-medium">Found by:</span> {{ $analysis['finder'] }}
+                                                        </p>
+                                                        <p class="text-sm text-gray-600">
+                                                            <span class="font-medium">Found on:</span> {{ $analysis['found_item']->date_found->format('M d, Y') }}
+                                                        </p>
+                                                        <p class="text-sm text-gray-600">
+                                                            <span class="font-medium">Description:</span>
+                                                            <span class="block mt-1 text-gray-500">{{ $analysis['found_item']->description }}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Matching Scores -->
+                                                <div>
+                                                    <h5 class="text-sm font-medium text-gray-900 mb-4">Attribute Match Scores</h5>
+                                                    <div class="space-y-4">
+                                                        @foreach($analysis['matching_attributes'] as $attribute => $score)
+                                                            <div>
+                                                                <div class="flex items-center justify-between mb-1">
+                                                                    <span class="text-sm font-medium text-gray-700">{{ ucfirst($attribute) }}</span>
+                                                                    <span class="text-sm font-medium text-gray-900">{{ number_format($score, 0) }}%</span>
+                                                                </div>
+                                                                <div class="overflow-hidden h-2 text-xs flex rounded bg-gray-100">
+                                                                    <div style="width: {{ $score }}%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center {{ $score >= 70 ? 'bg-green-500' : ($score >= 50 ? 'bg-yellow-500' : 'bg-red-500') }}"></div>
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            @if($analysis['found_item']->images->isNotEmpty())
+                                                <div class="mt-6">
+                                                    <h5 class="text-sm font-medium text-gray-900 mb-2">Images</h5>
+                                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                                        @foreach($analysis['found_item']->images as $image)
+                                                            <img src="{{ $image->url }}" alt="Found item image" class="h-32 w-full object-cover rounded-lg">
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
                         </div>
-                        <div class="ml-4 flex-shrink-0 flex">
-                            <button @click="notifications = notifications.filter(n => n.id !== notification.id)"
-                                    class="inline-flex text-white hover:text-gray-200">
-                                <span class="sr-only">Close</span>
-                                <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </button>
-                        </div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div x-data="{ show: false, message: '', type: 'success' }"
+         x-on:notify.window="show = true; message = $event.detail.message; type = $event.detail.type; setTimeout(() => { show = false }, 3000)"
+         x-show="show"
+         x-transition:enter="transform ease-out duration-300 transition"
+         x-transition:enter-start="translate-y-2 opacity-0 sm:translate-y-0 sm:translate-x-2"
+         x-transition:enter-end="translate-y-0 opacity-100 sm:translate-x-0"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed bottom-0 right-0 flex items-end justify-center px-4 py-6 pointer-events-none sm:p-6 sm:items-start sm:justify-end">
+        <div class="max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden">
+            <div class="p-4">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <template x-if="type === 'success'">
+                            <svg class="h-6 w-6 text-green-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </template>
+                        <template x-if="type === 'error'">
+                            <svg class="h-6 w-6 text-red-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </template>
+                    </div>
+                    <div class="ml-3 w-0 flex-1 pt-0.5">
+                        <p x-text="message" class="text-sm font-medium text-gray-900"></p>
+                    </div>
+                    <div class="ml-4 flex-shrink-0 flex">
+                        <button x-on:click="show = false" class="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <span class="sr-only">Close</span>
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
                     </div>
                 </div>
             </div>
-        </template>
+        </div>
     </div>
 </div>
-
-@push('scripts')
-<script>
-    document.addEventListener('livewire:initialized', () => {
-        Livewire.on('progressUpdate', ({ progress, stage }) => {
-            // Additional progress animations can be added here if needed
-        });
-
-        Livewire.on('matchesFound', ({ count, itemId }) => {
-            // Additional match found animations or interactions can be added here
-        });
-
-        // Handle polling
-        Livewire.on('scheduleNextPoll', () => {
-            setTimeout(() => {
-                @this.dispatch('pollMatches');
-            }, {{ $this::POLLING_INTERVAL }});
-        });
-    });
-</script>
-@endpush

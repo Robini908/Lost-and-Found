@@ -6,20 +6,77 @@ use GuzzleHttp\Client;
 use App\Models\LostItem;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use App\Jobs\ProcessImageEmbeddings;
+use Spatie\ImageOptimizer\OptimizerChainFactory;
+use Illuminate\Support\Str;
+use App\Models\ItemMatch;
+use App\Events\ItemMatched;
 
 class ItemMatchingService
 {
     protected $client;
     protected $apiToken;
+    protected $imageOptimizer;
 
     public function __construct()
     {
         $this->client = new Client();
-        $this->apiToken = config('services.huggingface.token');
+        $this->apiToken = config('services.huggingface.api_token');
+        $this->imageOptimizer = OptimizerChainFactory::create();
 
         if (empty($this->apiToken)) {
             throw new \RuntimeException('HuggingFace API token not configured. Please check your HUGGINGFACE_API_TOKEN in .env');
+        }
+    }
+
+    /**
+     * Optimize and process image for embeddings
+     *
+     * @param string $imageUrl
+     * @return string|null
+     */
+    protected function optimizeImage($imageUrl)
+    {
+        try {
+            // Generate a unique filename for the optimized image
+            $extension = pathinfo($imageUrl, PATHINFO_EXTENSION);
+            $filename = Str::random(40) . '.' . $extension;
+            $optimizedPath = storage_path('app/public/optimized/' . $filename);
+
+            // Create directory if it doesn't exist
+            if (!file_exists(dirname($optimizedPath))) {
+                mkdir(dirname($optimizedPath), 0755, true);
+            }
+
+            // Download the image
+            $imageContent = file_get_contents($imageUrl);
+            if ($imageContent === false) {
+                Log::error('Failed to download image', ['url' => $imageUrl]);
+                return null;
+            }
+
+            // Save the original image
+            file_put_contents($optimizedPath, $imageContent);
+
+            // Optimize the image
+            $this->imageOptimizer->optimize($optimizedPath);
+
+            // Get the optimized image size
+            $optimizedSize = filesize($optimizedPath);
+            Log::info('Image optimized successfully', [
+                'original_url' => $imageUrl,
+                'optimized_size' => $optimizedSize,
+                'optimized_path' => $optimizedPath
+            ]);
+
+            return $optimizedPath;
+        } catch (\Exception $e) {
+            Log::error('Image optimization failed', [
+                'error' => $e->getMessage(),
+                'url' => $imageUrl
+            ]);
+            return null;
         }
     }
 
@@ -198,9 +255,35 @@ class ItemMatchingService
             return Cache::get($cacheKey);
         }
 
-        // Process image embeddings
-        $job = new ProcessImageEmbeddings($imageUrl, $imageId);
-        return $job->handle(); // For now, process synchronously. Later we can switch to ->dispatch()
+        // Optimize the image first
+        $optimizedImagePath = $this->optimizeImage($imageUrl);
+        if (!$optimizedImagePath) {
+            Log::error('Image optimization failed, cannot proceed with embeddings');
+            return null;
+        }
+
+        try {
+            // Process optimized image embeddings
+            $job = new ProcessImageEmbeddings($optimizedImagePath, $imageId);
+            $embeddings = $job->handle();
+
+            // Clean up the optimized image
+            @unlink($optimizedImagePath);
+
+            if ($embeddings) {
+                Cache::put($cacheKey, $embeddings, now()->addWeek());
+            }
+
+            return $embeddings;
+        } catch (\Exception $e) {
+            Log::error('Failed to process image embeddings', [
+                'error' => $e->getMessage(),
+                'image_id' => $imageId
+            ]);
+            // Clean up the optimized image in case of error
+            @unlink($optimizedImagePath);
+            return null;
+        }
     }
 
     /**
@@ -501,15 +584,34 @@ class ItemMatchingService
                     'found_item_id' => $foundItem->id,
                     'similarity_score' => $similarity,
                     'processing_time_ms' => round($processingTime * 1000, 2),
-                    'matched' => $similarity > 0.7
+                    'matched' => $similarity > 0.3
                 ]);
 
-                if ($similarity > 0.7) {
+                if ($similarity > 0.3) {
+                    // Create or update the match in the database
+                    ItemMatch::updateOrCreate(
+                        [
+                            'lost_item_id' => $lostItem->id,
+                            'found_item_id' => $foundItem->id
+                        ],
+                        [
+                            'similarity_score' => $similarity,
+                            'matched_at' => now()
+                        ]
+                    );
+
                     $matches->push([
                         'found_item' => $foundItem,
                         'similarity' => $similarity,
                         'processing_time_ms' => round($processingTime * 1000, 2)
                     ]);
+
+                    // Broadcast a real-time event for the match
+                    broadcast(new ItemMatched([
+                        'lost_item_id' => $lostItem->id,
+                        'found_item_id' => $foundItem->id,
+                        'similarity_score' => $similarity
+                    ]));
                 }
             } catch (\Exception $e) {
                 Log::error('Error processing item in chunk', [
@@ -674,7 +776,7 @@ class ItemMatchingService
                         $lostItemImageEmbeddings
                     );
 
-                    if ($similarity > 0.7) {
+                    if ($similarity > 0.3) {
                         return true;
                     }
                 } catch (\Exception $e) {

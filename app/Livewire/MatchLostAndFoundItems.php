@@ -3,246 +3,200 @@
 namespace App\Livewire;
 
 use Livewire\Component;
-use App\Models\LostItem;
-use Livewire\Attributes\Computed;
 use Livewire\WithPagination;
-use App\Services\ItemMatchingService;
-use Illuminate\Support\Facades\Log;
+use App\Models\LostItem;
 use App\Models\ItemMatch;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use App\Jobs\ProcessItemMatching;
+use App\Services\ItemMatchingService;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Computed;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 class MatchLostAndFoundItems extends Component
 {
     use WithPagination;
 
-    // Add protected $paginationTheme
-    protected $paginationTheme = 'tailwind';
-
-    public $userId;
-    public $isLoading = false;
-    public $progress = 0;
-    public $processingItemId = null;
-    public $selectedTab = 'unmatched';
-    public $searchQuery = '';
+    // Search and filter properties
+    public $search = '';
     public $selectedCategory = '';
+    public $dateRange = '';
     public $sortField = 'created_at';
     public $sortDirection = 'desc';
-    public $itemsPerPage = 9;
-    public $processingStage = '';
-    public $showFilters = false;
-    public $batchSize = 5; // Number of items to process in each batch
-    public $autoMatchEnabled = true;
+    public $selectedItem = null;
+    public $showMatchDetails = false;
+    public $matchDetailsItem = null;
+    public $loadingMatches = false;
+    public $matchThreshold = 0.3;
+    public $perPage = 10;
+    public $itemTypeFilter = 'all'; // 'all', 'reported', 'searched'
+    public $activeTab = 'searching'; // 'searching', 'found'
+    public $showMatchAnalysis = false;
+    public $currentAnalysisItem = null;
+    public $matchAnalysis = [];
 
-    // Add page property for pagination
-    #[Computed]
-    public function page()
-    {
-        return $this->getPage();
-    }
-
+    // Filters
     protected $queryString = [
-        'searchQuery' => ['except' => ''],
+        'search' => ['except' => ''],
         'selectedCategory' => ['except' => ''],
-        'selectedTab' => ['except' => 'unmatched'],
-        'page' => ['except' => 1, 'as' => 'p'],
+        'dateRange' => ['except' => ''],
+        'sortField' => ['except' => 'created_at'],
+        'sortDirection' => ['except' => 'desc'],
+        'itemTypeFilter' => ['except' => 'all'],
+        'activeTab' => ['except' => 'searching'],
+        'page' => ['except' => 1],
     ];
 
-    protected ItemMatchingService $itemMatchingService;
-
-    // Cache TTL in seconds (1 hour)
-    protected const CACHE_TTL = 3600;
-    protected const POLLING_INTERVAL = 30000; // 30 seconds
-
-    public function boot(ItemMatchingService $itemMatchingService)
+    public function mount()
     {
-        $this->itemMatchingService = $itemMatchingService;
-    }
-
-    public function mount($userId)
-    {
-        $this->userId = $userId;
-        $this->startAutoMatching();
-    }
-
-    #[On('echo:items,ItemCreated')]
-    public function handleNewItem($event)
-    {
-        if ($this->autoMatchEnabled) {
-            $this->dispatchMatchingJob($event['itemId']);
-        }
-    }
-
-    #[On('echo:items,ItemUpdated')]
-    public function handleItemUpdate($event)
-    {
-        $this->invalidateCache();
-        if ($this->autoMatchEnabled) {
-            $this->dispatchMatchingJob($event['itemId']);
-        }
-    }
-
-    protected function dispatchMatchingJob($itemId)
-    {
-        ProcessItemMatching::dispatch($itemId)
-            ->onQueue('matching')
-            ->delay(now()->addSeconds(5));
-    }
-
-    #[On('pollMatches')]
-    public function processUnmatchedItems()
-    {
-        if (!$this->autoMatchEnabled) {
-            return;
-        }
-
-        $unmatchedItems = LostItem::query()
-            ->where('user_id', $this->userId)
-            ->whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])
-            ->doesntHave('matches')
-            ->limit(5)
-            ->get();
-
-        foreach ($unmatchedItems as $item) {
-            $this->dispatchMatchingJob($item->id);
-        }
-
-        // Schedule the next poll using dispatch and JavaScript setTimeout
-        $this->dispatch('scheduleNextPoll');
-    }
-
-    public function startAutoMatching()
-    {
-        if ($this->autoMatchEnabled) {
-            $this->processUnmatchedItems();
-        }
-    }
-
-    #[On('matchProcessed')]
-    public function handleMatchProcessed($data)
-    {
-        $this->invalidateCache();
-
-        if ($data['matches_found'] > 0) {
-            $this->notify('success', "Found {$data['matches_found']} new matches for item #{$data['item_id']}");
-        }
+        $this->loadingMatches = false;
     }
 
     #[Computed]
-    public function unmatchedItems()
+    public function lostItems()
     {
-        $cacheKey = $this->getUnmatchedItemsCacheKey();
-        return Cache::remember($cacheKey, self::CACHE_TTL, fn() => $this->getFilteredItems(false));
+        return LostItem::query()
+            ->where('user_id', Auth::id())
+            ->whereDoesntHave('matchesAsLost', function($query) {
+                $query->where('similarity_score', '>=', $this->matchThreshold);
+            })
+            ->where(function($query) {
+                $query->when($this->itemTypeFilter === 'all', function($q) {
+                    $q->whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED]);
+                })
+                ->when($this->itemTypeFilter === 'reported', function($q) {
+                    $q->where('item_type', LostItem::TYPE_REPORTED);
+                })
+                ->when($this->itemTypeFilter === 'searched', function($q) {
+                    $q->where('item_type', LostItem::TYPE_SEARCHED);
+                });
+            })
+            ->when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('title', 'like', '%' . $this->search . '%')
+                        ->orWhere('description', 'like', '%' . $this->search . '%');
+                });
+            })
+            ->when($this->selectedCategory, function ($query) {
+                $query->where('category_id', $this->selectedCategory);
+            })
+            ->when($this->dateRange, function ($query) {
+                $dates = explode(' - ', $this->dateRange);
+                if (count($dates) === 2) {
+                    $query->whereBetween('date_lost', $dates);
+                }
+            })
+            ->orderBy($this->sortField, $this->sortDirection)
+            ->with(['category', 'images'])
+            ->paginate($this->perPage);
+    }
+
+    #[Computed]
+    public function foundMatches()
+    {
+        return ItemMatch::where('similarity_score', '>=', $this->matchThreshold)
+            ->whereHas('lostItem', function($query) {
+                $query->where('user_id', Auth::id());
+            })
+            ->with(['lostItem.category', 'lostItem.images', 'foundItem.category', 'foundItem.images', 'foundItem.user'])
+            ->orderByDesc('similarity_score')
+            ->get()
+            ->map(function ($match) {
+                return [
+                    'lost_item' => $match->lostItem,
+                    'found_item' => $match->foundItem,
+                    'similarity' => $match->similarity_score,
+                    'matched_at' => $match->matched_at,
+                    'finder' => $match->foundItem->user->name
+                ];
+            });
     }
 
     #[Computed]
     public function matchedItems()
     {
-        $cacheKey = $this->getMatchedItemsCacheKey();
-        return Cache::remember($cacheKey, self::CACHE_TTL, fn() => $this->getFilteredItems(true));
-    }
+        if (!$this->selectedItem) {
+            return collect();
+        }
 
-    protected function getFilteredItems($matched)
-    {
-        $query = LostItem::query()
-            ->where('user_id', $this->userId)
-            ->whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED]);
-
-        $query->when($matched,
-            fn(Builder $q) => $q->has('matches'),
-            fn(Builder $q) => $q->doesntHave('matches')
-        );
-
-        $query->when($this->searchQuery, function (Builder $q) {
-            $q->where(function (Builder $sq) {
-                $sq->where('title', 'like', '%' . $this->searchQuery . '%')
-                  ->orWhere('description', 'like', '%' . $this->searchQuery . '%');
+        return ItemMatch::where('lost_item_id', $this->selectedItem)
+            ->whereHas('foundItem', function($query) {
+                $query->where('user_id', '!=', Auth::id())
+                      ->where('item_type', LostItem::TYPE_FOUND);
+            })
+            ->with(['foundItem.category', 'foundItem.images', 'foundItem.user'])
+            ->orderByDesc('similarity_score')
+            ->get()
+            ->map(function ($match) {
+                return [
+                    'item' => $match->foundItem,
+                    'similarity' => $match->similarity_score,
+                    'matched_at' => $match->matched_at,
+                    'finder' => $match->foundItem->user->name
+                ];
             });
-        });
-
-        $query->when($this->selectedCategory,
-            fn(Builder $q) => $q->where('category_id', $this->selectedCategory)
-        );
-
-        return $query->with([
-            'images',
-            'category',
-            'matches' => fn($q) => $q->orderBy('similarity_score', 'desc')
-                ->with(['foundItem.images', 'foundItem.category'])
-        ])
-        ->orderBy($this->sortField, $this->sortDirection)
-        ->paginate($this->itemsPerPage);
     }
 
-    public function toggleAutoMatch()
+    public function setActiveTab($tab)
     {
-        $this->autoMatchEnabled = !$this->autoMatchEnabled;
-        if ($this->autoMatchEnabled) {
-            $this->startAutoMatching();
-            $this->notify('info', 'Auto-matching enabled');
-        } else {
-            $this->notify('info', 'Auto-matching disabled');
+        $this->activeTab = $tab;
+        $this->resetPage();
+        $this->selectedItem = null;
+        $this->showMatchDetails = false;
+    }
+
+    public function setItemTypeFilter($type)
+    {
+        $this->itemTypeFilter = $type;
+        $this->resetPage();
+    }
+
+    public function findMatches($itemId)
+    {
+        $this->loadingMatches = true;
+        $this->selectedItem = $itemId;
+        $this->showMatchDetails = true;
+
+        try {
+            $lostItem = LostItem::where('user_id', Auth::id())->findOrFail($itemId);
+            $matchingService = app(ItemMatchingService::class);
+
+            dispatch(function () use ($matchingService, $lostItem) {
+                $matches = $matchingService->findMatches($lostItem);
+            })->afterResponse();
+
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Error finding matches: ' . $e->getMessage()
+            ]);
+        }
+
+        $this->loadingMatches = false;
+    }
+
+    #[On('echo:items.matches,item.matched')]
+    public function handleNewMatch($event)
+    {
+        if ($this->selectedItem == $event['matchData']['lost_item_id']) {
+            $this->dispatch('$refresh');
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'New potential match found!'
+            ]);
         }
     }
 
-    public function findMatchesForItem($itemId)
+    public function showMatchDetails($itemId)
     {
-        $this->isLoading = true;
-        $this->processingItemId = $itemId;
-        $this->dispatchMatchingJob($itemId);
-        $this->notify('info', 'Match processing started in background');
-            $this->isLoading = false;
-    }
+        $this->matchDetailsItem = LostItem::with(['category', 'images', 'user'])
+            ->where('item_type', LostItem::TYPE_FOUND)
+            ->where('user_id', '!=', Auth::id())
+            ->find($itemId);
 
-    // Cache key methods remain the same
-    protected function getUnmatchedItemsCacheKey(): string
-    {
-        return sprintf(
-            'unmatched_items:%s:%s:%s:%s:%s:%d:%s',
-            $this->userId,
-            $this->searchQuery,
-            $this->selectedCategory,
-            $this->sortField,
-            $this->sortDirection,
-            $this->page(),
-            $this->itemsPerPage
-        );
-    }
-
-    protected function getMatchedItemsCacheKey(): string
-    {
-        return sprintf(
-            'matched_items:%s:%s:%s:%s:%s:%d:%s',
-            $this->userId,
-            $this->searchQuery,
-            $this->selectedCategory,
-            $this->sortField,
-            $this->sortDirection,
-            $this->page(),
-            $this->itemsPerPage
-        );
-    }
-
-    // Add method to get current page
-    protected function getPage()
-    {
-        return request()->query('page', 1);
-    }
-
-    // Update resetPage method
-    public function resetPage()
-    {
-        $this->setPage(1);
-    }
-
-    public function invalidateCache()
-    {
-        Cache::forget($this->getUnmatchedItemsCacheKey());
-        Cache::forget($this->getMatchedItemsCacheKey());
+        if ($this->matchDetailsItem) {
+            $this->dispatch('open-modal', 'match-details');
+        }
     }
 
     public function sortBy($field)
@@ -253,46 +207,72 @@ class MatchLostAndFoundItems extends Component
             $this->sortField = $field;
             $this->sortDirection = 'asc';
         }
-        $this->invalidateCache();
     }
 
-    public function getListeners()
+    public function refreshMatches()
     {
-        return [
-            'echo:items,ItemDeleted' => 'handleItemDelete',
-            'refreshMatches' => '$refresh'
-        ];
+        if ($this->selectedItem) {
+            $this->findMatches($this->selectedItem);
+        }
     }
 
-    public function handleItemDelete($event)
+    public function closeMatchDetails()
     {
-        $this->invalidateCache();
-        $this->dispatch('refreshMatches');
+        $this->showMatchDetails = false;
+        $this->matchDetailsItem = null;
+        $this->selectedItem = null;
     }
 
-    /**
-     * Display a notification message
-     *
-     * @param string $type success|info|error
-     * @param string $message
-     * @return void
-     */
-    protected function notify($type, $message)
+    public function viewMatchAnalysis($itemId)
     {
-        $this->dispatch('notify', [
-            'type' => $type,
-            'message' => $message
-        ]);
+        $this->currentAnalysisItem = LostItem::with(['category', 'images'])
+            ->where('user_id', Auth::id())
+            ->findOrFail($itemId);
+
+        $this->matchAnalysis = ItemMatch::where('lost_item_id', $itemId)
+            ->where('similarity_score', '>=', $this->matchThreshold)
+            ->with(['foundItem.category', 'foundItem.images', 'foundItem.user'])
+            ->orderByDesc('similarity_score')
+            ->get()
+            ->map(function ($match) {
+                return [
+                    'found_item' => $match->foundItem,
+                    'similarity' => $match->similarity_score,
+                    'matched_at' => $match->matched_at,
+                    'finder' => $match->foundItem->user->name,
+                    'matching_attributes' => [
+                        'title' => similar_text($this->currentAnalysisItem->title, $match->foundItem->title, $titlePercentage) ?
+                            round($titlePercentage, 2) : 0,
+                        'description' => similar_text($this->currentAnalysisItem->description, $match->foundItem->description, $descPercentage) ?
+                            round($descPercentage, 2) : 0,
+                        'category' => $this->currentAnalysisItem->category_id === $match->foundItem->category_id ? 100 : 0,
+                        'location' => similar_text($this->currentAnalysisItem->location, $match->foundItem->location, $locationPercentage) ?
+                            round($locationPercentage, 2) : 0,
+                    ]
+                ];
+            });
+
+        $this->dispatch('open-modal', 'match-analysis');
+    }
+
+    public function closeMatchAnalysis()
+    {
+        $this->showMatchAnalysis = false;
+        $this->currentAnalysisItem = null;
+        $this->matchAnalysis = [];
     }
 
     public function render()
     {
         return view('livewire.match-lost-and-found-items', [
-            'categories' => Cache::remember('all_categories', self::CACHE_TTL,
-                fn() => \App\Models\Category::all()
-            ),
-            'unmatchedItems' => $this->unmatchedItems(),
-            'matchedItems' => $this->matchedItems()
+            'lostItems' => $this->lostItems,
+            'matchedItems' => $this->matchedItems,
+            'foundMatches' => $this->foundMatches,
+            'itemTypes' => [
+                'all' => 'All Items',
+                'reported' => 'Reported Items',
+                'searched' => 'Searched Items'
+            ]
         ]);
     }
 }

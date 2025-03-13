@@ -18,7 +18,7 @@
         "grok-php/laravel": "^1.0",
         "guzzlehttp/guzzle": "^7.9",
         "hashids/hashids": "*",
-        "intervention/image": "^3.11",
+        "intervention/image": "*",
         "intervention/image-laravel": "^1.5",
         "lab404/laravel-impersonate": "^1.7",
         "laravel/framework": "^10.48",
