@@ -64,7 +64,7 @@ Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9...
 All API requests should be made to:
 
 ```
-https://api.lostandfound-system.example.com/v1
+https://api.lostandfound.com/v1
 ```
 
 For local development:
@@ -787,7 +787,7 @@ This example shows how to find potential matches for a lost item:
 ```javascript
 // Using fetch API
 const fetchMatches = async (itemUuid, minScore = 0.5) => {
-  const response = await fetch(`https://api.lostandfound-system.example.com/v1/items/${itemUuid}/matches?min_score=${minScore}`, {
+  const response = await fetch(`https://api.lostandfound.com/v1/items/${itemUuid}/matches?min_score=${minScore}`, {
     method: 'GET',
     headers: {
       'Authorization': 'Bearer YOUR_ACCESS_TOKEN',
@@ -824,7 +824,7 @@ This example shows how to create a new lost item report:
 ```javascript
 // Using fetch API
 const reportLostItem = async (itemData) => {
-  const response = await fetch('https://api.lostandfound-system.example.com/v1/items/lost', {
+  const response = await fetch('https://api.lostandfound.com/v1/items/lost', {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer YOUR_ACCESS_TOKEN',
@@ -873,4 +873,12 @@ reportLostItem(itemData)
   .catch(error => {
     console.error('Error reporting lost item:', error);
   });
-``` 
+```
+
+## Contact Information
+
+For questions, support, or bug reports related to the API, please contact:
+
+Email: [abrahamopuba@gmail.com](mailto:abrahamopuba@gmail.com)
+
+We aim to respond to all inquiries within 48 hours. 

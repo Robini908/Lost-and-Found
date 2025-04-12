@@ -30,7 +30,7 @@ A comprehensive platform that connects people with their lost possessions throug
 
 </details>
 
-🔗 [Live Demo](https://demo.lostandfound-system.example.com) (Username: `demo` | Password: `password`)
+🔗 [Live Demo](https://demo.lostandfound.com) (Username: `demo` | Password: `password`)
 
 ## ✨ Features
 
@@ -185,9 +185,10 @@ php artisan test --coverage
 
 Deployment guides are available for:
 
-- [Docker Deployment](./docs/deployment/docker.md)
-- [Traditional Server Deployment](./docs/deployment/traditional.md)
-- [Cloud Service Providers](./docs/deployment/cloud.md)
+- [Comprehensive Deployment Guide](./docs/deployment.md) - Detailed instructions for all deployment scenarios
+- [Docker Deployment](./docs/deployment.md#docker-deployment) - Quick deployment using Docker
+- [Traditional Server Deployment](./docs/deployment.md#traditional-server-deployment) - Step-by-step server setup
+- [Cloud Service Providers](./docs/deployment.md#cloud-provider-deployment) - AWS and Digital Ocean deployment
 
 ## 🗺️ Project Roadmap
 
@@ -236,7 +237,7 @@ We welcome contributions! Please see our [Contributing Guide](./CONTRIBUTING.md)
 
 ## 🔒 Security
 
-If you discover any security vulnerabilities, please report them via email to [security@lostandfound.example.com](mailto:security@lostandfound.example.com). All security vulnerabilities will be promptly addressed.
+If you discover any security vulnerabilities, please report them via email to [abrahamopuba@gmail.com](mailto:abrahamopuba@gmail.com). All security vulnerabilities will be promptly addressed.
 
 ## 📄 License
 
