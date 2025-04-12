@@ -16,6 +16,23 @@ import ToastComponent from "../../vendor/usernotnull/tall-toasts/resources/js/ta
 import { Input, initTWE } from "tw-elements";
 window.flatpickr = flatpickr
 
+// Initialize Alpine.js stores and plugins
+document.addEventListener('alpine:init', () => {
+    Alpine.store('darkMode', {
+        on: false,
+        toggle() {
+            this.on = !this.on;
+        }
+    });
+
+    Alpine.store('sidebar', {
+        open: false,
+        toggle() {
+            this.open = !this.open;
+        }
+    });
+});
+
 // Initialize Tailwind Elements
 initTWE({ Input }, { allowReinits: true });
 
@@ -61,7 +78,3 @@ Livewire.hook('morphed', (el, component) => {
     initializeTooltips();
     initializeDataTables();
 });
-
-
-
-

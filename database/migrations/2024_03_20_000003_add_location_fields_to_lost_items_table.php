@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('lost_items', function (Blueprint $table) {
+            // Add location-related fields if they don't exist
             if (!Schema::hasColumn('lost_items', 'location_type')) {
                 $table->string('location_type')->nullable();
             }
@@ -30,6 +31,9 @@ return new class extends Migration
             if (!Schema::hasColumn('lost_items', 'landmarks')) {
                 $table->text('landmarks')->nullable();
             }
+            if (!Schema::hasColumn('lost_items', 'geolocation')) {
+                $table->json('geolocation')->nullable();
+            }
         });
     }
 
@@ -45,7 +49,8 @@ return new class extends Migration
                 'location_lat',
                 'location_lng',
                 'area',
-                'landmarks'
+                'landmarks',
+                'geolocation'
             ]);
         });
     }

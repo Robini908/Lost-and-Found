@@ -12,6 +12,8 @@ use Spatie\ImageOptimizer\OptimizerChainFactory;
 use Illuminate\Support\Str;
 use App\Models\ItemMatch;
 use App\Events\ItemMatched;
+use App\Notifications\ItemMatchedNotification;
+use Illuminate\Support\Facades\Notification;
 
 class ItemMatchingService
 {
@@ -578,39 +580,62 @@ class ItemMatchingService
                     $lostItemImageEmbeddings
                 );
 
-                $processingTime = microtime(true) - $itemStartTime;
+                $processingTime = (microtime(true) - $itemStartTime) * 1000; // Convert to milliseconds
+
                 Log::debug('Item matching result', [
                     'lost_item_id' => $lostItem->id,
                     'found_item_id' => $foundItem->id,
                     'similarity_score' => $similarity,
-                    'processing_time_ms' => round($processingTime * 1000, 2),
+                    'processing_time_ms' => round($processingTime, 2),
                     'matched' => $similarity > 0.3
                 ]);
 
                 if ($similarity > 0.3) {
                     // Create or update the match in the database
-                    ItemMatch::updateOrCreate(
+                    $match = ItemMatch::updateOrCreate(
                         [
                             'lost_item_id' => $lostItem->id,
                             'found_item_id' => $foundItem->id
                         ],
                         [
                             'similarity_score' => $similarity,
-                            'matched_at' => now()
+                            'matched_at' => now(),
+                            'processing_time_ms' => $processingTime
                         ]
                     );
 
                     $matches->push([
                         'found_item' => $foundItem,
                         'similarity' => $similarity,
-                        'processing_time_ms' => round($processingTime * 1000, 2)
+                        'processing_time_ms' => $processingTime
                     ]);
+
+                    // Send notifications to both users
+                    try {
+                        // Notify the person who reported the lost item
+                        $lostItem->user->notify(new ItemMatchedNotification($match, 'reporter'));
+
+                        // Notify the person who found the item
+                        $foundItem->user->notify(new ItemMatchedNotification($match, 'finder'));
+
+                        Log::info('Match notifications sent successfully', [
+                            'match_id' => $match->id,
+                            'lost_item_user' => $lostItem->user->id,
+                            'found_item_user' => $foundItem->user->id
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('Failed to send match notifications', [
+                            'match_id' => $match->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
 
                     // Broadcast a real-time event for the match
                     broadcast(new ItemMatched([
                         'lost_item_id' => $lostItem->id,
                         'found_item_id' => $foundItem->id,
-                        'similarity_score' => $similarity
+                        'similarity_score' => $similarity,
+                        'processing_time_ms' => $processingTime
                     ]));
                 }
             } catch (\Exception $e) {
@@ -800,7 +825,7 @@ class ItemMatchingService
     }
 
     /**
-     * Get category suggestions based on item title using AI
+     * Get category suggestions with database first and AI as fallback
      *
      * @param string $title
      * @param \Illuminate\Database\Eloquent\Collection $categories
@@ -813,9 +838,43 @@ class ItemMatchingService
         }
 
         try {
+            // Step 1: Try exact matches from database first (fastest)
+            $directMatches = $this->getDirectCategorySuggestions($title, $categories);
+            if (!empty($directMatches)) {
+                Log::info('Found direct category matches', [
+                    'title' => $title,
+                    'matches' => count($directMatches)
+                ]);
+                return $directMatches;
+            }
+
+            // Step 2: Try word-based matches (still fast)
+            $wordMatches = $this->getWordBasedCategorySuggestions($title, $categories);
+            if (!empty($wordMatches)) {
+                Log::info('Found word-based category matches', [
+                    'title' => $title,
+                    'matches' => count($wordMatches)
+                ]);
+                return $wordMatches;
+            }
+
+            // Step 3: Try semantic fallback matching (medium speed)
+            $semanticMatches = $this->getSemanticCategorySuggestions($title, $categories);
+            if (!empty($semanticMatches)) {
+                Log::info('Found semantic category matches', [
+                    'title' => $title,
+                    'matches' => count($semanticMatches)
+                ]);
+                return $semanticMatches;
+            }
+
+            // Step 4: Only use AI as final fallback (slowest)
+            Log::info('No database matches found, falling back to AI suggestions', [
+                'title' => $title
+            ]);
             return $this->getAIBasedCategorySuggestions($title, $categories);
         } catch (\Exception $e) {
-            Log::error('AI-based category matching failed, falling back to simple matching', [
+            Log::error('Category matching failed, falling back to simple matching', [
                 'error' => $e->getMessage(),
                 'title' => $title
             ]);
@@ -824,171 +883,528 @@ class ItemMatchingService
     }
 
     /**
-     * Get category suggestions using AI embeddings
+     * Get direct category matches based on exact text matching
      *
      * @param string $title
      * @param \Illuminate\Database\Eloquent\Collection $categories
      * @return array
      */
-    protected function getAIBasedCategorySuggestions($title, $categories)
+    public function getDirectCategorySuggestions($title, $categories)
     {
-        // Prepare context-rich texts for embeddings
-        $textsToProcess = [
-            'search' => $this->enrichTitleContext($title)
+        $titleLower = strtolower(trim($title));
+
+        // Step 1: Check for exact name matches (priority 1)
+        $exactMatches = $categories->filter(function ($category) use ($titleLower) {
+            return strtolower($category->name) === $titleLower;
+        });
+
+        if (!$exactMatches->isEmpty()) {
+            return $exactMatches->take(3)->pluck('id')->toArray();
+        }
+
+        // Step 2: Check for substring matches (priority 2)
+        $substringMatches = $categories->filter(function ($category) use ($titleLower) {
+            $categoryLower = strtolower($category->name);
+            return strpos($categoryLower, $titleLower) !== false ||
+                   strpos($titleLower, $categoryLower) !== false;
+        });
+
+        if (!$substringMatches->isEmpty()) {
+            return $substringMatches->take(3)->pluck('id')->toArray();
+        }
+
+        return [];
+    }
+
+    /**
+     * Get category matches based on word overlap
+     *
+     * @param string $title
+     * @param \Illuminate\Database\Eloquent\Collection $categories
+     * @return array
+     */
+    public function getWordBasedCategorySuggestions($title, $categories)
+    {
+        $titleWords = explode(' ', strtolower(trim($title)));
+        // Filter out common words
+        $stopWords = ['the', 'a', 'an', 'my', 'our', 'this', 'that', 'lost', 'found', 'item'];
+        $titleWords = array_diff($titleWords, $stopWords);
+
+        if (empty($titleWords)) {
+            return [];
+        }
+
+        $matchScores = [];
+
+        foreach ($categories as $category) {
+            $categoryWords = explode(' ', strtolower($category->name));
+            $categoryWords = array_diff($categoryWords, $stopWords);
+
+            $matchingWords = array_intersect($titleWords, $categoryWords);
+
+            if (!empty($matchingWords)) {
+                // Calculate match score based on number of matching words and their importance
+                $score = count($matchingWords) / max(count($titleWords), 1);
+                $matchScores[$category->id] = $score;
+            }
+        }
+
+        // Sort by score and return top matches
+        if (!empty($matchScores)) {
+            arsort($matchScores);
+            return array_slice(array_keys($matchScores), 0, 3);
+        }
+
+        return [];
+    }
+
+    /**
+     * Get semantic category suggestions based on predefined semantic groups
+     *
+     * @param string $title
+     * @param \Illuminate\Database\Eloquent\Collection $categories
+     * @return array
+     */
+    public function getSemanticCategorySuggestions($title, $categories)
+    {
+        // Use the existing semantic groups from isSemanticCategoryMatch
+        $semanticMatches = $this->findSemanticMatches($title, $categories);
+
+        if (!empty($semanticMatches)) {
+            return array_slice($semanticMatches, 0, 3);
+        }
+
+        return [];
+    }
+
+    /**
+     * Get AI-based category suggestions using embeddings
+     *
+     * @param string $title
+     * @param \Illuminate\Database\Eloquent\Collection $categories
+     * @return array
+     */
+    public function getAIBasedCategorySuggestions($title, $categories)
+    {
+        try {
+            // Step 1: Enrich the search context with semantic information
+            $searchContext = $this->buildSearchContext($title);
+
+            // Step 2: Get embeddings for the enriched search context
+            $searchEmbedding = $this->getTextEmbeddings($searchContext);
+            if (!$searchEmbedding) {
+                throw new \Exception('Failed to generate embeddings for search context');
+            }
+
+            // Step 3: Prepare category contexts and get their embeddings
+            $categoryEmbeddings = [];
+            $categoryContexts = [];
+
+            foreach ($categories as $category) {
+                $categoryContext = $this->buildEnrichedCategoryContext($category);
+                $categoryContexts[$category->id] = $categoryContext;
+
+                $embedding = $this->getTextEmbeddings($categoryContext);
+                if ($embedding) {
+                    $categoryEmbeddings[$category->id] = $embedding;
+                }
+            }
+
+            // Step 4: Calculate semantic similarities with enhanced confidence scoring
+        $similarities = [];
+            $confidenceThreshold = 0.30; // Lower threshold to catch more semantic matches
+
+            foreach ($categoryEmbeddings as $categoryId => $categoryEmbedding) {
+                $similarity = $this->cosineSimilarity($searchEmbedding, $categoryEmbedding);
+
+                // Enhanced semantic confidence calculation
+                $confidence = $this->calculateSemanticConfidence(
+                    $title,
+                    $searchContext,
+                    $categoryContexts[$categoryId],
+                    $similarity
+                );
+
+                // Boost confidence for semantic category matches
+                if ($this->isSemanticCategoryMatch($title, $categories[$categoryId])) {
+                    $confidence += 0.2;
+                }
+
+                $confidence = min(1.0, $confidence); // Cap at 1.0
+
+                if ($confidence >= $confidenceThreshold) {
+                    $similarities[$categoryId] = $confidence;
+                }
+            }
+
+            // Step 5: Sort by confidence and get top matches
+            arsort($similarities);
+            $topMatches = array_slice(array_keys($similarities), 0, 3);
+
+            // If no good matches, try semantic matching
+            if (empty($topMatches)) {
+                $semanticMatches = $this->findSemanticMatches($title, $categories);
+                if (!empty($semanticMatches)) {
+                    $topMatches = array_slice($semanticMatches, 0, 3);
+                }
+            }
+
+            return $topMatches;
+
+        } catch (\Exception $e) {
+            Log::error('AI-based category suggestion failed', [
+                'error' => $e->getMessage(),
+                'title' => $title
+            ]);
+            return []; // Don't fall back to simple matching
+        }
+    }
+
+    /**
+     * Check if there's a semantic match between item and category
+     */
+    protected function isSemanticCategoryMatch($title, $category)
+    {
+        $semanticGroups = [
+            'clothing' => ['jacket', 'shirt', 'pants', 'dress', 'coat', 'sweater', 'hoodie', 'wear', 'clothes'],
+            'electronics' => ['phone', 'laptop', 'tablet', 'computer', 'device', 'electronic', 'gadget'],
+            'accessories' => ['wallet', 'bag', 'purse', 'backpack', 'watch', 'accessory'],
+            'documents' => ['passport', 'id', 'license', 'certificate', 'card', 'document'],
+            'valuables' => ['jewelry', 'ring', 'necklace', 'gold', 'silver', 'precious']
         ];
 
-        // Add category contexts
-        foreach ($categories as $category) {
-            $textsToProcess['category_' . $category->id] = $this->buildCategoryContext($category);
+        $titleLower = strtolower($title);
+        $categoryLower = strtolower($category->name);
+
+        foreach ($semanticGroups as $group => $keywords) {
+            $titleMatch = false;
+            $categoryMatch = false;
+
+            foreach ($keywords as $keyword) {
+                if (strpos($titleLower, $keyword) !== false) {
+                    $titleMatch = true;
+                }
+                if (strpos($categoryLower, $keyword) !== false) {
+                    $categoryMatch = true;
+                }
+            }
+
+            if ($titleMatch && $categoryMatch) {
+                return true;
+            }
         }
 
-        // Get embeddings for all texts
-        $embeddings = $this->getBatchTextEmbeddings($textsToProcess);
-        if (!isset($embeddings['search'])) {
-            throw new \Exception('Failed to generate embeddings for search text');
-        }
+        return false;
+    }
 
-        $titleEmbedding = $embeddings['search'];
-        $similarities = [];
+    /**
+     * Find semantic matches based on item type and category relationships
+     */
+    protected function findSemanticMatches($title, $categories)
+    {
+        $matches = [];
+        $titleLower = strtolower($title);
 
-        // Calculate similarities with dynamic threshold
-        $baseThreshold = 0.3;
-        $titleLength = strlen($title);
-        $dynamicThreshold = $this->calculateDynamicThreshold($titleLength);
+        // Define semantic relationships
+        $relationships = [
+            ['keywords' => ['jacket', 'coat', 'sweater', 'hoodie'], 'category' => 'clothing'],
+            ['keywords' => ['phone', 'laptop', 'tablet'], 'category' => 'electronics'],
+            ['keywords' => ['wallet', 'bag', 'purse'], 'category' => 'accessories'],
+            ['keywords' => ['passport', 'id', 'license'], 'category' => 'documents'],
+            ['keywords' => ['jewelry', 'ring', 'necklace'], 'category' => 'valuables']
+        ];
 
+        foreach ($relationships as $rel) {
+            foreach ($rel['keywords'] as $keyword) {
+                if (strpos($titleLower, $keyword) !== false) {
+                    // Find categories that match the semantic category
         foreach ($categories as $category) {
-            $categoryEmbedding = $embeddings['category_' . $category->id] ?? null;
-            if ($categoryEmbedding) {
-                $similarity = $this->cosineSimilarity($titleEmbedding, $categoryEmbedding);
-
-                // Apply semantic boosting based on keyword matches
-                $similarity = $this->applySemanticBoosting($similarity, $title, $category);
-
-                if ($similarity >= $dynamicThreshold) {
-                    $similarities[] = [
-                        'id' => $category->id,
-                        'similarity' => $similarity
-                    ];
+                        if (strpos(strtolower($category->name), $rel['category']) !== false) {
+                            $matches[] = $category->id;
+                        }
+                    }
+                    break;
                 }
             }
         }
 
-        // Sort and return top matches
-        return collect($similarities)
-            ->sortByDesc('similarity')
-            ->take(5)
-            ->pluck('id')
-            ->toArray();
+        return array_unique($matches);
     }
 
     /**
-     * Enrich title context for better semantic matching
-     *
-     * @param string $title
-     * @return string
+     * Build category hierarchy for better semantic understanding
      */
-    protected function enrichTitleContext($title)
+    protected function buildCategoryHierarchy($categories)
     {
-        // Clean and normalize the title
-        $cleanTitle = trim(preg_replace('/\s+/', ' ', $title));
-
-        // Extract key terms and add context
-        $terms = explode(' ', strtolower($cleanTitle));
-        $context = "Item title: $cleanTitle. ";
-
-        // Add type context if detectable
-        $typeIndicators = [
-            'phone' => 'electronic device',
-            'wallet' => 'personal accessory',
-            'card' => 'document or payment method',
-            'key' => 'access tool',
-            'bag' => 'container or accessory',
-            'book' => 'reading material',
-            'document' => 'official paper'
+        $hierarchy = [];
+        $categoryGroups = [
+            'clothing' => ['jacket', 'shirt', 'pants', 'dress', 'coat', 'sweater', 'hoodie', 'clothing'],
+            'electronics' => ['phone', 'laptop', 'tablet', 'computer', 'device', 'gadget'],
+            'accessories' => ['wallet', 'bag', 'purse', 'backpack', 'watch'],
+            'documents' => ['passport', 'id', 'license', 'certificate', 'card'],
+            'valuables' => ['jewelry', 'ring', 'necklace', 'gold', 'silver']
         ];
 
-        foreach ($terms as $term) {
-            if (isset($typeIndicators[$term])) {
-                $context .= "This appears to be a {$typeIndicators[$term]}. ";
-                break;
+        foreach ($categories as $category) {
+            $categoryName = strtolower($category->name);
+            foreach ($categoryGroups as $group => $keywords) {
+                foreach ($keywords as $keyword) {
+                    if (strpos($categoryName, $keyword) !== false) {
+                        $hierarchy[$category->id] = $group;
+                        break 2;
+                    }
+                }
             }
         }
 
+        return $hierarchy;
+    }
+
+    /**
+     * Calculate enhanced semantic confidence with contextual understanding
+     */
+    protected function calculateSemanticConfidence($title, $searchContext, $categoryContext, $baseSimilarity)
+    {
+        $confidence = $baseSimilarity;
+
+        // Enhanced semantic analysis
+        $relevanceFactors = [
+            'direct_match' => $this->checkDirectMatch($title, $categoryContext),
+            'context_overlap' => $this->analyzeContextOverlap($searchContext, $categoryContext),
+            'semantic_coherence' => $this->analyzeSemanticCoherence($title, $categoryContext)
+        ];
+
+        // Apply weighted boosts with semantic priority
+        $weights = [
+            'direct_match' => 0.2,
+            'context_overlap' => 0.3,
+            'semantic_coherence' => 0.5
+        ];
+
+        foreach ($relevanceFactors as $factor => $value) {
+            $confidence += $value * $weights[$factor];
+        }
+
+        return min(1.0, $confidence);
+    }
+
+    /**
+     * Build rich semantic search context for item categorization
+     */
+    public function buildSearchContext($title)
+    {
+        $context = "Item Analysis Context:\n";
+        $context .= "Title: $title\n";
+
+        // Add semantic markers for better embedding understanding
+        $context .= "Purpose: Categorize this item based on its characteristics, usage, and context.\n";
+
+        // Add potential item attributes
+        $attributes = $this->extractItemAttributes($title);
+        if (!empty($attributes)) {
+            $context .= "Attributes: " . implode(", ", $attributes) . "\n";
+        }
+
         return $context;
     }
 
     /**
-     * Build rich context for category matching
-     *
-     * @param \App\Models\Category $category
-     * @return string
+     * Build enriched category context with semantic understanding
      */
-    protected function buildCategoryContext($category)
+    public function buildEnrichedCategoryContext($category)
     {
-        $context = "Category: {$category->name}. ";
+        $context = "Category Analysis:\n";
+        $context .= "Name: {$category->name}\n";
+
         if ($category->description) {
-            $context .= "Description: {$category->description}. ";
+            $context .= "Description: {$category->description}\n";
         }
 
-        // Add semantic context based on category name
-        $context .= "This category is suitable for ";
-        $context .= strtolower($category->name);
-        $context .= " type items and similar objects.";
+        // Add semantic markers for category understanding
+        $context .= "Purpose: This category is designed for items that are ";
+        $context .= $this->expandCategoryContext($category->name);
 
         return $context;
     }
 
     /**
-     * Calculate dynamic similarity threshold based on input
-     *
-     * @param int $titleLength
-     * @return float
+     * Extract meaningful attributes from item title
      */
-    protected function calculateDynamicThreshold($titleLength)
+    public function extractItemAttributes($title)
     {
-        // Shorter titles need higher threshold to prevent false positives
-        if ($titleLength <= 5) {
-            return 0.4;
-        } elseif ($titleLength <= 10) {
-            return 0.35;
+        $attributes = [];
+
+        // Common material patterns
+        $materials = ['leather', 'metal', 'plastic', 'wood', 'glass', 'fabric'];
+        foreach ($materials as $material) {
+            if (stripos($title, $material) !== false) {
+                $attributes[] = "Material: $material";
+            }
         }
-        return 0.3;
+
+        // Item type patterns
+        $types = [
+            'electronic' => ['phone', 'laptop', 'tablet', 'device'],
+            'document' => ['passport', 'id', 'card', 'certificate'],
+            'accessory' => ['wallet', 'bag', 'purse', 'watch'],
+            'valuable' => ['jewelry', 'ring', 'necklace', 'gold', 'silver']
+        ];
+
+        foreach ($types as $category => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (stripos($title, $keyword) !== false) {
+                    $attributes[] = "Type: $category";
+                break;
+                }
+            }
+        }
+
+        return array_unique($attributes);
     }
 
     /**
-     * Apply semantic boosting to similarity score
-     *
-     * @param float $similarity
-     * @param string $title
-     * @param \App\Models\Category $category
-     * @return float
+     * Expand category context with semantic understanding
      */
-    protected function applySemanticBoosting($similarity, $title, $category)
+    public function expandCategoryContext($categoryName)
     {
-        $boost = 0;
+        $categoryContexts = [
+            'electronics' => 'electronic devices, gadgets, and technological items that may have significant personal and monetary value',
+            'documents' => 'important papers, identification items, and official records that are crucial for personal identity and legal matters',
+            'accessories' => 'personal items worn or carried daily that often have both practical and sentimental value',
+            'jewelry' => 'precious items of personal adornment that often carry significant emotional and monetary worth',
+            'clothing' => 'personal garments and attire that may have both practical and sentimental importance',
+            'bags' => 'containers and carriers that often hold other valuable items and personal belongings',
+            'keys' => 'access tools and security items that are critical for daily life and security',
+            'books' => 'reading materials and educational resources that may have academic or personal significance',
+            'misc' => 'unique items with specific personal significance that may not fit traditional categories'
+        ];
 
-        // Direct name match boost
-        if (stripos($category->name, $title) !== false || stripos($title, $category->name) !== false) {
-            $boost += 0.1;
+        foreach ($categoryContexts as $key => $context) {
+            if (stripos($categoryName, $key) !== false) {
+        return $context;
+            }
         }
 
-        // Description match boost
-        if ($category->description && stripos($category->description, $title) !== false) {
-            $boost += 0.05;
+        return 'items with specific characteristics and purposes that require careful categorization';
+    }
+
+    /**
+     * Suggest a new category based on item analysis
+     */
+    public function suggestNewCategory($title, $searchContext)
+    {
+        // Extract key characteristics
+        $attributes = $this->extractItemAttributes($title);
+
+        // Generate category suggestion
+        $suggestion = [
+            'name' => $this->generateCategoryName($title, $attributes),
+            'description' => $this->generateCategoryDescription($title, $searchContext, $attributes),
+            'confidence' => 'AI_GENERATED'
+        ];
+
+        return $suggestion;
+    }
+
+    /**
+     * Generate an appropriate category name
+     */
+    public function generateCategoryName($title, $attributes)
+    {
+        // Remove common words and clean the title
+        $words = explode(' ', strtolower($title));
+        $commonWords = ['the', 'a', 'an', 'my', 'lost', 'found'];
+        $words = array_diff($words, $commonWords);
+
+        // Use the most significant terms
+        $significant = array_slice($words, 0, 2);
+
+        // Include type if available
+        foreach ($attributes as $attribute) {
+            if (strpos($attribute, 'Type:') === 0) {
+                $type = trim(str_replace('Type:', '', $attribute));
+                return ucwords($type . ' ' . implode(' ', $significant));
+            }
         }
 
-        // Prevent similarity from exceeding 1.0
-        return min(1.0, $similarity + $boost);
+        return ucwords(implode(' ', $significant));
+    }
+
+    /**
+     * Generate a detailed category description
+     */
+    public function generateCategoryDescription($title, $searchContext, $attributes)
+    {
+        $description = "Category for ";
+
+        if (!empty($attributes)) {
+            $description .= implode(', ', array_map(function($attr) {
+                return strtolower(str_replace(['Type:', 'Material:'], '', $attr));
+            }, $attributes)) . " items. ";
+        }
+
+        $description .= "Suitable for items similar to: $title. ";
+        $description .= "This category is designed to help organize and track items with similar characteristics and significance.";
+
+        return $description;
+    }
+
+    /**
+     * Get weight for different confidence factors
+     */
+    public function getFactorWeight($factor)
+    {
+        return [
+            'direct_match' => 0.3,
+            'context_overlap' => 0.2,
+            'semantic_coherence' => 0.5
+        ][$factor] ?? 0;
+    }
+
+    /**
+     * Check for direct matches in category context
+     */
+    public function checkDirectMatch($title, $categoryContext)
+    {
+        $titleWords = explode(' ', strtolower($title));
+        $contextWords = explode(' ', strtolower($categoryContext));
+
+        $matches = array_intersect($titleWords, $contextWords);
+        return count($matches) / count($titleWords);
+    }
+
+    /**
+     * Analyze context overlap between search and category
+     */
+    public function analyzeContextOverlap($searchContext, $categoryContext)
+    {
+        $searchWords = str_word_count(strtolower($searchContext), 1);
+        $categoryWords = str_word_count(strtolower($categoryContext), 1);
+
+        $overlap = array_intersect($searchWords, $categoryWords);
+        return count($overlap) / max(count($searchWords), count($categoryWords));
+    }
+
+    /**
+     * Analyze semantic coherence between title and category
+     */
+    public function analyzeSemanticCoherence($title, $categoryContext)
+    {
+        // Use embeddings to check semantic similarity
+        $titleEmbedding = $this->getTextEmbeddings($title);
+        $contextEmbedding = $this->getTextEmbeddings($categoryContext);
+
+        if ($titleEmbedding && $contextEmbedding) {
+            return $this->cosineSimilarity($titleEmbedding, $contextEmbedding);
+        }
+
+        return 0.5; // Default fallback value
     }
 
     /**
      * Fallback category suggestion method
-     *
-     * @param string $title
-     * @param \Illuminate\Database\Eloquent\Collection $categories
-     * @return array
      */
-    protected function getFallbackCategorySuggestions($title, $categories)
+    public function getFallbackCategorySuggestions($title, $categories)
     {
         // Simple text matching as fallback
         $matches = $categories->filter(function ($category) use ($title) {
@@ -1018,5 +1434,39 @@ class ItemMatchingService
         }
 
         return $matches->take(5)->pluck('id')->toArray();
+    }
+
+    /**
+     * Suggest a new category based on item analysis with context
+     */
+    public function suggestNewCategoryWithContext($title, $searchContext, $categoryHierarchy)
+    {
+        // Extract key characteristics
+        $attributes = $this->extractItemAttributes($title);
+
+        // Generate category suggestion
+        $suggestion = [
+            'name' => $this->generateCategoryName($title, $attributes),
+            'description' => $this->generateCategoryDescription($title, $searchContext, $attributes),
+            'confidence' => 'AI_GENERATED'
+        ];
+
+        // Add semantic understanding
+        $suggestion['semantic_understanding'] = $this->expandCategoryContext($title);
+
+        // Add hierarchical information
+        $suggestion['hierarchical_group'] = $categoryHierarchy[$this->getCategoryId($title, $attributes)] ?? 'Uncategorized';
+
+        return $suggestion;
+    }
+
+    /**
+     * Get category ID for semantic understanding
+     */
+    protected function getCategoryId($title, $attributes)
+    {
+        // Implement logic to determine the category ID based on the title and attributes
+        // This is a placeholder and should be replaced with actual implementation
+        return md5($title . implode(',', $attributes));
     }
 }

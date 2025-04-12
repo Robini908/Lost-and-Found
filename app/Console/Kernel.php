@@ -21,6 +21,8 @@ class Kernel extends ConsoleKernel
 
         // Add this line
         $schedule->command('sessions:clean')->daily();
+
+        $schedule->command('category:refresh-suggestions')->everySecond();
     }
 
     /**

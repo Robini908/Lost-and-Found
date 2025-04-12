@@ -1,51 +1,94 @@
-/* Add to your existing CSS */
+/* Futuristic Animations and Effects */
 @keyframes float {
     0% { transform: translateY(0px); }
     50% { transform: translateY(-20px); }
     100% { transform: translateY(0px); }
 }
 
+@keyframes neon-glow {
+    0% { box-shadow: 0 0 5px #00ffea, 0 0 10px #00ffea, 0 0 20px #00ffea; }
+    50% { box-shadow: 0 0 10px #00ffea, 0 0 20px #00ffea, 0 0 30px #00ffea; }
+    100% { box-shadow: 0 0 5px #00ffea, 0 0 10px #00ffea, 0 0 20px #00ffea; }
+}
+
+@keyframes hologram {
+    0% { opacity: 0.8; transform: perspective(500px) rotateX(15deg) translateY(0); }
+    50% { opacity: 1; transform: perspective(500px) rotateX(15deg) translateY(-10px); }
+    100% { opacity: 0.8; transform: perspective(500px) rotateX(15deg) translateY(0); }
+}
+
 .animate-float {
     animation: float 6s ease-in-out infinite;
+}
+
+.animate-neon {
+    animation: neon-glow 2s ease-in-out infinite;
+}
+
+.animate-hologram {
+    animation: hologram 3s ease-in-out infinite;
 }
 
 .gradient-text {
     background-clip: text;
     -webkit-background-clip: text;
     color: transparent;
-    background-image: linear-gradient(45deg, #3B82F6, #6366F1);
+    background-image: linear-gradient(45deg, #00ffea, #00b3ff, #0055ff);
 }
 
-@keyframes blob {
-    0% { transform: translate(0px, 0px) scale(1); }
-    33% { transform: translate(30px, -50px) scale(1.1); }
-    66% { transform: translate(-20px, 20px) scale(0.9); }
-    100% { transform: translate(0px, 0px) scale(1); }
-}
-
-.animate-blob {
-    animation: blob 7s infinite;
-}
-
-.animation-delay-2000 {
-    animation-delay: 2s;
-}
-
-.animation-delay-4000 {
-    animation-delay: 4s;
-}
-
-/* Add glass effect utilities */
+/* Futuristic Glass Effects */
 .glass-effect {
-    @apply backdrop-blur-lg bg-white/30 border border-white/20;
+    @apply backdrop-blur-lg bg-white/10 border border-white/20;
+    box-shadow: 0 8px 32px 0 rgba(0, 255, 234, 0.15);
 }
 
 .glass-card {
-    @apply glass-effect rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)];
+    @apply glass-effect rounded-2xl shadow-[0_8px_30px_rgb(0,255,234,0.12)];
 }
 
 .glass-card-hover {
-    @apply hover:shadow-[0_8px_30px_rgb(0,0,0,0.16)] transition-all duration-300 hover:translate-y-[-2px];
+    @apply hover:shadow-[0_8px_30px_rgb(0,255,234,0.16)] transition-all duration-300 hover:translate-y-[-2px];
+}
+
+/* Futuristic Buttons */
+.btn-futuristic {
+    @apply relative overflow-hidden border border-white/20 rounded-lg px-6 py-3 text-white font-medium;
+    background: linear-gradient(45deg, rgba(0, 255, 234, 0.1), rgba(0, 179, 255, 0.1));
+}
+
+.btn-futuristic:hover {
+    @apply shadow-[0_0_15px_rgba(0,255,234,0.3)];
+}
+
+.btn-futuristic::before {
+    @apply absolute top-0 left-[-100%] w-full h-full;
+    content: '';
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: all 0.5s;
+}
+
+.btn-futuristic:hover::before {
+    @apply left-[100%];
+}
+
+/* Holographic Grid Background */
+.holographic-grid {
+    @apply absolute inset-0 w-full h-full;
+    background: radial-gradient(circle at center, rgba(0, 255, 234, 0.05) 0%, transparent 70%);
+}
+
+.holographic-grid::before {
+    @apply absolute inset-0 w-full h-full;
+    content: '';
+    background: linear-gradient(90deg, transparent 50%, rgba(0, 255, 234, 0.02) 50%),
+                linear-gradient(0deg, transparent 50%, rgba(0, 255, 234, 0.02) 50%);
+    background-size: 50px 50px;
+    animation: grid-move 10s linear infinite;
+}
+
+@keyframes grid-move {
+    0% { transform: translateY(0) translateX(0); }
+    100% { transform: translateY(50px) translateX(50px); }
 }
 
 /* Add more custom animations as needed */

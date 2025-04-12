@@ -66,6 +66,17 @@
                             </div>
                         </div>
                         <div class="flex items-center space-x-2">
+                            @if(!empty($suggestedCategories))
+                                <!-- Suggestion source badge -->
+                                <span class="text-xs font-medium px-2.5 py-0.5 rounded-full
+                                    {{ $suggestionSource === 'database' ? 'bg-green-100 text-green-800' :
+                                       ($suggestionSource === 'semantic' ? 'bg-blue-100 text-blue-800' :
+                                       ($suggestionSource === 'ai' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800')) }}">
+                                    {{ $suggestionSource === 'database' ? 'Database Match' :
+                                       ($suggestionSource === 'semantic' ? 'Semantic Match' :
+                                       ($suggestionSource === 'ai' ? 'AI Suggestion' : 'Fallback')) }}
+                                </span>
+                            @endif
                             <span class="text-xs font-medium px-2.5 py-0.5 rounded-full {{ !empty($suggestedCategories) ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
                                 {{ !empty($suggestedCategories) ? count($suggestedCategories) . ' found' : 'No matches' }}
                             </span>
@@ -192,10 +203,10 @@
                                 @endforeach
                             </optgroup>
 
-                            <!-- Other Categories Group (Disabled) -->
+                            <!-- Other Categories Group -->
                             <optgroup label="Other Categories">
                                 @foreach($categories->whereNotIn('id', $suggestedCategories) as $category)
-                                    <option value="{{ $category->id }}" disabled class="text-gray-400">
+                                    <option value="{{ $category->id }}" class="text-gray-500">
                                         {{ $category->name }}
                                     </option>
                                 @endforeach
@@ -225,6 +236,25 @@
             @error('category_id')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
             @enderror
+
+            <!-- Category Suggestion Info -->
+            <div class="mt-2 p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
+                <div class="flex items-start">
+                    <svg class="w-4 h-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div>
+                        <p><span class="font-medium">Category suggestions</span> are generated based on your item title.</p>
+                        <p class="mt-1">The system prioritizes suggestions in this order for the fastest response:</p>
+                        <ol class="mt-1 ml-4 list-decimal">
+                            <li><span class="font-medium text-green-700">Database matches</span> - Direct matches from our category database (fastest)</li>
+                            <li><span class="font-medium text-blue-700">Semantic matches</span> - Logical connections between your item and categories</li>
+                            <li><span class="font-medium text-purple-700">AI suggestions</span> - AI-powered analysis for complex items (slower)</li>
+                        </ol>
+                        <p class="mt-1">Categories marked with ★ are recommended for your item.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -34,6 +34,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $roles = [
             'user' => [
                 'view lost items',
+                'create lost items',
             ],
             'admin' => [
                 'view lost items',
@@ -70,5 +71,11 @@ class RolesAndPermissionsSeeder extends Seeder
 
         // Assign the superadmin role to the user
         $superadmin->assignRole('superadmin');
+
+        // Assign 'user' role to all users who don't have any roles
+        $usersWithoutRoles = User::whereDoesntHave('roles')->get();
+        foreach ($usersWithoutRoles as $user) {
+            $user->assignRole('user');
+        }
     }
 }

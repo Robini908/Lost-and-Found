@@ -1,6 +1,39 @@
 @php
     use App\Models\LostItem;
+    use App\Models\ItemMatch;
+
     $userHasItems = LostItem::where('user_id', auth()->id())->exists();
+
+    // System-wide statistics
+    $totalLostItems = LostItem::where('item_type', LostItem::TYPE_REPORTED)->count();
+    $totalFoundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)->count();
+
+    // Calculate successful matches (where similarity score is >= 0.7)
+    $successfulMatches = ItemMatch::where('similarity_score', '>=', 0.7)->count();
+
+    // Calculate recovery rate
+    $recoveryRate = $totalLostItems > 0 ? ($successfulMatches / $totalLostItems) * 100 : 0;
+
+    // Get last 30 days statistics
+    $last30DaysStart = now()->subDays(30)->startOfDay();
+    $last30DaysLostItems = LostItem::where('item_type', LostItem::TYPE_REPORTED)
+        ->where('created_at', '>=', $last30DaysStart)
+        ->count();
+    $last30DaysFoundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)
+        ->where('created_at', '>=', $last30DaysStart)
+        ->count();
+
+    // Recent matches for the authenticated user
+    $recentMatches = ItemMatch::with(['lostItem', 'foundItem'])
+        ->whereHas('lostItem', function($query) {
+            $query->where('user_id', auth()->id());
+        })
+        ->orWhereHas('foundItem', function($query) {
+            $query->where('user_id', auth()->id());
+        })
+        ->latest('matched_at')
+        ->take(5)
+        ->get();
 @endphp
 
 <x-app-layout>
@@ -23,10 +56,11 @@
                                 @endif
                             </p>
                         </div>
-
                     </div>
                 </div>
             </div>
+
+
 
             <!-- No Items Message Card (Google Material Style) -->
             @if(!$userHasItems)
@@ -97,11 +131,9 @@
                 </div>
             </div>
 
-            <!-- Category Distribution Chart - Full Width -->
-            <div class="mb-8">
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+            <!-- Category Distribution Chart -->
+            <div class="col-span-12 mb-8">
                 <livewire:charts.category-distribution-chart />
-                </div>
             </div>
 
             <!-- Main Content Grid -->
@@ -318,6 +350,116 @@
                                 @endforelse
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Matched Items Section -->
+            <div class="mb-8">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-200">
+                    <div class="p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 class="text-2xl font-bold text-gray-900">Your Recent Matches</h3>
+                                <p class="text-sm text-gray-500 mt-1">Items that match your lost or found items</p>
+                            </div>
+                        </div>
+
+                        @if($recentMatches->isEmpty())
+                            <div class="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-sm mb-4">
+                                    <i class="fas fa-handshake text-gray-400 text-2xl"></i>
+                                </div>
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2">No Matches Yet</h3>
+                                <p class="text-gray-500">We'll notify you when we find potential matches for your items</p>
+                            </div>
+                        @else
+                            <div class="space-y-6">
+                                @foreach($recentMatches as $match)
+                                    <div class="bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all duration-200">
+                                        <div class="flex items-start gap-4">
+                                            <!-- Match Score Indicator -->
+                                            <div class="flex-shrink-0 w-16 h-16 rounded-lg {{ $match->similarity_score >= 0.7 ? 'bg-green-50' : ($match->similarity_score >= 0.5 ? 'bg-yellow-50' : 'bg-blue-50') }} flex flex-col items-center justify-center">
+                                                <span class="text-lg font-bold {{ $match->similarity_score >= 0.7 ? 'text-green-600' : ($match->similarity_score >= 0.5 ? 'text-yellow-600' : 'text-blue-600') }}">
+                                                    {{ number_format($match->similarity_score * 100, 0) }}%
+                                                </span>
+                                                <span class="text-xs text-gray-500">Match</span>
+                                            </div>
+
+                                            <!-- Match Details -->
+                                            <div class="flex-1">
+                                                <div class="flex items-center gap-2 mb-2">
+                                                    <h4 class="text-lg font-semibold text-gray-900">
+                                                        {{ $match->lostItem->user_id === auth()->id() ? $match->foundItem->title : $match->lostItem->title }}
+                                                    </h4>
+                                                    <span class="px-2 py-1 text-xs rounded-full {{ $match->lostItem->user_id === auth()->id() ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700' }}">
+                                                        {{ $match->lostItem->user_id === auth()->id() ? 'Your Lost Item' : 'Your Found Item' }}
+                                                    </span>
+                                                </div>
+
+                                                <!-- Match Metadata -->
+                                                <div class="grid grid-cols-2 gap-4 text-sm">
+                                                    <div>
+                                                        <p class="text-gray-500">Category</p>
+                                                        <p class="font-medium">{{ $match->lostItem->category->name }}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-gray-500">Matched On</p>
+                                                        <p class="font-medium">{{ $match->matched_at->format('M d, Y') }}</p>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Action Buttons -->
+                                                <div class="mt-4 flex gap-3">
+                                                    <a href="{{ route('lost-items.show', $match->lostItem->user_id === auth()->id() ? $match->foundItem->hashed_id : $match->lostItem->hashed_id) }}"
+                                                       class="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+                                                        <i class="fas fa-eye mr-2"></i>
+                                                        View Details
+                                                    </a>
+                                                    <button onclick="Livewire.emit('openChat', '{{ $match->lostItem->user_id === auth()->id() ? $match->foundItem->user_id : $match->lostItem->user_id }}')"
+                                                            class="inline-flex items-center px-4 py-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+                                                        <i class="fas fa-comments mr-2"></i>
+                                                        Contact Owner
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+
+                                <!-- Performance Metrics -->
+                                <div class="mt-6 grid grid-cols-3 gap-4">
+                                    <div class="bg-gray-50 rounded-xl p-4">
+                                        <p class="text-sm text-gray-500 mb-1">Average Match Time</p>
+                                        <p class="text-lg font-semibold text-gray-900">
+                                            @php
+                                                $avgProcessingTime = $recentMatches->avg('processing_time_ms');
+                                                if ($avgProcessingTime >= 1000) {
+                                                    echo number_format($avgProcessingTime / 1000, 2) . 's';
+                                                } else {
+                                                    echo number_format($avgProcessingTime, 1) . 'ms';
+                                                }
+                                            @endphp
+                                        </p>
+                                        <p class="text-xs text-gray-500 mt-1">Your matches processing time</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-xl p-4">
+                                        <p class="text-sm text-gray-500 mb-1">Your Matches</p>
+                                        <p class="text-lg font-semibold text-gray-900">
+                                            {{ $recentMatches->count() }}
+                                        </p>
+                                        <p class="text-xs text-gray-500 mt-1">Recent matches count</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-xl p-4">
+                                        <p class="text-sm text-gray-500 mb-1">Your Avg. Similarity</p>
+                                        <p class="text-lg font-semibold text-gray-900">
+                                            {{ number_format($recentMatches->avg('similarity_score') * 100, 1) }}%
+                                        </p>
+                                        <p class="text-xs text-gray-500 mt-1">Personal match confidence</p>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>

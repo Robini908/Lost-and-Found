@@ -189,13 +189,30 @@ class MatchLostAndFoundItems extends Component
 
     public function showMatchDetails($itemId)
     {
-        $this->matchDetailsItem = LostItem::with(['category', 'images', 'user'])
-            ->where('item_type', LostItem::TYPE_FOUND)
-            ->where('user_id', '!=', Auth::id())
-            ->find($itemId);
+        try {
+            $this->matchDetailsItem = LostItem::with(['category', 'images', 'user'])
+                ->where('item_type', LostItem::TYPE_FOUND)
+                ->where('user_id', '!=', Auth::id())
+                ->find($itemId);
 
-        if ($this->matchDetailsItem) {
-            $this->dispatch('open-modal', 'match-details');
+            if ($this->matchDetailsItem) {
+                $this->showMatchDetails = true;
+                $this->dispatch('notify', [
+                    'type' => 'success',
+                    'message' => 'Loading item details...'
+                ]);
+                $this->dispatch('open-modal', 'match-details');
+            } else {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'Item not found'
+                ]);
+            }
+        } catch (\Exception $e) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Error loading item details: ' . $e->getMessage()
+            ]);
         }
     }
 
@@ -260,6 +277,14 @@ class MatchLostAndFoundItems extends Component
         $this->showMatchAnalysis = false;
         $this->currentAnalysisItem = null;
         $this->matchAnalysis = [];
+    }
+
+    public function viewAllMatchesAnalysis()
+    {
+        $firstMatch = $this->foundMatches->first();
+        if ($firstMatch) {
+            $this->viewMatchAnalysis($firstMatch['lost_item']->id);
+        }
     }
 
     public function render()

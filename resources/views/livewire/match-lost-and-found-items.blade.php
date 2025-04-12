@@ -278,9 +278,24 @@
                                             <span class="ml-2">Found on {{ $match['found_item']->date_found->format('M d, Y') }}</span>
                                             <span class="ml-2 text-blue-600">by {{ $match['finder'] }}</span>
                                         </div>
-                                        <button wire:click="showMatchDetails({{ $match['found_item']->id }})" class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                                            View Details
-                                        </button>
+                                        <div class="flex items-center space-x-2">
+                                            <button wire:click="showMatchDetails({{ $match['found_item']->id }})"
+                                                    wire:loading.attr="disabled"
+                                                    class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                                <span wire:loading.remove wire:target="showMatchDetails({{ $match['found_item']->id }})">View Details</span>
+                                                <span wire:loading wire:target="showMatchDetails({{ $match['found_item']->id }})" class="inline-flex items-center">
+                                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Loading...
+                                                </span>
+                                            </button>
+                                            <a href="{{ route('items.claim', ['foundItemId' => $match['found_item']->id, 'lostItemId' => $match['lost_item']->id]) }}"
+                                               class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                                Claim Item
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -298,7 +313,7 @@
     <!-- Match Details Modal -->
     <div x-data="{ open: false }"
          x-show="open"
-         x-on:open-modal.window="if ($event.detail === 'match-details') open = true"
+         x-on:open-modal.window="if ($event.detail === 'match-details') { open = true }"
          x-on:close-modal.window="open = false"
          x-on:keydown.escape.window="open = false"
          x-transition:enter="ease-out duration-300"
@@ -308,13 +323,17 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          class="fixed inset-0 z-50 overflow-y-auto"
-         style="display: none;">
+         style="display: none;"
+         wire:key="match-details-modal">
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 transition-opacity" aria-hidden="true">
                 <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
             </div>
 
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                 @click.away="open = false">
                 @if($matchDetailsItem)
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                         <div class="sm:flex sm:items-start">
@@ -346,19 +365,24 @@
                             </div>
                         </div>
                     </div>
-                @endif
                 <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm" x-on:click="open = false">
+                        <button type="button"
+                                @click="open = false"
+                                class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
                         Close
                     </button>
                 </div>
+                @else
+                    <div class="bg-white px-4 py-6 text-center">
+                        <p class="text-gray-500">Loading item details...</p>
+                    </div>
+                @endif
             </div>
         </div>
     </div>
 
     <!-- Match Analysis Modal -->
     <div x-data="{ open: false }"
-         x-show="open"
          x-on:open-modal.window="if ($event.detail === 'match-analysis') open = true"
          x-on:close-modal.window="open = false"
          x-on:keydown.escape.window="open = false"

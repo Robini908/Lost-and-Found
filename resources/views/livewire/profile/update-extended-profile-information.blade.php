@@ -401,5 +401,16 @@
                 </div>
             </div>
         </form>
+
+        <!-- Add this debug section at the bottom of the form, before the closing </form> tag -->
+        @if(app()->environment('local'))
+        <div class="mt-6 p-4 bg-gray-100 rounded-lg">
+            <h3 class="text-sm font-medium text-gray-700 mb-2">Debug Information</h3>
+            <div class="text-xs text-gray-600">
+                <p>Form State: <pre>{{ json_encode($state, JSON_PRETTY_PRINT) }}</pre></p>
+                <p>Social Links: <pre>{{ json_encode($social, JSON_PRETTY_PRINT) }}</pre></p>
+            </div>
+        </div>
+        @endif
     </div>
 </div>

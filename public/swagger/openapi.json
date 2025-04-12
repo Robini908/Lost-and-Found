@@ -1,0 +1,276 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Lost & Found System API",
+    "description": "API for the Lost & Found System that allows integration with third-party platforms",
+    "version": "1.0.0",
+    "contact": {
+      "email": "support@lostandfound-system.example.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "API Server"
+    }
+  ],
+  "paths": {
+    "/users/me": {
+      "get": {
+        "summary": "Get current user",
+        "description": "Retrieves the authenticated user's profile information",
+        "tags": ["User Management"],
+        "security": [{"bearerAuth": []}],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/items/lost": {
+      "get": {
+        "summary": "List lost items",
+        "description": "Retrieves a paginated list of lost items",
+        "tags": ["Item Management"],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Items per page",
+            "schema": {
+              "type": "integer",
+              "default": 15
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LostItemsList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create lost item",
+        "description": "Creates a new lost item report",
+        "tags": ["Item Management"],
+        "security": [{"bearerAuth": []}],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LostItemCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LostItemResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "example": 123
+              },
+              "name": {
+                "type": "string",
+                "example": "John Doe"
+              },
+              "email": {
+                "type": "string",
+                "example": "john@example.com"
+              },
+              "profile_photo_url": {
+                "type": "string",
+                "example": "https://example.com/photos/john.jpg"
+              },
+              "reward_points": {
+                "type": "integer",
+                "example": 150
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2023-01-15T09:24:17Z"
+              }
+            }
+          }
+        }
+      },
+      "LostItemsList": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LostItem"
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "current_page": {
+                "type": "integer",
+                "example": 1
+              },
+              "per_page": {
+                "type": "integer",
+                "example": 15
+              },
+              "total": {
+                "type": "integer",
+                "example": 120
+              },
+              "total_pages": {
+                "type": "integer",
+                "example": 8
+              }
+            }
+          }
+        }
+      },
+      "LostItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 456
+          },
+          "uuid": {
+            "type": "string",
+            "example": "los_a1b2c3d4e5f6"
+          },
+          "title": {
+            "type": "string",
+            "example": "Lost iPhone 14 Pro"
+          },
+          "description": {
+            "type": "string",
+            "example": "Black iPhone 14 Pro with red case lost in Central Park"
+          }
+        }
+      },
+      "LostItemCreate": {
+        "type": "object",
+        "required": ["title", "description", "category_id", "date_lost"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Lost iPhone 14 Pro"
+          },
+          "description": {
+            "type": "string",
+            "example": "Black iPhone 14 Pro with red case lost in Central Park"
+          },
+          "category_id": {
+            "type": "integer",
+            "example": 5
+          },
+          "date_lost": {
+            "type": "string",
+            "format": "date",
+            "example": "2023-05-10"
+          }
+        }
+      },
+      "LostItemResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "example": 456
+              },
+              "uuid": {
+                "type": "string",
+                "example": "los_a1b2c3d4e5f6"
+              },
+              "upload_url": {
+                "type": "string",
+                "example": "https://example.com/api/v1/items/los_a1b2c3d4e5f6/images/upload"
+              },
+              "message": {
+                "type": "string",
+                "example": "Lost item report created successfully"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

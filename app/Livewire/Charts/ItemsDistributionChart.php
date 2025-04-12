@@ -4,49 +4,43 @@ namespace App\Livewire\Charts;
 
 use Livewire\Component;
 use App\Models\LostItem;
+use App\Models\ItemMatch;
 use Asantibanez\LivewireCharts\Models\PieChartModel;
-use Illuminate\Support\Facades\DB;
 
 class ItemsDistributionChart extends Component
 {
     public function render()
     {
-        $itemCounts = LostItem::select('item_type', DB::raw('count(*) as count'))
-            ->groupBy('item_type')
-            ->get()
-            ->mapWithKeys(function ($item) {
-                return [$item->item_type => $item->count];
-            });
+        // Get counts by item type
+        $reportedCount = LostItem::where('item_type', 'reported')->count();
+        $searchedCount = LostItem::where('item_type', 'searched')->count();
+        $foundCount = LostItem::where('item_type', 'found')->count();
+        $totalItems = $reportedCount + $searchedCount + $foundCount;
+
+        // Get successful matches (similarity score >= 0.7)
+        $matchedItems = ItemMatch::where('similarity_score', '>=', 0.7)->count();
 
         $pieChartModel = (new PieChartModel())
             ->setTitle('Item Status Distribution')
-            ->addSlice('Reported', $itemCounts[LostItem::TYPE_REPORTED] ?? 0, '#EF4444')
-            ->addSlice('Searched', $itemCounts[LostItem::TYPE_SEARCHED] ?? 0, '#3B82F6')
-            ->addSlice('Found', $itemCounts[LostItem::TYPE_FOUND] ?? 0, '#10B981')
+            ->addSlice('Reported', $reportedCount, '#EF4444')
+            ->addSlice('Searched', $searchedCount, '#3B82F6')
+            ->addSlice('Found', $foundCount, '#10B981')
             ->setAnimated(true)
-            ->setType('donut')
-            ->withOnSliceClickEvent('onSliceClick')
             ->setDataLabelsEnabled(true);
-
-        // Get additional statistics
-        $totalItems = $itemCounts->sum();
-        $claimedItems = LostItem::whereNotNull('claimed_by')->count();
-        $verifiedItems = LostItem::where('is_verified', true)->count();
-        $matchedItems = LostItem::whereNotNull('matched_found_item_id')->count();
 
         return view('livewire.charts.items-distribution-chart', [
             'pieChartModel' => $pieChartModel,
-            'stats' => [
-                'total' => $totalItems,
-                'claimed' => $claimedItems,
-                'verified' => $verifiedItems,
-                'matched' => $matchedItems,
-            ]
+            'totalItems' => $totalItems,
+            'reportedCount' => $reportedCount,
+            'searchedCount' => $searchedCount,
+            'foundCount' => $foundCount,
+            'matchedItems' => $matchedItems
         ]);
     }
 
     public function onSliceClick($slice)
     {
-        $this->emit('itemTypeSelected', $slice['label']);
+        // Handle slice click event if needed
+        $this->emit('itemTypeSelected', $slice);
     }
 }

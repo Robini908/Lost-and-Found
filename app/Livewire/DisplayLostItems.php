@@ -43,8 +43,9 @@ class DisplayLostItems extends Component
     public $color = '';
     public $location = '';
     public $radius = '';
-    public $selectedItems = [];
+    public $selectedItems = []; // Ensure this is always initialized as an empty array
     public $bulkAction = '';
+    public $showBulkActionsDropdown = false;
 
     // Map View
     public $mapCenter = ['lat' => 0, 'lng' => 0];
@@ -73,92 +74,114 @@ class DisplayLostItems extends Component
 
     public function mount()
     {
-        $this->categories = Category::all();
-        $this->initializeMapCenter();
-        $this->roleService = new RoleService();
-
-        $user = Auth::user();
-        if ($user instanceof \App\Models\User) {
-            $this->canDelete = $this->roleService->userHasRole($user, ['admin', 'superadmin']);
-        } else {
-            $this->canDelete = false;
-        }
+        $this->loadCategories();
+        $this->roleService = app('role-permission');
+        $this->canDelete = $this->roleService->canDeleteItems(Auth::user());
     }
 
-    protected function initializeMapCenter()
+    public function loadCategories()
     {
-        $this->mapCenter = [
-            'lat' => config('services.google.maps_default_lat', 0),
-            'lng' => config('services.google.maps_default_lng', 0)
-        ];
-        $this->mapZoom = config('services.google.maps_default_zoom', 12);
+        $this->categories = Cache::remember('categories', 60 * 60, function () {
+            return Category::select('id', 'name')->orderBy('name')->get()->toArray();
+        });
+    }
+
+    public function resetFilters()
+    {
+        $this->reset([
+            'search',
+            'status',
+            'category',
+            'dateRange',
+            'priceRange',
+            'condition',
+            'brand',
+            'color',
+            'location',
+            'radius'
+        ]);
+        $this->resetPage();
+    }
+
+    public function toggleFilters()
+    {
+        $this->showAdvancedFilters = !$this->showAdvancedFilters;
     }
 
     public function toggleView($view)
     {
         $this->view = $view;
-        if ($view === 'map') {
+
+        if ($view === 'map' && !$this->showMapView) {
             $this->showMapView = true;
-            $this->loadMapMarkers();
-        } else {
+            $this->initializeMap();
+        } elseif ($view !== 'map') {
             $this->showMapView = false;
         }
     }
 
-    public function loadMapMarkers()
+    public function initializeMap()
     {
+        // Initialize map with default center if needed
+        if ($this->mapCenter['lat'] == 0 && $this->mapCenter['lng'] == 0) {
+            $this->mapCenter = [
+                'lat' => 0, // Set to your default latitude
+                'lng' => 0  // Set to your default longitude
+            ];
+        }
+
+        // Load markers for current items
         $items = $this->getFilteredQuery()
-            ->with('images')
+            ->whereNotNull('location_lat')
+            ->whereNotNull('location_lng')
+            ->select('id', 'title', 'location_lat', 'location_lng', 'status')
             ->get();
 
         $this->markers = $items->map(function ($item) {
-            $firstImage = $item->images->first();
             return [
                 'id' => $item->id,
+                'title' => $item->title,
                 'lat' => (float) $item->location_lat,
                 'lng' => (float) $item->location_lng,
-                'title' => $item->title,
-                'status' => $item->status,
-                'image' => $firstImage ? $firstImage->url : null,
-                'imageCount' => $item->images->count()
+                'status' => $item->status
             ];
         })->toArray();
     }
 
-    public function viewDetails($itemId)
+    public function updatedSearch()
     {
-        try {
-            $this->selectedItem = LostItem::with(['images', 'category', 'user'])
-                ->findOrFail($itemId);
-            $this->activeImageIndex = 0;
-            $this->showModal = true;
-        } catch (\Exception $e) {
-            Log::error('Error viewing item details: ' . $e->getMessage());
-            toast()
-                ->danger('Unable to load item details. Please try again.')
-                ->push();
+        $this->resetPage();
+    }
+
+    public function updatedStatus()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedCategory()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDateRange()
+    {
+        $this->resetPage();
+    }
+
+    public function sortBy($field)
+    {
+        if ($this->sortField === $field) {
+            $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortField = $field;
+            $this->sortDirection = 'asc';
         }
     }
 
-    public function nextImage()
+    public function viewItem($itemId)
     {
-        if ($this->selectedItem && $this->selectedItem->images->count() > 0) {
-            $this->activeImageIndex = ($this->activeImageIndex + 1) % $this->selectedItem->images->count();
-        }
-    }
-
-    public function previousImage()
-    {
-        if ($this->selectedItem && $this->selectedItem->images->count() > 0) {
-            $this->activeImageIndex = ($this->activeImageIndex - 1 + $this->selectedItem->images->count()) % $this->selectedItem->images->count();
-        }
-    }
-
-    public function setActiveImage($index)
-    {
-        if ($this->selectedItem && $index >= 0 && $index < $this->selectedItem->images->count()) {
-            $this->activeImageIndex = $index;
-        }
+        $this->selectedItem = $itemId;
+        $this->showModal = true;
     }
 
     public function closeModal()
@@ -166,66 +189,37 @@ class DisplayLostItems extends Component
         $this->showModal = false;
         $this->selectedItem = null;
         $this->activeImageIndex = 0;
-        $this->resetErrorBag();
     }
 
-    public function toggleAdvancedFilters()
+    public function nextImage($total)
     {
-        $this->showAdvancedFilters = !$this->showAdvancedFilters;
+        $this->activeImageIndex = ($this->activeImageIndex + 1) % $total;
     }
 
-    public function resetFilters()
+    public function prevImage($total)
     {
-        $this->reset([
-            'search', 'status', 'category', 'dateRange',
-            'condition', 'brand', 'color', 'location',
-            'radius'
-        ]);
+        $this->activeImageIndex = ($this->activeImageIndex - 1 + $total) % $total;
     }
 
-    /**
-     * Check if any filters are currently active
-     */
-    public function hasActiveFilters(): bool
+    public function hasActiveFilters()
     {
-        return !empty($this->search) ||
-               !empty($this->status) ||
-               !empty($this->category) ||
-               !empty($this->dateRange) ||
-               !empty($this->condition) ||
-               !empty($this->brand) ||
-               !empty($this->color) ||
-               !empty($this->location) ||
-               !empty($this->radius);
-    }
-
-    public function updatingSearch()
-    {
-        $this->resetPage();
-    }
-
-    public function getMapMarkers()
-    {
-        return $this->getFilteredQuery()
-            ->with('images')
-            ->whereNotNull(['location_lat', 'location_lng'])
-            ->get()
-            ->map(function ($item) {
-                $firstImage = $item->images->first();
-                return [
-                    'id' => $item->id,
-                    'title' => $item->title,
-                    'lat' => $item->location_lat,
-                    'lng' => $item->location_lng,
-                    'status' => $item->status,
-                    'image' => $firstImage ? $firstImage->url : null,
-                    'imageCount' => $item->images->count()
-                ];
-            });
+        return $this->search ||
+               $this->status ||
+               $this->category ||
+               $this->dateRange ||
+               $this->condition ||
+               $this->brand ||
+               $this->color ||
+               $this->location;
     }
 
     public function toggleItemSelection($itemId)
     {
+        // Ensure selectedItems is an array
+        if (!is_array($this->selectedItems)) {
+            $this->selectedItems = [];
+        }
+
         if (in_array($itemId, $this->selectedItems)) {
             $this->selectedItems = array_diff($this->selectedItems, [$itemId]);
         } else {
@@ -243,24 +237,56 @@ class DisplayLostItems extends Component
         $this->selectedItems = [];
     }
 
-    public function exportSelected($format = 'csv')
+    public function exportSelected($format = 'pdf')
     {
         if (empty($this->selectedItems)) {
             $this->addError('export', 'Please select items to export');
+            toast()
+                ->warning('Please select items to export')
+                ->push();
             return;
         }
 
-        return response()->streamDownload(function () use ($format) {
-            $items = LostItem::whereIn('id', $this->selectedItems)
-                ->with(['category', 'user'])
-                ->get();
+        // Make sure selectedItems is properly formatted
+        $itemIds = is_array($this->selectedItems) ? implode(',', $this->selectedItems) : $this->selectedItems;
 
-            if ($format === 'csv') {
-                $this->exportToCsv($items);
-            } else {
-                $this->exportToPdf($items);
-            }
-        }, 'lost-items.' . $format);
+        // Redirect to the appropriate export controller method
+        return redirect()->route('items.export.' . $format, [
+            'item_ids' => $itemIds
+        ]);
+    }
+
+    public function printSelected()
+    {
+        if (empty($this->selectedItems)) {
+            $this->addError('print', 'Please select items to print');
+            toast()
+                ->warning('Please select items to print')
+                ->push();
+            return;
+        }
+
+        // Make sure selectedItems is properly formatted
+        $itemIds = is_array($this->selectedItems) ? implode(',', $this->selectedItems) : $this->selectedItems;
+
+        // Redirect to print view
+        return redirect()->route('items.print', [
+            'item_ids' => $itemIds
+        ]);
+    }
+
+    public function exportToPdf($items)
+    {
+        // This function is replaced by the ItemExportController
+        // Keeping as a placeholder for backwards compatibility
+        return null;
+    }
+
+    public function exportToCsv($items)
+    {
+        // This function is replaced by the ItemExportController
+        // Keeping as a placeholder for backwards compatibility
+        return null;
     }
 
     public function claimItem($itemId)
@@ -408,6 +434,49 @@ class DisplayLostItems extends Component
         }
     }
 
+    /**
+     * Execute bulk action on selected items
+     */
+    public function executeBulkAction()
+    {
+        if (empty($this->selectedItems)) {
+            toast()
+                ->info('Please select items first.')
+                ->push();
+            return;
+        }
+
+        if (empty($this->bulkAction)) {
+            toast()
+                ->info('Please select an action.')
+                ->push();
+            return;
+        }
+
+        switch ($this->bulkAction) {
+            case 'export-pdf':
+                return $this->exportSelected('pdf');
+                break;
+            case 'export-word':
+                return $this->exportSelected('word');
+                break;
+            case 'export-excel':
+                return $this->exportSelected('excel');
+                break;
+            case 'print':
+                return $this->printSelected();
+                break;
+            case 'delete':
+                return $this->deleteSelected();
+                break;
+            default:
+                toast()
+                    ->info('Invalid action selected.')
+                    ->push();
+                break;
+        }
+    }
+
     protected function getFilteredQuery()
     {
         return LostItem::query()
@@ -441,10 +510,17 @@ class DisplayLostItems extends Component
 
         $items = $query->paginate($this->perPage);
 
+        // Ensure selectedItems is always an array
+        if (!is_array($this->selectedItems)) {
+            $this->selectedItems = [];
+        }
+
+        $totalSelected = count($this->selectedItems);
+
         return view('livewire.display-lost-items', [
             'items' => $items,
             'categories' => $this->categories,
-            'totalSelected' => count($this->selectedItems),
+            'totalSelected' => $totalSelected,
             'canDelete' => $this->canDelete
         ]);
     }

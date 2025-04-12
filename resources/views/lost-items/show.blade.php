@@ -29,7 +29,7 @@
                         </livewire:contact-reporter>
                     @endif
 
-                    <livewire:share-item :item="$item">
+                    <livewire:share-item :itemId="$item->id">
                         <x-slot name="trigger">
                             <button class="inline-flex items-center px-6 py-2.5 bg-white hover:bg-gray-50 active:bg-gray-100 text-gray-700 text-sm font-medium rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 border border-gray-200"
                                     data-tippy-content="Share this item">

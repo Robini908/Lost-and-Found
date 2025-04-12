@@ -1,76 +1,66 @@
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- System-wide Stats Section -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <!-- Lost Items -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-500">Lost Items</p>
-                <h3 class="text-2xl font-semibold text-gray-900 mt-1">{{ $stats['totalLostItems'] }}</h3>
+    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center">
+                <i class="fas fa-search text-red-500 text-xl"></i>
             </div>
-            <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-                <i class="fas fa-search text-blue-500"></i>
-            </div>
+            <span class="px-3 py-1 text-xs font-medium bg-red-50 text-red-600 rounded-full">System Wide</span>
         </div>
-        <div class="mt-4 flex items-center text-sm">
-            <span class="text-gray-500">Last 30 days:</span>
-            <span class="ml-2 font-medium text-gray-900">{{ $stats['lastMonthLostItems'] }}</span>
+        <h3 class="text-2xl font-bold text-gray-900">{{ $totalLostItems }}</h3>
+        <p class="text-sm text-gray-500 mt-1">Lost Items</p>
+        <div class="mt-2 flex items-center text-xs text-gray-500">
+            <i class="fas fa-clock mr-1.5"></i>
+            <span>Last 30 days: {{ $last30DaysLostItems }}</span>
         </div>
     </div>
 
     <!-- Found Items -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-500">Found Items</p>
-                <h3 class="text-2xl font-semibold text-gray-900 mt-1">{{ $stats['totalFoundItems'] }}</h3>
+    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
+                <i class="fas fa-box text-green-500 text-xl"></i>
             </div>
-            <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
-                <i class="fas fa-box text-green-500"></i>
-            </div>
+            <span class="px-3 py-1 text-xs font-medium bg-green-50 text-green-600 rounded-full">System Wide</span>
         </div>
-        <div class="mt-4 flex items-center text-sm">
-            <span class="text-gray-500">Last 30 days:</span>
-            <span class="ml-2 font-medium text-gray-900">{{ $stats['lastMonthFoundItems'] }}</span>
+        <h3 class="text-2xl font-bold text-gray-900">{{ $totalFoundItems }}</h3>
+        <p class="text-sm text-gray-500 mt-1">Found Items</p>
+        <div class="mt-2 flex items-center text-xs text-gray-500">
+            <i class="fas fa-clock mr-1.5"></i>
+            <span>Last 30 days: {{ $last30DaysFoundItems }}</span>
         </div>
     </div>
 
     <!-- Successful Matches -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-500">Successful Matches</p>
-                <h3 class="text-2xl font-semibold text-gray-900 mt-1">{{ $stats['successfulMatches'] }}</h3>
+    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center">
+                <i class="fas fa-handshake text-blue-500 text-xl"></i>
             </div>
-            <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center">
-                <i class="fas fa-check-circle text-purple-500"></i>
-            </div>
+            <span class="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-600 rounded-full">System Wide</span>
         </div>
-        <div class="mt-4 flex items-center text-sm">
-            <span class="text-gray-500">Success rate:</span>
-            <span class="ml-2 font-medium text-gray-900">{{ $stats['matchRate'] }}</span>
+        <h3 class="text-2xl font-bold text-gray-900">{{ $successfulMatches }}</h3>
+        <p class="text-sm text-gray-500 mt-1">Successful Matches</p>
+        <div class="mt-2 flex items-center text-xs text-gray-500">
+            <i class="fas fa-chart-line mr-1.5"></i>
+            <span>High confidence matches (≥70%)</span>
         </div>
     </div>
 
     <!-- Recovery Rate -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm font-medium text-gray-500">Recovery Rate</p>
-                <h3 class="text-2xl font-semibold text-gray-900 mt-1">{{ $stats['recoveryRate'] }}</h3>
+    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
+        <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center">
+                <i class="fas fa-percentage text-purple-500 text-xl"></i>
             </div>
-            <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center">
-                <i class="fas fa-chart-line text-indigo-500"></i>
-            </div>
+            <span class="px-3 py-1 text-xs font-medium bg-purple-50 text-purple-600 rounded-full">System Wide</span>
         </div>
-        <div class="mt-4 flex items-center text-sm">
-            <span class="text-gray-500">Trend:</span>
-            <span class="ml-2 font-medium text-gray-900">{{ $stats['recoveryTrend'] }}</span>
-            @if($stats['recoveryTrend'] === 'Increasing')
-                <i class="fas fa-arrow-up text-green-500 ml-1"></i>
-            @elseif($stats['recoveryTrend'] === 'Decreasing')
-                <i class="fas fa-arrow-down text-red-500 ml-1"></i>
-            @else
-                <i class="fas fa-minus text-gray-500 ml-1"></i>
-            @endif
+        <h3 class="text-2xl font-bold text-gray-900">{{ number_format($recoveryRate, 1) }}%</h3>
+        <p class="text-sm text-gray-500 mt-1">Recovery Rate</p>
+        <div class="mt-2 flex items-center text-xs text-gray-500">
+            <i class="fas fa-chart-pie mr-1.5"></i>
+            <span>Lost items successfully matched</span>
         </div>
     </div>
 </div>

@@ -72,6 +72,11 @@ class Kernel extends HttpKernel
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
 
+            // Spatie Permission Middleware
+            'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
+            'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
+
             // Custom middleware
             'bypass.verified' => \App\Http\Middleware\BypassEmailVerification::class,
             'security.headers' => \App\Http\Middleware\SecurityHeaders::class,
@@ -108,5 +113,10 @@ class Kernel extends HttpKernel
         'sql.protect' => \App\Http\Middleware\SqlInjectionProtection::class,
         'encrypt.data' => \App\Http\Middleware\DataEncryption::class,
         'recaptcha' => \App\Http\Middleware\Recaptcha::class,
+        
+        // Spatie Permission Middleware
+        'role' => \Spatie\Permission\Middlewares\RoleMiddleware::class,
+        'permission' => \Spatie\Permission\Middlewares\PermissionMiddleware::class,
+        'role_or_permission' => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
     ];
 }

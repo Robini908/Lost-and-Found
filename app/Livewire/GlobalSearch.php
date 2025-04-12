@@ -5,28 +5,25 @@ namespace App\Livewire;
 use Livewire\Component;
 use App\Models\LostItem;
 use Illuminate\Support\Str;
-use Livewire\Attributes\Debounce;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Reactive;
 use Illuminate\Support\Facades\Storage;
 
 class GlobalSearch extends Component
 {
     public $query = '';
-    public $searchResults = [];
     public $isSearching = false;
     public $showResults = false;
 
+    protected $queryString = ['query'];
 
-    public function updatedQuery()
+    public function getSearchResultsProperty()
     {
         if (strlen($this->query) < 2) {
-            $this->searchResults = [];
-            $this->showResults = false;
-            return;
+            return [];
         }
 
-        $this->isSearching = true;
-
-        $this->searchResults = LostItem::where(function ($query) {
+        return LostItem::where(function ($query) {
                 $query->where('title', 'like', '%' . $this->query . '%')
                     ->orWhere('description', 'like', '%' . $this->query . '%')
                     ->orWhere('location_address', 'like', '%' . $this->query . '%')
@@ -44,14 +41,14 @@ class GlobalSearch extends Component
                     'id' => $item->id,
                     'title' => $item->title,
                     'description' => $item->description,
-                    'type' => 'Lost Item',
+                    'type' => $item->item_type === 'found' ? 'Found' : ($item->item_type === 'searched' ? 'Searched' : 'Lost'),
                     'category' => $item->category ? $item->category->name : 'Uncategorized',
                     'location' => $item->location_type === 'map' ? $item->location_address : $item->area,
                     'location_address' => $item->location_address,
                     'area' => $item->area,
                     'date' => $item->created_at->format('M d, Y'),
                     'image' => $item->images->first() ? $item->images->first()->image_path : null,
-                    'url' => route('lost-items.show', $item->hashed_id),
+                    'url' => route('lost-items.show', $item->id),
                     'highlight' => $this->highlightMatch($item->title, $this->query),
                     'created_at' => $item->created_at,
                     'is_verified' => $item->is_verified ?? false,
@@ -59,9 +56,11 @@ class GlobalSearch extends Component
                     'currency' => $item->currency
                 ];
             });
+    }
 
-        $this->showResults = true;
-        $this->isSearching = false;
+    public function updatedQuery()
+    {
+        $this->showResults = strlen($this->query) >= 2;
     }
 
     protected function highlightMatch($text, $query)
@@ -75,7 +74,6 @@ class GlobalSearch extends Component
     public function clearSearch()
     {
         $this->query = '';
-        $this->searchResults = [];
         $this->showResults = false;
     }
 
@@ -87,6 +85,8 @@ class GlobalSearch extends Component
 
     public function render()
     {
-        return view('livewire.global-search');
+        return view('livewire.global-search', [
+            'searchResults' => $this->searchResults
+        ]);
     }
 }

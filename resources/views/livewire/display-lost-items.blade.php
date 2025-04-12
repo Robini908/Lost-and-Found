@@ -60,23 +60,79 @@
             </div>
 
             <div class="mt-4 md:mt-0 flex items-center space-x-3">
-            <!-- View Toggle Buttons -->
+                <!-- Bulk Actions Dropdown -->
+                <div class="relative inline-block text-left" x-data="{ open: false }">
+                    <button @click="open = !open" type="button" class="inline-flex items-center px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-cog mr-2"></i>
+                        Bulk Actions
+                        <i class="fas fa-chevron-down ml-2"></i>
+                    </button>
+                    <div
+                        x-show="open"
+                        @click.away="open = false"
+                        class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 focus:outline-none z-10"
+                        x-transition:enter="transition ease-out duration-100"
+                        x-transition:enter-start="transform opacity-0 scale-95"
+                        x-transition:enter-end="transform opacity-100 scale-100"
+                        x-transition:leave="transition ease-in duration-75"
+                        x-transition:leave-start="transform opacity-100 scale-100"
+                        x-transition:leave-end="transform opacity-0 scale-95">
+                        <div class="py-1">
+                            <button wire:click="selectAll" class="text-gray-700 group flex items-center px-4 py-2 text-sm w-full hover:bg-gray-100">
+                                <i class="fas fa-check-square mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                Select All
+                            </button>
+                            <button wire:click="deselectAll" class="text-gray-700 group flex items-center px-4 py-2 text-sm w-full hover:bg-gray-100">
+                                <i class="fas fa-square mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                Deselect All
+                            </button>
+                        </div>
+                        <div class="py-1">
+                            <button wire:click="exportSelected('pdf')" class="text-gray-700 group flex items-center px-4 py-2 text-sm w-full hover:bg-gray-100">
+                                <i class="fas fa-file-pdf mr-3 text-red-400 group-hover:text-red-500"></i>
+                                Export as PDF
+                            </button>
+                            <button wire:click="exportSelected('word')" class="text-gray-700 group flex items-center px-4 py-2 text-sm w-full hover:bg-gray-100">
+                                <i class="fas fa-file-word mr-3 text-blue-400 group-hover:text-blue-500"></i>
+                                Export as Word
+                            </button>
+                            <button wire:click="exportSelected('excel')" class="text-gray-700 group flex items-center px-4 py-2 text-sm w-full hover:bg-gray-100">
+                                <i class="fas fa-file-excel mr-3 text-green-400 group-hover:text-green-500"></i>
+                                Export as Excel
+                            </button>
+                            <button wire:click="printSelected" class="text-gray-700 group flex items-center px-4 py-2 text-sm w-full hover:bg-gray-100">
+                                <i class="fas fa-print mr-3 text-gray-400 group-hover:text-gray-500"></i>
+                                Print Items
+                            </button>
+                        </div>
+                        @if($canDelete)
+                        <div class="py-1">
+                            <button wire:click="deleteSelected" class="text-red-700 group flex items-center px-4 py-2 text-sm w-full hover:bg-red-50">
+                                <i class="fas fa-trash mr-3 text-red-400 group-hover:text-red-500"></i>
+                                Delete Selected
+                            </button>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- View Toggle Buttons -->
                 <div class="flex items-center space-x-2">
-                <button wire:click="toggleView('grid')"
-                    class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    <i class="fas fa-th-large mr-2"></i>
-                    Grid
-                </button>
-                <button wire:click="toggleView('list')"
-                    class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    <i class="fas fa-list mr-2"></i>
-                    List
-                </button>
-                <button wire:click="toggleView('map')"
-                    class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'map' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    <i class="fas fa-map-marker-alt mr-2"></i>
-                    Map
-                </button>
+                    <button wire:click="toggleView('grid')"
+                        class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'grid' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-th-large mr-2"></i>
+                        Grid
+                    </button>
+                    <button wire:click="toggleView('list')"
+                        class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'list' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-list mr-2"></i>
+                        List
+                    </button>
+                    <button wire:click="toggleView('map')"
+                        class="inline-flex items-center px-4 py-2 rounded-md {{ $view === 'map' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50' }} border border-gray-300 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i class="fas fa-map-marker-alt mr-2"></i>
+                        Map
+                    </button>
                 </div>
             </div>
         </div>
@@ -114,7 +170,7 @@
                         class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
                         <option value="">All Categories</option>
                         @foreach($categories as $category)
-                            <option value="{{ $category->id }}">{{ $category->name }}</option>
+                            <option value="{{ $category['id'] }}">{{ $category['name'] }}</option>
                         @endforeach
                     </select>
                 </div>

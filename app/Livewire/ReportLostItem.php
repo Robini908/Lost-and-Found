@@ -36,6 +36,7 @@ class ReportLostItem extends Component
     public $description = '';
     public $category_id = '';
     public $suggestedCategories = [];
+    public $suggestionSource = 'none'; // To track where suggestions came from: database, semantic, or ai
     public $condition;
     public $brand = '';
     public $model;
@@ -132,6 +133,8 @@ class ReportLostItem extends Component
                 'title' => 'required|min:5',
                 'description' => 'required|min:10',
                 'is_anonymous' => 'boolean',
+            ],
+            3 => [
                 'category_id' => [
                     'required',
                     'exists:categories,id',
@@ -141,13 +144,18 @@ class ReportLostItem extends Component
                                 $suggestedCategoryNames = Category::whereIn('id', $this->suggestedCategories)
                                     ->pluck('name')
                                     ->implode(', ');
-                                $fail("The selected category doesn't seem to match the item title. Suggested categories: {$suggestedCategoryNames}");
+                                $fail("Please select one of the suggested categories or create a new one. Suggested: {$suggestedCategoryNames}");
                             }
                         }
                     }
-                ]
+                ],
+                'brand',
+                'color',
+                'condition',
+                'date',
+                'images.*',
+                'notes'
             ],
-            3 => ['brand', 'color', 'condition', 'date', 'images.*', 'notes'],
             4 => [
                 'locationType',
                 'location_address' => $this->locationType === 'specific' ? 'required' : 'nullable',
@@ -243,14 +251,17 @@ class ReportLostItem extends Component
      */
     public function updated($propertyName)
     {
-        // Handle title updates with quick category suggestions
+        // Handle title updates with semantic category suggestions
         if ($propertyName === 'title') {
             if (empty($this->title) || strlen($this->title) < 3) {
                 $this->reset('category_id', 'suggestedCategories');
                 return;
             }
 
-                    $this->updateSuggestedCategories();
+            // Only trigger category suggestions in step 2 or 3
+            if (in_array($this->currentStep, [2, 3])) {
+                $this->updateSuggestedCategories();
+            }
             return;
         }
 
@@ -276,77 +287,77 @@ class ReportLostItem extends Component
     }
 
     /**
-     * Update suggested categories using quick local matching
+     * Update suggested categories based on the item title
+     * Prioritizing database categories first with AI as fallback
      */
-    protected function updateSuggestedCategories()
+    public function updateSuggestedCategories()
     {
         try {
-            $titleWords = array_filter(
-                explode(' ', strtolower($this->title)),
-                fn($word) => strlen($word) >= 3
-            );
+            if (empty($this->title) || strlen($this->title) < 3) {
+                $this->reset('category_id', 'suggestedCategories', 'suggestionSource');
+                return;
+            }
 
-            // Try AI-based matching first
+            // Use the updated ItemMatchingService which now prioritizes database categories
             if ($this->itemMatchingService) {
-                $aiSuggestions = $this->itemMatchingService->getCategorySuggestions(
-                $this->title,
-                $this->categories
-            );
+                // First try direct database matches
+                $directMatches = $this->itemMatchingService->getDirectCategorySuggestions(
+                    $this->title,
+                    collect($this->categories)
+                );
 
-                if (!empty($aiSuggestions)) {
-                    $this->suggestedCategories = $aiSuggestions;
+                if (!empty($directMatches)) {
+                    $this->suggestedCategories = $directMatches;
+                    $this->suggestionSource = 'database';
+                    if (empty($this->category_id)) {
+                        $this->category_id = $directMatches[0];
+                    }
+                    $this->dispatch('suggestionsUpdated');
+                    return;
+                }
+
+                // Then try word-based matches
+                $wordMatches = $this->itemMatchingService->getWordBasedCategorySuggestions(
+                    $this->title,
+                    collect($this->categories)
+                );
+
+                if (!empty($wordMatches)) {
+                    $this->suggestedCategories = $wordMatches;
+                    $this->suggestionSource = 'semantic';
+                    if (empty($this->category_id)) {
+                        $this->category_id = $wordMatches[0];
+                    }
+                    $this->dispatch('suggestionsUpdated');
+                    return;
+                }
+
+                // Finally try AI-based suggestion as fallback
+                $aiMatches = $this->itemMatchingService->getAIBasedCategorySuggestions(
+                    $this->title,
+                    collect($this->categories)
+                );
+
+                if (!empty($aiMatches)) {
+                    $this->suggestedCategories = $aiMatches;
+                    $this->suggestionSource = 'ai';
+                    if (empty($this->category_id)) {
+                        $this->category_id = $aiMatches[0];
+                    }
+
+                    if (count($aiMatches) < 2) {
+                        $this->prepareNewCategoryFromTitle();
+                    }
+
                     $this->dispatch('suggestionsUpdated');
                     return;
                 }
             }
 
-            // Define category keywords mapping for fallback matching
-            $categoryKeywords = [
-                'phone' => ['phone', 'mobile', 'iphone', 'android', 'smartphone', 'cell'],
-                'laptop' => ['laptop', 'computer', 'pc', 'macbook', 'notebook'],
-                'tablet' => ['tablet', 'ipad', 'surface'],
-                'accessories' => ['accessory', 'accessories', 'charger', 'case', 'cover', 'headphone', 'earphone', 'airpod'],
-                'wallet' => ['wallet', 'purse', 'money', 'card holder'],
-                'document' => ['document', 'id', 'passport', 'license', 'certificate'],
-                'jewelry' => ['jewelry', 'ring', 'necklace', 'bracelet', 'watch'],
-                'bag' => ['bag', 'backpack', 'luggage', 'suitcase', 'handbag'],
-            ];
-
-            // Fallback to exact category name matches
-            $exactMatches = $this->categories->filter(function ($category) use ($titleWords) {
-                $categoryNameWords = explode(' ', strtolower($category->name));
-                return count(array_intersect($titleWords, $categoryNameWords)) > 0;
-            });
-
-            if ($exactMatches->isNotEmpty()) {
-                $this->suggestedCategories = $exactMatches->take(3)->keys()->all();
-                $this->dispatch('suggestionsUpdated');
-                return;
-            }
-
-            // Last resort: keyword-based matching
-            $keywordMatches = $this->categories->filter(function ($category) use ($titleWords, $categoryKeywords) {
-                $categoryText = strtolower($category->name . ' ' . $category->description);
-
-                foreach ($titleWords as $word) {
-                    foreach ($categoryKeywords as $type => $keywords) {
-                        if (in_array($word, $keywords) && str_contains($categoryText, $type)) {
-                            return true;
-                        }
-                    }
-                }
-
-                return false;
-            });
-
-            if ($keywordMatches->isNotEmpty()) {
-                $this->suggestedCategories = $keywordMatches->take(3)->keys()->all();
-                $this->dispatch('suggestionsUpdated');
-                return;
-            }
-
-            // If no matches found at all, reset suggestions
+            // If no matches at all, prepare a new category
+            $this->prepareNewCategoryFromTitle();
             $this->suggestedCategories = [];
+            $this->suggestionSource = 'none';
             $this->dispatch('suggestionsUpdated');
 
         } catch (\Exception $e) {
@@ -354,51 +365,175 @@ class ReportLostItem extends Component
                 'error' => $e->getMessage(),
                 'title' => $this->title
             ]);
-            $this->suggestedCategories = [];
+
+            // Ensure we always have suggestions by using direct database fallback
+            if (empty($this->suggestedCategories)) {
+                $this->handleFallbackCategorySuggestions();
+                $this->suggestionSource = 'fallback';
+            }
         }
     }
 
     /**
-     * Prepare new category details based on the title
+     * Handle fallback category suggestions when AI matching fails
      */
-    protected function prepareNewCategoryFromTitle()
+    public function handleFallbackCategorySuggestions()
     {
-        $words = explode(' ', strtolower($this->title));
-        $commonWords = ['the', 'a', 'an', 'my', 'our', 'their', 'his', 'her', 'its'];
-        $words = array_diff($words, $commonWords);
+        // Get basic keyword matches
+        $matches = collect($this->categories)->filter(function ($category) {
+            $titleWords = explode(' ', strtolower($this->title));
+            $categoryWords = explode(' ', strtolower($category->name));
 
-        // Generate a meaningful category name from the title
-        $this->newCategoryName = ucwords(implode(' ', array_slice($words, 0, 2)));
+            // Check for word matches
+            $matchingWords = array_intersect($titleWords, $categoryWords);
+            if (!empty($matchingWords)) {
+                return true;
+            }
 
-        // Set a descriptive category description
-        $this->newCategoryDescription = "Category for items similar to: {$this->title}";
+            // Check description if available
+            if ($category->description) {
+                foreach ($titleWords as $word) {
+                    if (stripos($category->description, $word) !== false) {
+                        return true;
+                    }
+                }
+            }
 
-        // Suggest an appropriate icon based on the title
-        $this->suggestCategoryIcon();
+            return false;
+        });
+
+        if ($matches->isNotEmpty()) {
+            $this->suggestedCategories = $matches->take(3)->keys()->all();
+        } else {
+            // If no matches, suggest creating a new category
+            $this->prepareNewCategoryFromTitle();
+            $this->suggestedCategories = [];
+        }
+
+        $this->dispatch('suggestionsUpdated');
     }
 
     /**
-     * Suggest an appropriate icon based on the title
+     * Prepare new category details based on the title with semantic understanding
+     */
+    public function prepareNewCategoryFromTitle()
+    {
+        try {
+            // Get item attributes and context
+            $attributes = $this->itemMatchingService->extractItemAttributes($this->title);
+
+            // Generate a meaningful category name
+            $words = explode(' ', strtolower($this->title));
+            $commonWords = ['the', 'a', 'an', 'my', 'our', 'their', 'his', 'her', 'its', 'lost', 'found'];
+            $words = array_diff($words, $commonWords);
+
+            // Try to extract a type-based name first
+            $categoryName = '';
+            foreach ($attributes as $attribute) {
+                if (strpos($attribute, 'Type:') === 0) {
+                    $type = trim(str_replace('Type:', '', $attribute));
+                    $categoryName = ucwords($type . ' Items');
+                    break;
+                }
+            }
+
+            // If no type found, use the first two significant words
+            if (empty($categoryName)) {
+                $significant = array_slice($words, 0, 2);
+                $categoryName = ucwords(implode(' ', $significant) . ' Items');
+            }
+
+            $this->newCategoryName = $categoryName;
+
+            // Generate a semantic description
+            $this->newCategoryDescription = $this->generateSemanticDescription($attributes);
+
+            // Suggest an appropriate icon
+            $this->suggestCategoryIcon();
+
+            Log::info('New category prepared', [
+                'name' => $this->newCategoryName,
+                'description' => $this->newCategoryDescription,
+                'based_on_title' => $this->title
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to prepare new category', [
+                'error' => $e->getMessage(),
+                'title' => $this->title
+            ]);
+
+            // Fallback to basic category name
+            $this->newCategoryName = ucwords($this->title) . ' Category';
+            $this->newCategoryDescription = "Category for items similar to: {$this->title}";
+            $this->newCategoryIcon = 'box';
+        }
+    }
+
+    /**
+     * Generate a semantic description for the new category
+     */
+    public function generateSemanticDescription($attributes)
+    {
+        $description = "Category for ";
+
+        if (!empty($attributes)) {
+            $description .= implode(', ', array_map(function($attr) {
+                return strtolower(str_replace(['Type:', 'Material:'], '', $attr));
+            }, $attributes)) . " items. ";
+        }
+
+        $description .= "This category is designed for items that share characteristics with {$this->title}. ";
+        $description .= "Items in this category typically have significant personal or practical value and require careful handling.";
+
+        return $description;
+    }
+
+    /**
+     * Suggest an appropriate icon based on semantic understanding
      */
     protected function suggestCategoryIcon()
     {
-        $iconMappings = [
-            'phone|mobile|iphone|android|smartphone' => 'mobile',
-            'wallet|purse|money' => 'wallet',
-            'key|keys|access' => 'key',
-            'card|id|credit|debit|pass' => 'credit-card',
-            'bag|backpack|luggage|suitcase' => 'suitcase',
-            'book|notebook|diary' => 'book',
-            'laptop|computer|pc|mac' => 'laptop',
-            'watch|clock|time' => 'clock',
-            'glasses|sunglasses' => 'glasses',
-            'document|paper|certificate' => 'file-alt',
-            'jewelry|ring|necklace' => 'gem',
-            'umbrella|parasol' => 'umbrella'
+        $semanticMappings = [
+            // Electronics and devices
+            'phone|mobile|laptop|computer|tablet|device|electronic' => 'microchip',
+
+            // Personal items and accessories
+            'wallet|purse|bag|backpack|accessory' => 'shopping-bag',
+
+            // Documents and identification
+            'card|id|passport|document|certificate|license' => 'file-alt',
+
+            // Valuable items
+            'jewelry|ring|necklace|watch|gold|silver' => 'gem',
+
+            // Keys and security items
+            'key|access|security' => 'key',
+
+            // Clothing and personal items
+            'clothing|jacket|shirt|dress|wear' => 'tshirt',
+
+            // Books and educational materials
+            'book|notebook|diary|journal' => 'book',
+
+            // Transportation
+            'car|vehicle|bicycle|bike' => 'car',
+
+            // Pet-related
+            'pet|dog|cat|animal' => 'paw',
+
+            // Technology
+            'usb|drive|memory|storage' => 'hdd',
+
+            // Musical instruments
+            'guitar|piano|music|instrument' => 'music',
+
+            // Sports equipment
+            'sport|ball|equipment|gear' => 'futbol'
         ];
 
         $titleLower = strtolower($this->title);
-        foreach ($iconMappings as $pattern => $icon) {
+        foreach ($semanticMappings as $pattern => $icon) {
             if (preg_match("/($pattern)/i", $titleLower)) {
                 $this->newCategoryIcon = $icon;
                 return;

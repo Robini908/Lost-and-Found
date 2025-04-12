@@ -4,28 +4,27 @@
 
 <div x-data="{
     focused: false,
-    query: @entangle('query'),
-    showResults: @entangle('showResults'),
     init() {
-        this.$watch('query', value => {
+        this.$watch('$wire.query', value => {
             if (!value) {
-                this.showResults = false;
+                $wire.showResults = false;
             }
         });
     }
 }"
     @click.away="focused = false"
     class="relative">
+
     <div class="relative">
         <input
-            wire:model.live="query"
+            wire:model.live.debounce.300ms="query"
             type="search"
             placeholder="Search by title, description, location..."
             class="w-full sm:w-64 pl-10 pr-4 py-2 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:bg-white focus:border-blue-300 transition duration-150"
             @focus="focused = true"
             @keydown.escape.window="focused = false"
             @keydown.tab="focused = false"
-            @keydown.enter.prevent="if($wire.query) $wire.navigateToResult($wire.searchResults[0]?.url)"
+            @keydown.enter.prevent="if($wire.query && $wire.searchResults.length) $wire.navigateToResult($wire.searchResults[0]?.url)"
         >
         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg class="h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -46,21 +45,16 @@
 
     <!-- Search Results Dropdown -->
     <div
-        x-show="focused && $wire.showResults && $wire.query"
-        class="absolute mt-10 w-full bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 transform scale-95"
-        x-transition:enter-end="opacity-100 transform scale-100"
-        x-transition:leave="transition ease-in duration-100"
-        x-transition:leave-start="opacity-100 transform scale-100"
-        x-transition:leave-end="opacity-0 transform scale-95">
+        x-show="focused && $wire.showResults && $wire.query.length >= 2"
+        x-cloak
+        class="absolute mt-2 w-full bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-50">
 
         <!-- Results Found -->
-        <div x-show="$wire.searchResults.length > 0">
+        @if(count($searchResults) > 0)
             <div class="max-h-96 overflow-y-auto">
                 @foreach($searchResults as $result)
                     <button
-                        wire:click="navigateToResult('{{ route('lost-items.show', $result['id']) }}')"
+                        wire:click="navigateToResult('{{ $result['url'] }}')"
                         class="w-full px-4 py-3 hover:bg-gray-50 flex items-center space-x-4 text-left transition duration-150">
                         <!-- Item Image -->
                         <div class="flex-shrink-0 w-12 h-12 bg-gray-100 rounded-lg overflow-hidden">
@@ -82,10 +76,10 @@
                                     {!! $result['highlight'] !!}
                                 </p>
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{
-                                    $result['type'] === LostItem::TYPE_FOUND ? 'bg-green-100 text-green-800' :
-                                    ($result['type'] === LostItem::TYPE_SEARCHED ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')
+                                    $result['type'] === 'Found' ? 'bg-green-100 text-green-800' :
+                                    ($result['type'] === 'Searched' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')
                                 }}">
-                                    {{ ucfirst($result['type']) }}
+                                    {{ $result['type'] }}
                                 </span>
                             </div>
                             <div class="mt-1 flex items-center text-xs text-gray-500 space-x-2">
@@ -107,7 +101,7 @@
                             </div>
                             <div class="mt-1 flex items-center text-xs space-x-2">
                                 <span class="text-gray-400">
-                                    {{ $result['created_at']->diffForHumans() }}
+                                    {{ \Carbon\Carbon::parse($result['created_at'])->diffForHumans() }}
                                 </span>
                                 @if($result['is_verified'])
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
@@ -120,28 +114,22 @@
                     </button>
                 @endforeach
             </div>
-
-            @if(count($searchResults) >= 5)
-                <div class="px-4 py-3 bg-gray-50 text-xs text-gray-500">
-                    Showing top 5 results. Type more to refine your search.
+        @else
+            <!-- No Results -->
+            @if(strlen($query) >= 2)
+                <div class="px-4 py-6 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="mt-4 text-sm text-gray-900">No results found for "{{ $query }}"</p>
+                    <p class="mt-2 text-xs text-gray-500">Try adjusting your search terms or filters.</p>
                 </div>
             @endif
-        </div>
-
-        <!-- No Results -->
-        <div x-show="$wire.searchResults.length === 0">
-            <div class="px-4 py-6 text-center">
-                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p class="mt-4 text-sm text-gray-900">No results found for "{{ $query }}"</p>
-                <p class="mt-2 text-xs text-gray-500">Try adjusting your search terms or filters.</p>
-            </div>
-        </div>
+        @endif
     </div>
 
     <!-- Loading State -->
-    <div wire:loading class="absolute right-0 top-0 mt-2 mr-3">
+    <div wire:loading wire:target="query" class="absolute right-0 top-0 mt-2 mr-3">
         <svg class="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

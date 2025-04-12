@@ -64,6 +64,10 @@
                             <i class="fas fa-users"></i>
                         </x-nav-link>
 
+                        <x-nav-link href="{{ route('admin.items') }}" :active="request()->routeIs('admin.items')" data-tippy-content="Manage Items">
+                            <i class="fas fa-box"></i>
+                        </x-nav-link>
+
                         <x-nav-link href="{{ route('settings') }}" :active="request()->routeIs('settings')" data-tippy-content="Settings">
                             <i class="fas fa-cog"></i>
                         </x-nav-link>
@@ -71,8 +75,6 @@
                         <x-nav-link href="{{ route('analytics') }}" :active="request()->routeIs('analytics')" data-tippy-content="Analytics">
                             <i class="fas fa-chart-bar"></i>
                         </x-nav-link>
-
-
                     @endif
                 </div>
             </div>
@@ -205,6 +207,11 @@
                 <x-responsive-nav-link href="{{ route('admin.manage-users') }}" :active="request()->routeIs('admin.manage-users')">
                     <i class="fas fa-users mr-2"></i>
                     {{ __('Manage Users') }}
+                </x-responsive-nav-link>
+
+                <x-responsive-nav-link href="{{ route('admin.items') }}" :active="request()->routeIs('admin.items')">
+                    <i class="fas fa-box mr-2"></i>
+                    {{ __('Manage Items') }}
                 </x-responsive-nav-link>
 
                 <x-responsive-nav-link href="{{ route('settings') }}" :active="request()->routeIs('settings')">

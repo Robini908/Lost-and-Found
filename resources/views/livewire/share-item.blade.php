@@ -49,7 +49,7 @@
                 <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-medium text-white">
-                            Share "{{ $item->title }}"
+                            Share "{{ $shareTitle }}"
                         </h3>
                         <button wire:click="closeModal" class="text-white hover:text-gray-200 focus:outline-none">
                             <i class="fas fa-times"></i>

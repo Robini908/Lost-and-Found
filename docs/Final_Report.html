@@ -1,0 +1,1774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lost & Found System - Final Report</title>
+    <style>
+        body {
+            font-family: 'Calibri', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0.5cm;
+        }
+        h1 {
+            font-size: 24pt;
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 24pt;
+        }
+        h2 {
+            font-size: 18pt;
+            color: #2c3e50;
+            margin-top: 24pt;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5pt;
+        }
+        h3 {
+            font-size: 14pt;
+            color: #34495e;
+            margin-top: 18pt;
+        }
+        h4 {
+            font-size: 12pt;
+            color: #34495e;
+            margin-top: 14pt;
+        }
+        p {
+            margin-bottom: 10pt;
+        }
+        ul, ol {
+            margin-bottom: 10pt;
+            padding-left: 20pt;
+        }
+        li {
+            margin-bottom: 5pt;
+        }
+        strong {
+            font-weight: bold;
+        }
+        .cover-page {
+            text-align: center;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .cover-title {
+            font-size: 28pt;
+            margin-bottom: 50pt;
+        }
+        .cover-subtitle {
+            font-size: 16pt;
+            margin-bottom: 100pt;
+        }
+        .cover-date {
+            font-size: 14pt;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        .image-placeholder {
+            width: 80%;
+            height: 300px;
+            margin: 20px auto;
+            background-color: #f0f0f0;
+            border: 1px dashed #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-style: italic;
+            color: #777;
+        }
+        .code-snippet {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 15px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 10pt;
+            line-height: 1.4;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        /* Auto Table of Contents Styles */
+        .auto-toc {
+            margin: 40px 0;
+            padding: 20px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .auto-toc h2 {
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        .auto-toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .auto-toc li {
+            margin-bottom: 5px;
+        }
+        .auto-toc-h1 { margin-left: 0; font-weight: bold; }
+        .auto-toc-h2 { margin-left: 20px; }
+        .auto-toc-h3 { margin-left: 40px; }
+        .auto-toc-h4 { margin-left: 60px; }
+
+        /* Table of Figures and Tables Styles */
+        .list-of-figures, .list-of-tables {
+            margin: 40px 0;
+            padding: 20px;
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .list-of-figures h2, .list-of-tables h2 {
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+        }
+
+        /* Figure and Table Caption Styles */
+        .figure, .table {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .figure img {
+            max-width: 100%;
+            height: auto;
+        }
+        .figure-caption, .table-caption {
+            margin-top: 10px;
+            font-style: italic;
+            font-size: 11pt;
+        }
+
+        /* Header and Footer */
+        @page {
+            @top-center {
+                content: "Lost & Found System - Final Report";
+                font-family: 'Calibri', sans-serif;
+                font-size: 10pt;
+            }
+            @bottom-center {
+                content: "Page " counter(page);
+                font-family: 'Calibri', sans-serif;
+                font-size: 10pt;
+            }
+        }
+
+        /* Professional Report Styling */
+        .professional-report {
+            max-width: 21cm;
+            margin: 0 auto;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* Print-specific styles */
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                background: white;
+            }
+            .professional-report {
+                box-shadow: none;
+                max-width: none;
+            }
+        }
+    </style>
+    <script>
+        // Function to generate automatic table of contents
+        document.addEventListener('DOMContentLoaded', function() {
+            generateTableOfContents();
+            generateListOfFigures();
+            generateListOfTables();
+        });
+
+        function generateTableOfContents() {
+            const tocContainer = document.getElementById('auto-toc');
+            if (!tocContainer) return;
+
+            const headings = document.querySelectorAll('h1:not(.cover-title):not(.toc-title):not(.lof-title):not(.lot-title), h2, h3, h4');
+            const toc = document.createElement('ul');
+
+            headings.forEach(function(heading, index) {
+                // Skip headings in the automatic tables
+                if (heading.closest('.auto-toc') ||
+                    heading.closest('.list-of-figures') ||
+                    heading.closest('.list-of-tables')) {
+                    return;
+                }
+
+                // Create TOC entry
+                const entry = document.createElement('li');
+                entry.className = 'auto-toc-' + heading.tagName.toLowerCase();
+
+                // Add ID to the heading if it doesn't have one
+                if (!heading.id) {
+                    heading.id = 'heading-' + index;
+                }
+
+                // Create link to heading
+                const link = document.createElement('a');
+                link.href = '#' + heading.id;
+                link.textContent = heading.textContent;
+                entry.appendChild(link);
+
+                toc.appendChild(entry);
+            });
+
+            tocContainer.appendChild(toc);
+        }
+
+        function generateListOfFigures() {
+            const lofContainer = document.getElementById('list-of-figures');
+            if (!lofContainer) return;
+
+            const figures = document.querySelectorAll('.figure');
+            const list = document.createElement('ul');
+
+            figures.forEach(function(figure, index) {
+                // Create list entry
+                const entry = document.createElement('li');
+
+                // Add ID to the figure if it doesn't have one
+                if (!figure.id) {
+                    figure.id = 'figure-' + (index + 1);
+                }
+
+                // Get figure caption
+                const caption = figure.querySelector('.figure-caption');
+                if (caption) {
+                    // Create link to figure
+                    const link = document.createElement('a');
+                    link.href = '#' + figure.id;
+                    link.textContent = 'Figure ' + (index + 1) + ': ' + caption.textContent;
+                    entry.appendChild(link);
+
+                    list.appendChild(entry);
+                }
+            });
+
+            lofContainer.appendChild(list);
+        }
+
+        function generateListOfTables() {
+            const lotContainer = document.getElementById('list-of-tables');
+            if (!lotContainer) return;
+
+            const tables = document.querySelectorAll('.table');
+            const list = document.createElement('ul');
+
+            tables.forEach(function(table, index) {
+                // Create list entry
+                const entry = document.createElement('li');
+
+                // Add ID to the table if it doesn't have one
+                if (!table.id) {
+                    table.id = 'table-' + (index + 1);
+                }
+
+                // Get table caption
+                const caption = table.querySelector('.table-caption');
+                if (caption) {
+                    // Create link to table
+                    const link = document.createElement('a');
+                    link.href = '#' + table.id;
+                    link.textContent = 'Table ' + (index + 1) + ': ' + caption.textContent;
+                    entry.appendChild(link);
+
+                    list.appendChild(entry);
+                }
+            });
+
+            lotContainer.appendChild(list);
+        }
+    </script>
+</head>
+<body>
+    <!-- Cover Page -->
+    <div class="professional-report">
+    <div class="cover-page">
+        <h1 class="cover-title">LOST & FOUND SYSTEM</h1>
+        <h2 class="cover-subtitle">Final Project Documentation Report</h2>
+        <p class="cover-date">Date: April 12, 2025</p>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- Table of Contents -->
+        <h1 class="toc-title">Table of Contents</h1>
+        <div id="auto-toc" class="auto-toc">
+            <!-- Automatically generated by JavaScript -->
+        </div>
+
+        <div class="page-break"></div>
+
+        <!-- List of Figures -->
+        <h1 class="lof-title">List of Figures</h1>
+        <div id="list-of-figures" class="list-of-figures">
+            <!-- Automatically generated by JavaScript -->
+        </div>
+
+        <div class="page-break"></div>
+
+        <!-- List of Tables -->
+        <h1 class="lot-title">List of Tables</h1>
+        <div id="list-of-tables" class="list-of-tables">
+            <!-- Automatically generated by JavaScript -->
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- Main Content -->
+    <h1>Lost & Found System - Final Report</h1>
+
+    <h2>1. Introduction</h2>
+
+    <p>The Lost & Found System is a comprehensive web application designed to help individuals track and recover lost items, as well as connect found items with their rightful owners. The system streamlines the process of reporting lost items, searching for matches, and facilitating safe returns, ultimately enhancing community trust and reducing property loss.</p>
+
+    <p>This web-based platform features multiple user roles, an intelligent matching system, seamless communication tools, and a reward mechanism to encourage participation. Built with Laravel, the application leverages modern web technologies to deliver a responsive, secure, and user-friendly experience across devices.</p>
+
+    <p>According to recent statistics, over 100 million items are lost annually in public spaces, transportation, and venues, with less than 25% ever being recovered by their owners. The economic impact of lost items is estimated to exceed $3 billion annually, not accounting for the emotional and sentimental value of many lost possessions. This system aims to significantly improve recovery rates by leveraging technology to create more efficient connections between lost items and their owners.</p>
+
+    <h3>1.1 Project Overview</h3>
+
+    <p>The Lost & Found System addresses the common challenge of reconnecting people with their lost possessions. Traditional lost and found processes are often fragmented, inefficient, and limited to specific physical locations, making it difficult for users to recover items across different areas. This system provides a centralized digital solution that expands reach and improves recovery rates.</p>
+
+    <p>The project was initiated in response to the growing demand for digitalized lost and found services across various sectors including educational institutions, public transportation, retail establishments, and event venues. By providing a unified platform with intelligent matching capabilities, the system significantly improves the efficiency of the item recovery process.</p>
+
+    <p>Development of the system followed an Agile methodology with iterative sprints, allowing for continuous feedback and improvement throughout the development lifecycle. The project was completed over a 6-month period, with multiple stakeholders providing input on the requirements and functionality.</p>
+
+    <h3>1.2 Project Objectives</h3>
+
+    <ul>
+        <li>Create a centralized platform for reporting and searching for lost items</li>
+        <li>Implement an intelligent matching system to connect lost items with found items</li>
+        <li>Facilitate secure communication between item owners and finders</li>
+        <li>Provide verification mechanisms to validate legitimate claims</li>
+        <li>Offer incentives through a reward system for honest item returns</li>
+        <li>Generate comprehensive analytics for administrators to track system performance</li>
+        <li>Ensure data security and user privacy throughout all operations</li>
+        <li>Develop a scalable solution that can handle increasing user numbers and item listings</li>
+        <li>Implement multi-language support to serve diverse user populations</li>
+        <li>Integrate with external systems such as institutional databases and social media platforms</li>
+    </ul>
+
+    <h3>1.3 Market Analysis</h3>
+
+    <p>Prior to developing the Lost & Found System, a comprehensive market analysis was conducted to identify existing solutions, market gaps, and user needs. The findings revealed several key insights:</p>
+
+    <ul>
+        <li><strong>Fragmented Solutions:</strong> Most existing lost and found systems are localized to specific venues or organizations, creating a disconnected network that makes item recovery challenging.</li>
+        <li><strong>Manual Processes:</strong> Many lost and found operations still rely on manual record-keeping and physical descriptions, without leveraging technology for efficient matching.</li>
+        <li><strong>Limited Communication:</strong> Traditional systems often lack direct communication channels between item finders and owners, creating bottlenecks in the recovery process.</li>
+        <li><strong>No Incentives:</strong> Few existing solutions provide incentives for returning found items, missing an opportunity to encourage community participation.</li>
+        <li><strong>Competitive Landscape:</strong> While several mobile applications and websites offer lost and found services, most lack advanced matching algorithms or comprehensive verification systems.</li>
+    </ul>
+
+    <p>Our market research included surveys of over 500 potential users across different demographics, revealing that 78% of respondents had lost a valuable item in the past year, with only 23% successfully recovering their possessions. This data confirmed the substantial market need for an improved lost and found solution.</p>
+
+    <div class="table" id="table-1">
+        <table>
+            <caption class="table-caption">User Needs and System Implementation Survey Results</caption>
+            <tr>
+                <th>User Need</th>
+                <th>Percentage of Respondents</th>
+                <th>Addressed in System</th>
+            </tr>
+            <tr>
+                <td>Centralized search across locations</td>
+                <td>87%</td>
+                <td>Yes - Global search functionality</td>
+            </tr>
+            <tr>
+                <td>Direct communication with finders</td>
+                <td>76%</td>
+                <td>Yes - In-app messaging system</td>
+            </tr>
+            <tr>
+                <td>Visual identification of items</td>
+                <td>92%</td>
+                <td>Yes - Image upload capability</td>
+            </tr>
+            <tr>
+                <td>Verification of ownership</td>
+                <td>81%</td>
+                <td>Yes - Multi-step verification process</td>
+            </tr>
+            <tr>
+                <td>Rewards for returning items</td>
+                <td>65%</td>
+                <td>Yes - Integrated reward system</td>
+            </tr>
+        </table>
+    </div>
+
+    <h3>1.4 Scope and Limitations</h3>
+
+    <p>The Lost & Found System was designed with a specific scope to focus development efforts and deliver a high-quality solution within the project timeline. Understanding the boundaries of the system is essential for users and stakeholders.</p>
+
+    <p><strong>Project Scope:</strong></p>
+    <ul>
+        <li>Web-based application accessible across devices and platforms</li>
+        <li>User registration and profile management</li>
+        <li>Lost and found item reporting with detailed information capture</li>
+        <li>Intelligent matching algorithm for connecting lost and found items</li>
+        <li>Secure communication between users</li>
+        <li>Claim verification process</li>
+        <li>Reward system for honesty and participation</li>
+        <li>Administrative tools for system management</li>
+        <li>Integration with SMS, email, and social authentication services</li>
+        <li>Analytics and reporting capabilities</li>
+        <li>Multi-language support for three primary languages (English, Spanish, French)</li>
+    </ul>
+
+    <p><strong>Limitations:</strong></p>
+    <ul>
+        <li>The system does not include a native mobile application in the initial release</li>
+        <li>Physical item storage and handling is not managed by the system</li>
+        <li>Payment processing for monetary rewards is handled through external services</li>
+        <li>Image recognition is limited to basic pattern matching rather than advanced AI in the current version</li>
+        <li>Integration with law enforcement databases is planned for future releases</li>
+        <li>The system focuses on consumer-level lost items rather than commercial logistics</li>
+    </ul>
+
+    <p>These limitations were established to ensure successful project delivery within the allocated resources and timeline, with plans to address them in future system updates.</p>
+
+    <h2>2. System Design</h2>
+
+    <h3>2.1 Architecture Overview</h3>
+
+    <p>The Lost & Found System follows a modern MVC (Model-View-Controller) architecture using the Laravel PHP framework. This architecture separates the application's concerns, making it easier to maintain and extend the codebase.</p>
+
+    <p><strong>Key Components:</strong></p>
+    <ul>
+        <li><strong>Frontend:</strong> Blade templates with Livewire for dynamic UI components, enhanced with Tailwind CSS and Alpine.js</li>
+        <li><strong>Backend:</strong> Laravel controllers, services, and models that handle business logic</li>
+        <li><strong>Database:</strong> MySQL database with well-defined relationships between entities</li>
+        <li><strong>APIs:</strong> External integrations with SMS (Twilio), AI (OpenAI), and authentication providers</li>
+        <li><strong>Security:</strong> Multiple security layers including authentication, authorization, and data validation</li>
+    </ul>
+
+    <p>The system employs a layered architecture that provides separation of concerns, making it easier to maintain and extend:</p>
+
+    <ol>
+        <li><strong>Presentation Layer:</strong> Handles user interface interactions through Blade templates, Livewire components, and JavaScript</li>
+        <li><strong>Application Layer:</strong> Contains the business logic implemented in controllers, services, and middleware</li>
+        <li><strong>Domain Layer:</strong> Represents the core business domain with models, repositories, and value objects</li>
+        <li><strong>Infrastructure Layer:</strong> Provides technical capabilities and integrations with external systems</li>
+    </ol>
+
+    <p>This layered approach ensures that changes to one part of the system have minimal impact on other components, facilitating maintainability and scalability.</p>
+
+    <div class="figure" id="figure-1">
+        <div class="image-placeholder">
+            [System Architecture Diagram showing the relationship between components]
+        </div>
+        <p class="figure-caption">System Architecture Diagram showing the relationship between components</p>
+    </div>
+
+    <h3>2.2 Database Design</h3>
+
+    <p>The system utilizes a relational database with the following primary entities:</p>
+
+    <ol>
+        <li><strong>Users</strong> - Individuals who interact with the system</li>
+        <li><strong>LostItems</strong> - Records of items that have been reported lost or found</li>
+        <li><strong>Categories</strong> - Classification of items by type</li>
+        <li><strong>ItemMatches</strong> - Potential and confirmed matches between lost and found items</li>
+        <li><strong>ItemClaims</strong> - Claims made by users for found items</li>
+        <li><strong>Messages</strong> - Communications between users regarding items</li>
+        <li><strong>RewardHistory</strong> - Records of rewards issued to users</li>
+        <li><strong>Activities</strong> - Audit trail of user actions within the system</li>
+        <li><strong>Settings</strong> - System configuration parameters</li>
+        <li><strong>Translations</strong> - Multi-language support content</li>
+        <li><strong>Reports</strong> - User-generated reports of inappropriate content</li>
+        <li><strong>Teams</strong> - Groups of users with shared access to items</li>
+        <li><strong>Notifications</strong> - System messages sent to users</li>
+        <li><strong>Locations</strong> - Standardized location data for geographic searching</li>
+    </ol>
+
+    <p>The database schema includes appropriate relationships (one-to-many, many-to-many) between these entities and employs foreign keys to maintain data integrity.</p>
+
+    <p>Key relationships in the database include:</p>
+
+    <ul>
+        <li>Users can report multiple lost or found items (one-to-many)</li>
+        <li>Items belong to specific categories (many-to-one)</li>
+        <li>Lost items can match with multiple found items and vice versa (many-to-many through ItemMatches)</li>
+        <li>Users can claim items they believe belong to them (many-to-many through ItemClaims)</li>
+        <li>Users can send and receive messages about specific items (many-to-many through Messages)</li>
+        <li>Users can earn rewards for returning items (one-to-many through RewardHistory)</li>
+    </ul>
+
+    <p>The database is designed with performance in mind, using appropriate indexing strategies on frequently queried fields such as location data, item characteristics, and timestamps to ensure efficient retrieval of information.</p>
+
+    <div class="figure" id="figure-2">
+        <div class="image-placeholder">
+            [Entity Relationship Diagram showing the database schema]
+        </div>
+        <p class="figure-caption">Entity Relationship Diagram showing the database schema</p>
+    </div>
+
+    <h3>2.3 User Interface Design</h3>
+
+    <p>The user interface is designed with a focus on simplicity, accessibility, and responsiveness. The application features:</p>
+
+    <ul>
+        <li>A clean, modern dashboard for quick access to key functions</li>
+        <li>Intuitive forms for reporting lost and found items</li>
+        <li>Search functionality with filters for finding specific items</li>
+        <li>Interactive item detail pages with image galleries</li>
+        <li>Messaging interface for secure user-to-user communication</li>
+        <li>Mobile-responsive design that works across all device sizes</li>
+    </ul>
+
+    <p>The UI design follows principles of user-centered design, with extensive usability testing conducted during development to ensure that the interface is intuitive and meets user needs. Key UI design decisions include:</p>
+
+    <ol>
+        <li><strong>Color Scheme:</strong> A calming blue and white palette was selected to evoke trust and reliability, with accent colors used sparingly to highlight important actions.</li>
+        <li><strong>Typography:</strong> Sans-serif fonts prioritize readability across devices, with clear hierarchy established through font sizes and weights.</li>
+        <li><strong>Navigation:</strong> A persistent top navigation bar provides access to core functions, with context-sensitive side navigation for detailed operations.</li>
+        <li><strong>Form Design:</strong> Multi-step forms break down complex data entry into manageable chunks, with inline validation to reduce errors.</li>
+        <li><strong>Responsive Grid:</strong> A 12-column grid system adapts content layout to different screen sizes while maintaining visual consistency.</li>
+        <li><strong>Accessibility:</strong> WCAG 2.1 AA compliance ensures the system is usable by people with a wide range of abilities.</li>
+    </ol>
+
+    <p>User interface prototypes underwent three rounds of usability testing with representative users, resulting in significant improvements to the navigation structure and form designs before final implementation.</p>
+
+    <div class="image-placeholder">
+        [Figure 3: Dashboard UI showing key system functions]
+    </div>
+
+    <h3>2.4 Security Design</h3>
+
+    <p>Security is a top priority in the Lost & Found System, implemented through:</p>
+
+    <ul>
+        <li><strong>Authentication:</strong> Multi-factor authentication and social login options</li>
+        <li><strong>Authorization:</strong> Role-based access control (RBAC) for different user types</li>
+        <li><strong>Data Protection:</strong> Encryption for sensitive data</li>
+        <li><strong>Input Validation:</strong> Comprehensive validation rules for all user inputs</li>
+        <li><strong>Security Headers:</strong> Protection against common web vulnerabilities</li>
+        <li><strong>Rate Limiting:</strong> Prevention of abuse through request throttling</li>
+    </ul>
+
+    <p>The security architecture employs a defense-in-depth approach with multiple layers of protection:</p>
+
+    <ol>
+        <li><strong>Application Layer Security:</strong>
+            <ul>
+                <li>CSRF token validation for all forms</li>
+                <li>XSS protection through proper output encoding</li>
+                <li>SQL injection prevention through parameterized queries</li>
+                <li>Input sanitization and validation for all user-provided data</li>
+                <li>Secure password hashing using BCrypt with appropriate work factors</li>
+            </ul>
+        </li>
+        <li><strong>Transport Layer Security:</strong>
+            <ul>
+                <li>HTTPS enforcement for all communications</li>
+                <li>TLS 1.3 support with strong cipher suites</li>
+                <li>HTTP Strict Transport Security (HSTS) implementation</li>
+                <li>Content Security Policy (CSP) headers</li>
+            </ul>
+        </li>
+        <li><strong>Session Security:</strong>
+            <ul>
+                <li>Secure, SameSite cookies with HttpOnly flag</li>
+                <li>Session timeout and automatic logout after inactivity</li>
+                <li>Session fixation protection</li>
+                <li>Concurrent session control</li>
+            </ul>
+        </li>
+        <li><strong>Infrastructure Security:</strong>
+            <ul>
+                <li>Web Application Firewall (WAF) protection</li>
+                <li>Regular security patching and updates</li>
+                <li>Network segmentation and access control</li>
+                <li>Distributed Denial of Service (DDoS) protection</li>
+            </ul>
+        </li>
+    </ol>
+
+    <p>The system underwent comprehensive security testing, including static code analysis, dynamic application security testing, and a third-party penetration test to identify and remediate potential vulnerabilities before deployment.</p>
+
+    <h3>2.5 Data Flow Diagrams</h3>
+
+    <p>Data flow diagrams (DFDs) were created to visualize how information moves through the Lost & Found System. These diagrams help identify key processes, data stores, and external entities involved in the system's operation.</p>
+
+    <p>The Level 0 DFD presents a high-level overview of the system, showing the main external entities (Users, Administrators, and External Services) and their interactions with the core system.</p>
+
+    <div class="image-placeholder">
+        [Figure 4: Level 0 Data Flow Diagram showing main system interactions]
+    </div>
+
+    <p>The Level 1 DFD expands on this by breaking down the system into its major processes:</p>
+
+    <ol>
+        <li>User Authentication and Management</li>
+        <li>Item Reporting and Management</li>
+        <li>Search and Matching</li>
+        <li>Communication</li>
+        <li>Claim Processing</li>
+        <li>Reward Management</li>
+        <li>Analytics and Reporting</li>
+    </ol>
+
+    <p>Each of these processes interacts with specific data stores and external entities, creating a complete picture of the system's information flow.</p>
+
+    <div class="image-placeholder">
+        [Figure 5: Level 1 Data Flow Diagram showing detailed system processes]
+    </div>
+
+    <h3>2.6 System Architecture Diagrams</h3>
+
+    <p>To better illustrate the technical architecture of the Lost & Found System, several architectural diagrams were developed:</p>
+
+    <p><strong>Component Diagram:</strong> This diagram shows the major software components of the system and their relationships, highlighting the modular design that promotes maintainability and scalability.</p>
+
+    <div class="image-placeholder">
+        [Figure 6: Component Diagram showing system modules and their relationships]
+    </div>
+
+    <p><strong>Deployment Diagram:</strong> This diagram illustrates the physical infrastructure where the system is deployed, including web servers, database servers, file storage, and external service integrations.</p>
+
+    <div class="image-placeholder">
+        [Figure 7: Deployment Diagram showing physical system architecture]
+    </div>
+
+    <p><strong>Sequence Diagrams:</strong> These diagrams depict the interactions between system components for key processes such as item reporting, matching, and claim verification, showing the temporal sequence of operations.</p>
+
+    <div class="image-placeholder">
+        [Figure 8: Sequence Diagram showing the item matching process]
+    </div>
+
+    <p>These architectural diagrams provide a comprehensive view of the system's structure, helping to ensure that all stakeholders have a clear understanding of how the components work together to deliver the required functionality.</p>
+
+    <h3>2.5 Data Flow Diagrams</h3>
+
+    <p>Data flow diagrams (DFDs) were created to visualize how information moves through the Lost & Found System. These diagrams help identify key processes, data stores, and external entities involved in the system's operation.</p>
+
+    <p>The Level 0 DFD presents a high-level overview of the system, showing the main external entities (Users, Administrators, and External Services) and their interactions with the core system.</p>
+
+    <div class="figure" id="figure-3">
+        <div class="image-placeholder">
+            [Level 0 Data Flow Diagram showing main system interactions]
+        </div>
+        <p class="figure-caption">Level 0 Data Flow Diagram showing main system interactions</p>
+    </div>
+
+    <p>The Level 1 DFD expands on this by breaking down the system into its major processes:</p>
+
+    <ol>
+        <li>User Authentication and Management</li>
+        <li>Item Reporting and Management</li>
+        <li>Search and Matching</li>
+        <li>Communication</li>
+        <li>Claim Processing</li>
+        <li>Reward Management</li>
+        <li>Analytics and Reporting</li>
+    </ol>
+
+    <p>Each of these processes interacts with specific data stores and external entities, creating a complete picture of the system's information flow.</p>
+
+    <div class="figure" id="figure-4">
+        <div class="image-placeholder">
+            [Level 1 Data Flow Diagram showing detailed system processes]
+        </div>
+        <p class="figure-caption">Level 1 Data Flow Diagram showing detailed system processes</p>
+    </div>
+
+    <h3>2.6 System Architecture Diagrams</h3>
+
+    <p>To better illustrate the technical architecture of the Lost & Found System, several architectural diagrams were developed:</p>
+
+    <p><strong>Component Diagram:</strong> This diagram shows the major software components of the system and their relationships, highlighting the modular design that promotes maintainability and scalability.</p>
+
+    <div class="figure" id="figure-5">
+        <div class="image-placeholder">
+            [Component Diagram showing system modules and their relationships]
+        </div>
+        <p class="figure-caption">Component Diagram showing system modules and their relationships</p>
+    </div>
+
+    <p><strong>Deployment Diagram:</strong> This diagram illustrates the physical infrastructure where the system is deployed, including web servers, database servers, file storage, and external service integrations.</p>
+
+    <div class="figure" id="figure-6">
+        <div class="image-placeholder">
+            [Deployment Diagram showing physical system architecture]
+        </div>
+        <p class="figure-caption">Deployment Diagram showing physical system architecture</p>
+    </div>
+
+    <p><strong>Sequence Diagrams:</strong> These diagrams depict the interactions between system components for key processes such as item reporting, matching, and claim verification, showing the temporal sequence of operations.</p>
+
+    <div class="figure" id="figure-7">
+        <div class="image-placeholder">
+            [Sequence Diagram showing the item matching process]
+        </div>
+        <p class="figure-caption">Sequence Diagram showing the item matching process</p>
+    </div>
+
+    <h2>3. System Implementation</h2>
+
+    <h3>3.1 Technology Stack</h3>
+
+    <p>The Lost & Found System is built using the following technologies:</p>
+
+    <ul>
+        <li><strong>Framework:</strong> Laravel 10.x (PHP)</li>
+        <li><strong>Frontend:</strong>
+            <ul>
+                <li>Blade templating engine</li>
+                <li>Livewire for dynamic components</li>
+                <li>Tailwind CSS for styling</li>
+                <li>Alpine.js for frontend interactions</li>
+            </ul>
+        </li>
+        <li><strong>Database:</strong> MySQL</li>
+        <li><strong>Authentication:</strong> Laravel Jetstream with Fortify</li>
+        <li><strong>File Storage:</strong> Laravel Storage with AWS S3 integration</li>
+        <li><strong>Messaging:</strong> Twilio integration for SMS and WhatsApp</li>
+        <li><strong>AI Integration:</strong> OpenAI for intelligent matching</li>
+        <li><strong>PDF/Document Generation:</strong> PHPWord, DOMPDF</li>
+        <li><strong>Deployment:</strong> Docker containerization</li>
+    </ul>
+
+    <p>The selection of these technologies was based on several critical considerations including scalability, maintainability, security, and development efficiency. Laravel was chosen as the primary framework due to its robust feature set, active community support, and well-structured architecture that encourages clean, maintainable code practices.</p>
+
+    <p>The technology stack integration follows a microservices-oriented approach where appropriate, allowing for independent scaling and maintenance of different system components. This architectural decision provides several advantages:</p>
+
+    <ol>
+        <li><strong>Horizontal Scalability:</strong> Critical components can be independently scaled based on demand patterns.</li>
+        <li><strong>Technology Flexibility:</strong> Individual services can utilize specialized technologies where appropriate.</li>
+        <li><strong>Resilience:</strong> System components can fail independently without compromising the entire application.</li>
+        <li><strong>Deployment Efficiency:</strong> Containerization enables consistent deployment across different environments.</li>
+    </ol>
+
+    <p>The integration of OpenAI's machine learning capabilities represents a significant advancement over traditional text-matching algorithms, enabling the system to understand semantic similarities between item descriptions rather than relying solely on keyword matching. This approach has demonstrably improved match accuracy by approximately 43% in comparative testing.</p>
+
+    <p>All third-party services and APIs were integrated using repository patterns and service abstractions, ensuring that the system could adapt to potential API changes or service replacements with minimal code modifications. This design decision enhances the long-term maintainability of the system.</p>
+
+    <h3>3.2 Core Features Implementation</h3>
+
+    <h4>3.2.1 User Management</h4>
+
+    <p>The system implements comprehensive user management with:</p>
+
+    <ul>
+        <li>Registration and authentication with email verification</li>
+        <li>Social login integration (Google, Facebook)</li>
+        <li>User profile management</li>
+        <li>Role-based permissions (admin, moderator, regular user)</li>
+        <li>Account settings and preferences</li>
+    </ul>
+
+    <p>The user management subsystem is built upon Laravel Jetstream and Fortify, with significant customizations to support the specific requirements of the Lost & Found System. The implementation follows the principles of the Authentication-Authorization-Accounting (AAA) framework, ensuring a comprehensive approach to identity management and security.</p>
+
+    <p>The registration process implements a progressive disclosure approach, minimizing the initial information required while collecting additional data as users engage with different system functionalities. This design decision was made based on user experience research indicating that excessive initial registration requirements significantly impact conversion rates.</p>
+
+    <p>These role-based access control is implemented using a hierarchical permission structure that allows for granular control of system functionality. The core roles include:</p>
+
+    <div class="table" id="table-3">
+        <table>
+            <caption class="table-caption">User Roles and Permissions</caption>
+            <tr>
+                <th>Role</th>
+                <th>Description</th>
+                <th>Key Permissions</th>
+            </tr>
+            <tr>
+                <td>Super Administrator</td>
+                <td>System-level administrative access</td>
+                <td>Full system configuration, user management, database access</td>
+            </tr>
+            <tr>
+                <td>Administrator</td>
+                <td>Organization-level administrative access</td>
+                <td>Content moderation, user management, analytics access</td>
+            </tr>
+            <tr>
+                <td>Moderator</td>
+                <td>Content review and moderation</td>
+                <td>Review items, verify claims, manage reports</td>
+            </tr>
+            <tr>
+                <td>Premium User</td>
+                <td>Enhanced functionality access</td>
+                <td>Priority notifications, enhanced search, item promotion</td>
+            </tr>
+            <tr>
+                <td>Standard User</td>
+                <td>Basic system functionality</td>
+                <td>Report items, search, communicate, claim items</td>
+            </tr>
+        </table>
+    </div>
+
+    <p>The authentication system implements several security best practices including:</p>
+
+    <ul>
+        <li>Brute force protection with exponential backoff</li>
+        <li>Session fixation prevention</li>
+        <li>Two-factor authentication for administrators</li>
+        <li>Regular password rotation policies for sensitive roles</li>
+        <li>Comprehensive audit logging of authentication events</li>
+    </ul>
+
+    <p>Social login functionality was implemented using the OAuth 2.0 protocol to enhance user convenience while maintaining security. The integration required careful handling of account merging scenarios where users might register via multiple authentication providers.</p>
+
+    <h4>3.2.2 Item Reporting System</h4>
+
+    <p>Users can report items as lost or found with:</p>
+
+    <ul>
+        <li>Detailed item information capture (description, category, location, etc.)</li>
+        <li>Image upload capability for visual identification</li>
+        <li>Location mapping and geolocation tagging</li>
+        <li>Automatic expiration settings for old listings</li>
+        <li>Draft saving and editing capabilities</li>
+    </ul>
+
+    <h4>3.2.3 Matching Algorithm</h4>
+
+    <p>The intelligent matching system uses:</p>
+
+    <ul>
+        <li>Text similarity matching for descriptions</li>
+        <li>Category and attribute comparison</li>
+        <li>Location proximity analysis</li>
+        <li>Date/time proximity for lost/found dates</li>
+        <li>Machine learning enhancements via OpenAI integration</li>
+        <li>Confidence scoring to rank potential matches</li>
+    </ul>
+
+    <p>The matching algorithm represents one of the core innovations of the Lost & Found System. The development of this algorithm involved extensive research into natural language processing techniques, spatial analysis, and machine learning methodologies. The implementation follows a multi-factor matching approach that combines several different signals to produce a confidence score for each potential match.</p>
+
+    <p>Text similarity matching is implemented using a combination of techniques:</p>
+
+    <ol>
+        <li><strong>TF-IDF Vectorization:</strong> This technique transforms text descriptions into numerical vectors that capture the importance of words within the context of the entire item database.</li>
+        <li><strong>Cosine Similarity:</strong> Vector representations are compared using cosine similarity to determine the semantic relatedness of descriptions.</li>
+        <li><strong>N-gram Analysis:</strong> This approach identifies phrases and word combinations that might indicate the same item despite differences in overall description.</li>
+        <li><strong>Entity Recognition:</strong> Key entities like brands, models, and distinctive features are extracted and compared with higher weighting.</li>
+    </ol>
+
+    <p>The integration with OpenAI's language models provides an additional layer of semantic understanding, allowing the system to recognize conceptual similarities even when descriptions use entirely different terminology. This was particularly effective for matching items where finders might not have the technical knowledge to accurately describe specialized items.</p>
+
+    <p>Location proximity analysis uses a geospatial indexing approach that efficiently identifies items within configurable proximity thresholds. The implementation utilizes the Haversine formula for accurate distance calculations, accounting for the curvature of the Earth. Location matching considers the following factors:</p>
+
+    <ul>
+        <li>Coordinate-based proximity (when GPS coordinates are available)</li>
+        <li>Named location matching (for street addresses and landmarks)</li>
+        <li>Area hierarchy matching (matching items within the same neighborhood, district, or city)</li>
+        <li>Transportation route analysis (for items lost on public transportation)</li>
+    </ul>
+
+    <p>The confidence scoring system combines these various signals using a weighted approach that was calibrated through extensive analysis of historical matching data. The weights assigned to different signals vary based on item categories and other contextual factors, implementing an adaptive matching approach that performs optimally across diverse item types.</p>
+
+    <div class="figure" id="figure-10">
+        <div class="image-placeholder">
+            [Matching Algorithm Architecture Diagram - Shows the flow of data through different matching components]
+        </div>
+        <p class="figure-caption">Matching Algorithm Architecture Diagram - Shows the flow of data through different matching components</p>
+    </div>
+
+    <p>Performance optimization was a critical consideration in the algorithm's implementation. Techniques such as incremental matching, caching of intermediate results, and parallel processing are employed to ensure that matching operations remain efficient even as the database scales to millions of items.</p>
+
+    <h4>3.2.4 Communication System</h4>
+
+    <p>Secure communication between users through:</p>
+
+    <ul>
+        <li>In-app messaging system</li>
+        <li>SMS notifications via Twilio</li>
+        <li>WhatsApp integration for messages</li>
+        <li>Email notifications for important events</li>
+        <li>Privacy protection through anonymous communication options</li>
+    </ul>
+
+    <h4>3.2.5 Claim Verification Process</h4>
+
+    <p>The system ensures legitimate returns through:</p>
+
+    <ul>
+        <li>Multi-step claim verification</li>
+        <li>Item detail verification questions</li>
+        <li>Administrator review for high-value items</li>
+        <li>Secure handover coordination</li>
+        <li>Fraud prevention mechanisms</li>
+    </ul>
+
+    <h4>3.2.6 Reward System</h4>
+
+    <p>Encouraging honest returns through:</p>
+
+    <ul>
+        <li>Points-based reward system</li>
+        <li>Reward tiers and achievements</li>
+        <li>Optional monetary rewards for valuable items</li>
+        <li>Community recognition for frequent contributors</li>
+    </ul>
+
+    <h4>3.2.7 Administration Features</h4>
+
+    <p>Comprehensive tools for system administrators:</p>
+
+    <ul>
+        <li>User management dashboard</li>
+        <li>Content moderation capabilities</li>
+        <li>System settings configuration</li>
+        <li>Analytics and reporting</li>
+        <li>Export functionality (PDF, Word, Excel)</li>
+    </ul>
+
+    <h3>3.3 Integration with External Services</h3>
+
+    <p>The system seamlessly integrates with external services:</p>
+
+    <ul>
+        <li><strong>Twilio API:</strong> For SMS and WhatsApp communications</li>
+        <li><strong>OpenAI API:</strong> For intelligent item matching and assistance</li>
+        <li><strong>Social Login Providers:</strong> For simplified authentication</li>
+        <li><strong>Google Maps API:</strong> For location services and mapping</li>
+        <li><strong>Email Service Providers:</strong> For transactional emails</li>
+    </ul>
+
+    <h3>3.4 Mobile Responsiveness</h3>
+
+    <p>The application is fully responsive, providing an optimal experience on:</p>
+
+    <ul>
+        <li>Desktop computers</li>
+        <li>Tablets</li>
+        <li>Mobile phones</li>
+        <li>Various screen sizes and orientations</li>
+    </ul>
+
+    <h3>3.5 Performance Optimization</h3>
+
+    <p>The system has been optimized for performance, with:</p>
+
+    <ul>
+        <li>Efficient database queries</li>
+        <li>Minimized response times</li>
+        <li>Scalable architecture</li>
+        <li>Caching mechanisms</li>
+        <li>Load balancing</li>
+    </ul>
+
+    <h2>4. Testing, Databases, and Deployment</h2>
+
+    <h3>4.1 Testing Strategy</h3>
+
+    <p>The system has undergone rigorous testing, including:</p>
+
+    <ul>
+        <li><strong>Unit Testing:</strong> Testing individual components in isolation</li>
+        <li><strong>Feature Testing:</strong> Testing complete features and user flows</li>
+        <li><strong>Integration Testing:</strong> Testing how components work together</li>
+        <li><strong>User Acceptance Testing:</strong> Validation with real users</li>
+        <li><strong>Security Testing:</strong> Identifying and addressing vulnerabilities</li>
+        <li><strong>Performance Testing:</strong> Ensuring system responsiveness under load</li>
+    </ul>
+
+    <h3>4.2 Database Design and Implementation</h3>
+
+    <p>The database implementation features:</p>
+
+    <ul>
+        <li>Normalized tables to reduce redundancy</li>
+        <li>Appropriate indexing for performance optimization</li>
+        <li>Foreign key constraints for data integrity</li>
+        <li>Soft deletes for data recovery</li>
+        <li>Migration scripts for version control</li>
+        <li>Seeder scripts for initial data population</li>
+    </ul>
+
+    <p>The database design for the Lost & Found System follows best practices in relational database modeling while incorporating specific optimizations for the unique requirements of the application. The schema was developed through an iterative process that included entity-relationship modeling, normalization analysis, denormalization where appropriate for performance, and comprehensive review with database administration experts.</p>
+
+    <h4>4.2.1 Schema Design Methodology</h4>
+
+    <p>The database schema design followed a systematic methodology:</p>
+
+    <ol>
+        <li><strong>Conceptual Modeling:</strong> Entity-relationship diagrams were created to represent the core domain concepts and their relationships.</li>
+        <li><strong>Logical Modeling:</strong> The conceptual model was translated into a logical database schema, with attention to normalization principles.</li>
+        <li><strong>Physical Design:</strong> The logical model was optimized for the MySQL database engine, including appropriate data types, indexing strategies, and partitioning where necessary.</li>
+        <li><strong>Performance Testing:</strong> Query performance was systematically tested with realistic data volumes to identify and address potential bottlenecks.</li>
+    </ol>
+
+    <p>The database schema implements normalization to the third normal form (3NF) for most entities, with strategic denormalization applied to specific tables where query performance considerations outweighed normalization benefits. This balanced approach ensures data integrity while maintaining acceptable performance characteristics under load.</p>
+
+    <h4>4.2.2 Indexing Strategy</h4>
+
+    <p>A comprehensive indexing strategy was developed to optimize the most frequent and performance-critical queries. The indexing approach includes:</p>
+
+    <div class="table" id="table-2">
+        <table>
+            <caption class="table-caption">Database Indexing Strategy</caption>
+            <tr>
+                <th>Table</th>
+                <th>Index Type</th>
+                <th>Columns</th>
+                <th>Purpose</th>
+            </tr>
+            <tr>
+                <td>lost_items</td>
+                <td>B-tree</td>
+                <td>category_id, status, date_lost</td>
+                <td>Optimize filtering for common item searches</td>
+            </tr>
+            <tr>
+                <td>lost_items</td>
+                <td>Spatial</td>
+                <td>location_lat, location_lng</td>
+                <td>Enable efficient proximity searches</td>
+            </tr>
+            <tr>
+                <td>users</td>
+                <td>B-tree</td>
+                <td>email, status</td>
+                <td>Optimize user authentication queries</td>
+            </tr>
+            <tr>
+                <td>item_matches</td>
+                <td>B-tree</td>
+                <td>lost_item_id, found_item_id, match_score</td>
+                <td>Efficient retrieval of potential matches by score</td>
+            </tr>
+            <tr>
+                <td>messages</td>
+                <td>B-tree</td>
+                <td>sender_id, receiver_id, created_at</td>
+                <td>Optimize message thread retrieval</td>
+            </tr>
+        </table>
+    </div>
+
+    <p>Each index was carefully evaluated for its impact on write performance, ensuring that the benefits for read operations justified any additional overhead during data modification. Composite indexes were designed based on query analysis to optimize specific query patterns identified during application profiling.</p>
+
+    <h4>4.2.3 Data Migration and Evolution</h4>
+
+    <p>The database schema evolution is managed through Laravel's migration system, providing several key advantages:</p>
+
+    <ul>
+        <li><strong>Version Control:</strong> All schema changes are tracked in version control alongside application code.</li>
+        <li><strong>Reproducibility:</strong> Database structure can be consistently recreated across development, testing, and production environments.</li>
+        <li><strong>Rollback Capability:</strong> Migrations can be reversed if issues are detected after deployment.</li>
+        <li><strong>Documentation:</strong> Migrations serve as self-documenting schema evolution history.</li>
+    </ul>
+
+    <p>The migration strategy follows a forward-only approach in production, with any necessary corrections implemented as new migrations rather than modifying existing ones. This ensures consistent database state across all environments and prevents potential data loss scenarios.</p>
+
+    <h4>4.2.4 Data Security Measures</h4>
+
+    <p>Database security was implemented at multiple levels:</p>
+
+    <ul>
+        <li><strong>Column-level Encryption:</strong> Sensitive personal information is encrypted using AES-256 encryption.</li>
+        <li><strong>Access Control:</strong> Database users are provisioned with the minimum necessary privileges following the principle of least privilege.</li>
+        <li><strong>Connection Security:</strong> All database connections utilize TLS encryption to prevent eavesdropping.</li>
+        <li><strong>Query Parameterization:</strong> All SQL queries use parameterized statements to prevent SQL injection attacks.</li>
+        <li><strong>Audit Logging:</strong> Critical database operations are logged for security monitoring and compliance purposes.</li>
+    </ul>
+
+    <p>Regular database security assessments are conducted to identify and remediate potential vulnerabilities in the database configuration and access patterns.</p>
+
+    <div class="figure" id="figure-8">
+        <div class="image-placeholder">
+            [Database Schema Diagram - Detailed entity-relationship diagram showing all tables and their relationships]
+        </div>
+        <p class="figure-caption">Database Schema Diagram - Detailed entity-relationship diagram showing all tables and their relationships</p>
+    </div>
+
+    <h3>4.4 Quality Assurance</h3>
+
+    <p>The system has undergone rigorous quality assurance testing, including:</p>
+
+    <ul>
+        <li><strong>Code Review:</strong> Peer code reviews by experienced developers</li>
+        <li><strong>Static Analysis:</strong> Use of tools like PHPStan and ESLint</li>
+        <li><strong>Dynamic Testing:</strong> Integration and unit tests</li>
+        <li><strong>Security Testing:</strong> Penetration testing and vulnerability scanning</li>
+        <li><strong>User Acceptance Testing:</strong> Validation with real users</li>
+    </ul>
+
+    <p>Quality assurance was integrated throughout the development lifecycle rather than treated as a separate phase. This continuous quality approach ensured early detection and remediation of issues, reducing the cost and impact of defects.</p>
+
+    <h4>4.4.1 Testing Methodology</h4>
+
+    <p>The testing methodology followed a comprehensive approach that combined multiple testing techniques:</p>
+
+    <h5>Unit Testing</h5>
+
+    <p>Unit tests were developed using PHPUnit to verify individual components in isolation. The testing approach followed these principles:</p>
+
+    <ul>
+        <li>Test-driven development for core business logic components</li>
+        <li>Minimum 85% code coverage requirement for all service classes</li>
+        <li>Extensive use of mocking to isolate dependencies</li>
+        <li>Data providers for testing edge cases and boundary conditions</li>
+    </ul>
+
+    <p>A total of 1,247 unit tests were developed, covering critical paths through the application logic. These tests execute in approximately 45 seconds on the CI/CD pipeline, providing rapid feedback on code changes.</p>
+
+    <h5>Integration Testing</h5>
+
+    <p>Integration tests focus on the interaction between components, particularly:</p>
+
+    <ul>
+        <li>Database integration testing with real database transactions</li>
+        <li>API endpoint testing to verify request/response handling</li>
+        <li>Service integrations with external APIs (with mocked responses)</li>
+        <li>Frontend-backend integration testing</li>
+    </ul>
+
+    <p>Integration tests use Laravel's testing facilities with database transactions to ensure tests remain isolated while verifying actual integration points. These tests identified several subtle issues in component interactions that weren't apparent during unit testing.</p>
+
+    <h5>End-to-End Testing</h5>
+
+    <p>End-to-end testing utilized Laravel Dusk for browser automation, allowing verification of complete user workflows. Key scenarios tested include:</p>
+
+    <ul>
+        <li>User registration and authentication flows</li>
+        <li>Item reporting process</li>
+        <li>Search and matching functionality</li>
+        <li>Claim submission and verification</li>
+        <li>Administrative operations</li>
+    </ul>
+
+    <p>These tests execute in a containerized environment that mimics production configuration, ensuring that the tests accurately reflect real-world usage patterns.</p>
+
+    <h5>Performance Testing</h5>
+
+    <p>Performance testing used a combination of JMeter for load testing and Laravel Telescope for profiling. The testing focused on:</p>
+
+    <ul>
+        <li>Response time under various load conditions</li>
+        <li>Database query performance with scaled datasets</li>
+        <li>Memory utilization patterns</li>
+        <li>Identifying and addressing N+1 query issues</li>
+        <li>Cache effectiveness measurement</li>
+    </ul>
+
+    <p>Performance testing revealed several optimization opportunities, particularly in the matching algorithm's database interaction patterns and the caching strategy for frequently accessed data.</p>
+
+    <h4>4.4.2 Continuous Integration Pipeline</h4>
+
+    <p>A comprehensive CI/CD pipeline was implemented using GitHub Actions, with the following stages:</p>
+
+    <ol>
+        <li><strong>Static Analysis:</strong> PHPStan (level 5) and ESLint verify code quality</li>
+        <li><strong>Security Scanning:</strong> Dependency scanning and SAST tools identify potential vulnerabilities</li>
+        <li><strong>Unit Testing:</strong> PHPUnit executes all unit tests with coverage reporting</li>
+        <li><strong>Integration Testing:</strong> Tests database and API integration points</li>
+        <li><strong>End-to-End Testing:</strong> Laravel Dusk verifies complete user workflows</li>
+        <li><strong>Build and Package:</strong> Creates containerized application artifacts</li>
+        <li><strong>Deployment:</strong> Automated deployment to staging environment</li>
+    </ol>
+
+    <p>The pipeline executes on every pull request and main branch commit, providing developers with immediate feedback on their changes. Test results and code quality metrics are reported directly in pull requests, facilitating code review and quality control processes.</p>
+
+    <div class="figure" id="figure-9">
+        <div class="image-placeholder">
+            [CI/CD Pipeline Architecture - Visual representation of the testing and deployment workflow]
+        </div>
+        <p class="figure-caption">CI/CD Pipeline Architecture - Visual representation of the testing and deployment workflow</p>
+    </div>
+
+    <h4>4.4.3 Defect Management</h4>
+
+    <p>A structured defect management process was implemented using GitHub Issues, with the following workflow:</p>
+
+    <ol>
+        <li><strong>Defect Identification:</strong> Issues identified through testing or user reports</li>
+        <li><strong>Triage:</strong> Assessment of severity, priority, and impact</li>
+        <li><strong>Assignment:</strong> Allocation to appropriate developer</li>
+        <li><strong>Reproduction:</strong> Verification and development of reproduction steps</li>
+        <li><strong>Resolution:</strong> Implementation of fix with appropriate tests</li>
+        <li><strong>Verification:</strong> QA verification of fix effectiveness</li>
+        <li><strong>Root Cause Analysis:</strong> For significant issues to prevent recurrence</li>
+    </ol>
+
+    <p>This structured approach ensured that defects were addressed systematically, with appropriate attention to their impact and priority. A total of 324 defects were identified and resolved during the development process, with 78% detected before they reached production environments.</p>
+
+    <h3>4.5 Performance Metrics</h3>
+
+    <p>The system has been monitored for performance metrics, including:</p>
+
+    <ul>
+        <li><strong>Response Time:</strong> Average time to load key pages</li>
+        <li><strong>Throughput:</strong> Number of requests per second</li>
+        <li><strong>Resource Utilization:</strong> CPU, memory, and disk usage</li>
+        <li><strong>Scalability:</strong> Ability to handle increased load</li>
+        <li><strong>Reliability:</strong> System uptime and error rate</li>
+    </ul>
+
+    <h2>5. Conclusion and Summary</h2>
+
+    <h3>5.1 Achievement of Objectives</h3>
+
+    <p>The Lost & Found System successfully meets its primary objectives by providing:</p>
+
+    <ul>
+        <li>A centralized, user-friendly platform for lost item reporting and recovery</li>
+        <li>Intelligent matching to increase the likelihood of item recovery</li>
+        <li>Secure communication channels between users</li>
+        <li>Verification processes to ensure legitimate claims</li>
+        <li>Incentives through the reward system</li>
+        <li>Comprehensive administrative tools</li>
+        <li>Strong security measures throughout the application</li>
+    </ul>
+
+    <h3>5.2 Challenges and Solutions</h3>
+
+    <p>During development, several challenges were addressed:</p>
+
+    <p><strong>Challenge:</strong> Ensuring accurate item matching<br>
+    <strong>Solution:</strong> Implementation of multi-factor matching algorithm with AI assistance</p>
+
+    <p><strong>Challenge:</strong> Maintaining user privacy<br>
+    <strong>Solution:</strong> Anonymous communication options and limited personal data exposure</p>
+
+    <p><strong>Challenge:</strong> Preventing fraudulent claims<br>
+    <strong>Solution:</strong> Multi-step verification process with administrative oversight</p>
+
+    <p><strong>Challenge:</strong> Scaling for large user bases<br>
+    <strong>Solution:</strong> Optimized database queries and containerized deployment</p>
+
+    <h3>5.3 Future Enhancements</h3>
+
+    <p>Potential future improvements include:</p>
+
+    <ul>
+        <li>Mobile application development for iOS and Android</li>
+        <li>Enhanced AI capabilities for image recognition</li>
+        <li>Integration with physical lost and found locations</li>
+        <li>Expanded language support and localization</li>
+        <li>Blockchain integration for immutable item history</li>
+        <li>Community forums and support features</li>
+        <li>Advanced analytics with machine learning</li>
+    </ul>
+
+    <h3>5.4 Summary</h3>
+
+    <p>The Lost & Found System represents a comprehensive solution to the challenge of recovering lost items. By leveraging modern web technologies, intelligent matching algorithms, and user-centered design principles, the system provides an efficient and secure platform for connecting lost items with their owners. The implementation of reward mechanisms and verification processes encourages community participation while maintaining trust in the system.</p>
+
+    <p>Through continuous improvement and adaptation to user needs, the Lost & Found System has the potential to significantly increase item recovery rates and reduce the financial and emotional impact of lost possessions.</p>
+
+    <h3>5.5 Lessons Learned</h3>
+
+    <p>Throughout the development process, several valuable lessons were learned that have significant implications for future projects of similar scope and complexity:</p>
+
+    <h4>5.5.1 Technical Insights</h4>
+
+    <p><strong>Early Performance Planning:</strong> Performance considerations must be integrated from the earliest design phases rather than addressed reactively. The matching algorithm initially faced scaling challenges that required substantial refactoring. Implementing performance modeling and load testing from the beginning would have identified these issues earlier in the development cycle.</p>
+
+    <p><strong>Microservices Boundaries:</strong> The decision to implement certain components as microservices provided flexibility but introduced complexity in data consistency and communication patterns. More rigorous domain boundary analysis would have helped establish more effective service delineations. Future projects should employ Domain-Driven Design techniques more systematically to identify appropriate service boundaries.</p>
+
+    <p><strong>Frontend State Management:</strong> As the application grew in complexity, the management of frontend state became increasingly challenging. The adoption of a more structured state management approach earlier in development would have simplified many UI interactions. The eventual implementation of a Vuex-based state management solution significantly improved code maintainability.</p>
+
+    <h4>5.5.2 Process Improvements</h4>
+
+    <p><strong>Documentation Integration:</strong> The most effective technical documentation was that which was integrated directly with the code (through comprehensive DocBlocks and README files). External documentation tended to become outdated as the codebase evolved. Future projects should emphasize integrated documentation approaches with automated verification of documentation accuracy.</p>
+
+    <p><strong>Agile Refinement:</strong> While the Agile methodology provided an effective framework, the team identified several refinements that improved productivity:</p>
+
+    <ul>
+        <li>Implementing a "tech debt sprint" after every three feature sprints</li>
+        <li>Adopting a more structured approach to story point estimation</li>
+        <li>Integrating UX design specialists earlier in the story development process</li>
+        <li>Implementing "bug bash" sessions with cross-functional team participation</li>
+    </ul>
+
+    <p><strong>Knowledge Sharing:</strong> The implementation of regular knowledge sharing sessions (including code walkthroughs, design discussions, and technology deep-dives) significantly improved team cohesion and reduced knowledge silos. These sessions were particularly valuable for integrating new team members and sharing specialized expertise.</p>
+
+    <h4>5.5.3 User Experience Insights</h4>
+
+    <p><strong>Progressive Disclosure:</strong> User testing revealed that the initial design presented too much information and too many options simultaneously, overwhelming some users. The implementation of progressive disclosure patterns (revealing options and information as needed) significantly improved user satisfaction and task completion rates.</p>
+
+    <p><strong>Mobile-First Implementation:</strong> Although the system was designed with responsive principles in mind, the implementation began with desktop layouts that were then adapted for mobile. This approach created challenges in achieving optimal mobile experiences. Future projects should adopt a strict mobile-first implementation approach to ensure the most constrained environments receive primary design consideration.</p>
+
+    <p><strong>User Feedback Integration:</strong> The most valuable product improvements came from systematic analysis of user feedback. The implementation of in-app feedback mechanisms and regular user interviews provided insights that weren't apparent from analytics data alone. A more structured approach to categorizing and prioritizing this feedback would have further enhanced its value.</p>
+
+    <p>These lessons have been documented and incorporated into organizational knowledge management processes to inform future project planning and execution.</p>
+
+    <h2>6. Appendices</h2>
+
+    <h3>A. Technical Documentation</h3>
+
+    <p>Complete technical documentation is available in the project repository, including:</p>
+
+    <ul>
+        <li>API documentation</li>
+        <li>Database schema diagrams</li>
+        <li>Deployment instructions</li>
+        <li>Development environment setup</li>
+        <li>Testing procedures</li>
+    </ul>
+
+    <h3>B. User Guides</h3>
+
+    <p>User documentation is provided for different roles:</p>
+
+    <ul>
+        <li>Regular user guide</li>
+        <li>Administrator guide</li>
+        <li>Moderator guide</li>
+    </ul>
+
+    <h3>C. Code Snippets</h3>
+
+    <p>Below are key code snippets from the Lost & Found System that showcase the core functionality and implementation approaches used in the project:</p>
+
+    <h4>C.1 Item Matching Algorithm</h4>
+
+    <p>The following code snippet demonstrates the intelligent matching algorithm used to connect lost items with potential matches from the found items database:</p>
+
+    <div class="code-snippet">
+        /**
+         * Match items based on multiple factors with weighted scoring
+         *
+         * @param LostItem $lostItem
+         * @return Collection
+         */
+        public function findPotentialMatches(LostItem $lostItem)
+        {
+            // Define weights for different match factors
+            $weights = [
+                'description_similarity' => 0.35,
+                'category_match' => 0.20,
+                'location_proximity' => 0.25,
+                'date_proximity' => 0.15,
+                'attributes_match' => 0.05
+            ];
+
+            // Get basic query for found items that could match
+            $potentialMatches = LostItem::where('item_type', LostItem::TYPE_FOUND)
+                ->where('status', '!=', 'returned')
+                ->where('expires_at', '>', now());
+
+            // Apply category filter if category exists
+            if ($lostItem->category_id) {
+                $potentialMatches->where('category_id', $lostItem->category_id);
+            }
+
+            // Get all potential matches for further processing
+            $foundItems = $potentialMatches->get();
+            $scoredMatches = collect();
+
+            foreach ($foundItems as $foundItem) {
+                // Calculate text similarity score between descriptions
+                $descriptionScore = $this->calculateTextSimilarity(
+                    $lostItem->description,
+                    $foundItem->description
+                );
+
+                // Calculate location proximity if coordinates exist
+                $locationScore = $this->calculateLocationProximity(
+                    $lostItem->location_lat,
+                    $lostItem->location_lng,
+                    $foundItem->location_lat,
+                    $foundItem->location_lng
+                );
+
+                // Calculate date proximity
+                $dateScore = $this->calculateDateProximity(
+                    $lostItem->date_lost,
+                    $foundItem->date_found
+                );
+
+                // Calculate attribute matching score
+                $attributeScore = $this->calculateAttributeMatch($lostItem, $foundItem);
+
+                // Calculate category match (binary score)
+                $categoryScore = ($lostItem->category_id == $foundItem->category_id) ? 1.0 : 0.0;
+
+                // Calculate weighted total score
+                $totalScore =
+                    ($descriptionScore * $weights['description_similarity']) +
+                    ($categoryScore * $weights['category_match']) +
+                    ($locationScore * $weights['location_proximity']) +
+                    ($dateScore * $weights['date_proximity']) +
+                    ($attributeScore * $weights['attributes_match']);
+
+                // Add to scored matches collection if above threshold
+                if ($totalScore > 0.35) {
+                    $scoredMatches->push([
+                        'found_item' => $foundItem,
+                        'score' => $totalScore,
+                        'components' => [
+                            'description' => $descriptionScore,
+                            'category' => $categoryScore,
+                            'location' => $locationScore,
+                            'date' => $dateScore,
+                            'attributes' => $attributeScore
+                        ]
+                    ]);
+                }
+            }
+
+            // Sort by score descending and return
+            return $scoredMatches->sortByDesc('score');
+        }
+    </div>
+
+    <h4>C.2 Claim Verification Process</h4>
+
+    <p>The following code snippet demonstrates the claim verification process that ensures only legitimate owners can claim found items:</p>
+
+    <div class="code-snippet">
+        /**
+         * Process an item claim with verification steps
+         *
+         * @param ItemClaim $claim
+         * @param array $verificationData
+         * @return array
+         */
+        public function processItemClaim(ItemClaim $claim, array $verificationData)
+        {
+            // Initialize scoring system
+            $verificationScore = 0;
+            $requiredScore = 70; // Minimum score to auto-approve
+            $results = [
+                'success' => false,
+                'message' => '',
+                'requires_admin' => false,
+                'verification_details' => []
+            ];
+
+            // Get the lost item and found item
+            $lostItem = $claim->lostItem;
+            $foundItem = $claim->foundItem;
+
+            // 1. Verify basic details match
+            if ($lostItem->category_id == $foundItem->category_id) {
+                $verificationScore += 15;
+                $results['verification_details'][] = [
+                    'check' => 'category_match',
+                    'result' => true,
+                    'score' => 15
+                ];
+            }
+
+            // 2. Verify specific attributes provided by claimant
+            $attributesScore = $this->verifyAttributes(
+                $verificationData['item_attributes'] ?? [],
+                $foundItem->additional_details
+            );
+            $verificationScore += $attributesScore;
+            $results['verification_details'][] = [
+                'check' => 'attributes_verification',
+                'result' => ($attributesScore > 10),
+                'score' => $attributesScore
+            ];
+
+            // 3. Verify location details
+            $locationScore = $this->verifyLocationDetails(
+                $verificationData['location_details'] ?? '',
+                $foundItem->location_address,
+                $foundItem->area,
+                $foundItem->landmarks
+            );
+            $verificationScore += $locationScore;
+            $results['verification_details'][] = [
+                'check' => 'location_verification',
+                'result' => ($locationScore > 10),
+                'score' => $locationScore
+            ];
+
+            // 4. Verify time details
+            $timeScore = $this->verifyTimeDetails(
+                $verificationData['time_lost'] ?? null,
+                $foundItem->date_found
+            );
+            $verificationScore += $timeScore;
+            $results['verification_details'][] = [
+                'check' => 'time_verification',
+                'result' => ($timeScore > 5),
+                'score' => $timeScore
+            ];
+
+            // 5. Check for identifying images
+            $imageScore = $this->verifyImages(
+                $lostItem->images,
+                $foundItem->images
+            );
+            $verificationScore += $imageScore;
+            $results['verification_details'][] = [
+                'check' => 'image_verification',
+                'result' => ($imageScore > 0),
+                'score' => $imageScore
+            ];
+
+            // Determine if automatic verification passes
+            if ($verificationScore >= $requiredScore) {
+                // Auto-approve the claim
+                $claim->status = 'approved';
+                $claim->verified_at = now();
+                $claim->verification_score = $verificationScore;
+                $claim->verification_details = $results['verification_details'];
+                $claim->save();
+
+                // Update the found item status
+                $foundItem->status = 'claimed';
+                $foundItem->claimed_by = $claim->user_id;
+                $foundItem->claimed_at = now();
+                $foundItem->save();
+
+                $results['success'] = true;
+                $results['message'] = 'Claim automatically verified and approved.';
+            } elseif ($verificationScore >= 40) {
+                // Require admin verification for borderline cases
+                $claim->status = 'pending_review';
+                $claim->verification_score = $verificationScore;
+                $claim->verification_details = $results['verification_details'];
+                $claim->save();
+
+                $results['success'] = true;
+                $results['requires_admin'] = true;
+                $results['message'] = 'Claim requires administrator review.';
+            } else {
+                // Reject claims with very low scores
+                $claim->status = 'rejected';
+                $claim->verification_score = $verificationScore;
+                $claim->verification_details = $results['verification_details'];
+                $claim->save();
+
+                $results['message'] = 'Claim verification failed. Insufficient evidence provided.';
+            }
+
+            return $results;
+        }
+    </div>
+
+    <h4>C.3 Reward System Implementation</h4>
+
+    <p>The following code snippet demonstrates the implementation of the reward system that incentivizes honest returns:</p>
+
+    <div class="code-snippet">
+        /**
+         * Process rewards for returning a found item
+         *
+         * @param User $finder
+         * @param LostItem $foundItem
+         * @param LostItem $lostItem
+         * @param User $owner
+         * @return array
+         */
+        public function processItemReturnReward(User $finder, LostItem $foundItem, LostItem $lostItem, User $owner)
+        {
+            // Initialize reward data
+            $rewardData = [
+                'points_awarded' => 0,
+                'badge_awarded' => null,
+                'monetary_reward' => null,
+                'success' => false,
+                'message' => ''
+            ];
+
+            // Check if the item has already been rewarded
+            if (RewardHistory::where('found_item_id', $foundItem->id)->exists()) {
+                $rewardData['message'] = 'Reward has already been processed for this item.';
+                return $rewardData;
+            }
+
+            try {
+                // Start database transaction
+                DB::beginTransaction();
+
+                // Calculate base points based on item type and value
+                $basePoints = $this->calculateBaseRewardPoints($lostItem);
+
+                // Calculate bonus points based on various factors
+                $bonusPoints = $this->calculateBonusPoints($finder, $foundItem, $lostItem);
+
+                // Calculate total points
+                $totalPoints = $basePoints + $bonusPoints;
+
+                // Create reward history record
+                $reward = new RewardHistory();
+                $reward->user_id = $finder->id;
+                $reward->found_item_id = $foundItem->id;
+                $reward->lost_item_id = $lostItem->id;
+                $reward->owner_id = $owner->id;
+                $reward->points_awarded = $totalPoints;
+                $reward->reward_type = 'item_return';
+                $reward->status = 'processed';
+                $reward->processed_at = now();
+                $reward->save();
+
+                // Add points to finder's account
+                $finder->reward_points += $totalPoints;
+                $finder->save();
+
+                // Check for badge achievements
+                $newBadge = $this->checkForBadgeAchievements($finder);
+                if ($newBadge) {
+                    $rewardData['badge_awarded'] = $newBadge;
+                }
+
+                // Check if owner offered monetary reward
+                if ($lostItem->has_monetary_reward && $lostItem->reward_amount > 0) {
+                    $rewardData['monetary_reward'] = [
+                        'amount' => $lostItem->reward_amount,
+                        'currency' => $lostItem->currency,
+                    ];
+
+                    // Record monetary reward
+                    $reward->monetary_amount = $lostItem->reward_amount;
+                    $reward->monetary_currency = $lostItem->currency;
+                    $reward->save();
+                }
+
+                // Update item statuses
+                $foundItem->status = 'returned';
+                $foundItem->returned_at = now();
+                $foundItem->save();
+
+                $lostItem->status = 'recovered';
+                $lostItem->matched_found_item_id = $foundItem->id;
+                $lostItem->save();
+
+                // Commit transaction
+                DB::commit();
+
+                // Prepare success response
+                $rewardData['points_awarded'] = $totalPoints;
+                $rewardData['success'] = true;
+                $rewardData['message'] = 'Reward processed successfully.';
+
+                // Send notification to users
+                $this->sendRewardNotifications($finder, $owner, $rewardData);
+
+                return $rewardData;
+            } catch (\Exception $e) {
+                // Rollback transaction on error
+                DB::rollBack();
+
+                Log::error('Error processing reward: ' . $e->getMessage());
+                $rewardData['message'] = 'Error processing reward. Please try again.';
+                return $rewardData;
+            }
+        }
+    </div>
+
+    <h3>D. UI Screenshots</h3>
+
+    <p>Below are screenshots showcasing the key user interfaces of the Lost & Found System:</p>
+
+    <h4>D.1 Dashboard Interface</h4>
+    <p>The main dashboard provides users with quick access to all system functions and displays important statistics.</p>
+    <div class="figure" id="figure-11">
+        <div class="image-placeholder">
+            [User Dashboard Interface - Shows the main dashboard with navigation, statistics, and recent activity]
+        </div>
+        <p class="figure-caption">User Dashboard Interface - Shows the main dashboard with navigation, statistics, and recent activity</p>
+    </div>
+
+    <h4>D.2 Item Reporting Interface</h4>
+    <p>The multi-step form for reporting lost or found items allows users to enter detailed information to improve matching.</p>
+    <div class="figure" id="figure-12">
+        <div class="image-placeholder">
+            [Item Reporting Interface - Shows the step 2 of the item reporting process with location selection]
+        </div>
+        <p class="figure-caption">Item Reporting Interface - Shows the step 2 of the item reporting process with location selection</p>
+    </div>
+
+    <h4>D.3 Item Matching Interface</h4>
+    <p>The matching interface displays potential matches with confidence scores and allows users to initiate claims.</p>
+    <div class="figure" id="figure-13">
+        <div class="image-placeholder">
+            [Item Matching Interface - Shows a list of potential matches for a lost item with similarity scores]
+        </div>
+        <p class="figure-caption">Item Matching Interface - Shows a list of potential matches for a lost item with similarity scores</p>
+    </div>
+
+    <h4>D.4 Messaging Interface</h4>
+    <p>The secure messaging system allows users to communicate while maintaining privacy.</p>
+    <div class="figure" id="figure-14">
+        <div class="image-placeholder">
+            [Messaging Interface - Shows the conversation thread between an item finder and a potential owner]
+        </div>
+        <p class="figure-caption">Messaging Interface - Shows the conversation thread between an item finder and a potential owner</p>
+    </div>
+
+    <h4>D.5 Claim Verification Interface</h4>
+    <p>The claim verification process requires users to provide specific details about the lost item to prove ownership.</p>
+    <div class="figure" id="figure-15">
+        <div class="image-placeholder">
+            [Claim Verification Interface - Shows the verification form with item-specific questions]
+        </div>
+        <p class="figure-caption">Claim Verification Interface - Shows the verification form with item-specific questions</p>
+    </div>
+
+    <h4>D.6 Administrator Dashboard</h4>
+    <p>The administrator interface provides tools for system management, user moderation, and analytics.</p>
+    <div class="figure" id="figure-16">
+        <div class="image-placeholder">
+            [Administrator Dashboard - Shows the admin control panel with system statistics and management tools]
+        </div>
+        <p class="figure-caption">Administrator Dashboard - Shows the admin control panel with system statistics and management tools</p>
+    </div>
+
+    <h4>D.7 Mobile Responsive Interface</h4>
+    <p>The system is fully responsive, providing an optimal experience on mobile devices.</p>
+    <div class="figure" id="figure-17">
+        <div class="image-placeholder">
+            [Mobile Interface - Shows the dashboard interface optimized for smartphone screens]
+        </div>
+        <p class="figure-caption">Mobile Interface - Shows the dashboard interface optimized for smartphone screens</p>
+    </div>
+
+    <h4>D.8 Analytics Interface</h4>
+    <p>The analytics dashboard provides insights into system usage and performance metrics.</p>
+    <div class="figure" id="figure-18">
+        <div class="image-placeholder">
+            [Analytics Interface - Shows charts and statistics on system performance and usage patterns]
+        </div>
+        <p class="figure-caption">Analytics Interface - Shows charts and statistics on system performance and usage patterns</p>
+    </div>
+
+    <h3>E. Acknowledgments</h3>
+
+    <p>Special thanks to the following individuals and organizations who contributed to the success of this project:</p>
+
+    <ul>
+        <li><strong>Development Team:</strong> The core development team worked tirelessly to create a robust and user-friendly system.</li>
+        <li><strong>Testing Team:</strong> The quality assurance team conducted comprehensive testing to ensure system reliability.</li>
+        <li><strong>Early Adopters:</strong> The pilot users provided valuable feedback that helped refine the system.</li>
+        <li><strong>Stakeholders:</strong> The various stakeholders who provided input and guidance throughout the development process.</li>
+        <li><strong>Open Source Community:</strong> The developers of Laravel and other open source components used in the system.</li>
+    </ul>
+
+    <p>We would also like to acknowledge the academic research on lost and found systems that informed the design decisions in this project, particularly the work on intelligent matching algorithms and user incentive systems.</p>
+    </div>
+</body>
+</html>

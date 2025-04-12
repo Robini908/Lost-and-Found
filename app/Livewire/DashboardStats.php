@@ -4,11 +4,17 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\LostItem;
+use App\Models\ItemMatch;
 use Carbon\Carbon;
 
 class DashboardStats extends Component
 {
-    public $stats = [];
+    public $totalLostItems;
+    public $totalFoundItems;
+    public $last30DaysLostItems;
+    public $last30DaysFoundItems;
+    public $successfulMatches;
+    public $recoveryRate;
 
     public function mount()
     {
@@ -17,52 +23,26 @@ class DashboardStats extends Component
 
     public function loadStats()
     {
-        $lastMonth = Carbon::now()->subDays(30);
+        // Calculate total items
+        $this->totalLostItems = LostItem::where('item_type', LostItem::TYPE_REPORTED)->count();
+        $this->totalFoundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)->count();
 
-        $totalLostItems = LostItem::whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])->count();
-        $totalFoundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)->count();
-        $lastMonthLostItems = LostItem::whereIn('item_type', [LostItem::TYPE_REPORTED, LostItem::TYPE_SEARCHED])
-            ->where('created_at', '>=', $lastMonth)
+        // Calculate last 30 days statistics
+        $last30DaysStart = now()->subDays(30)->startOfDay();
+        $this->last30DaysLostItems = LostItem::where('item_type', LostItem::TYPE_REPORTED)
+            ->where('created_at', '>=', $last30DaysStart)
             ->count();
-        $lastMonthFoundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)
-            ->where('created_at', '>=', $lastMonth)
-            ->count();
-
-        // Calculate successful matches
-        $successfulMatches = LostItem::whereNotNull('matched_found_item_id')->count();
-        $totalItems = $totalLostItems + $totalFoundItems;
-        $matchRate = $totalItems > 0 ? round(($successfulMatches / $totalItems) * 100, 1) : 0;
-
-        // Calculate recovery trend
-        $previousMonthMatches = LostItem::whereNotNull('matched_found_item_id')
-            ->where('created_at', '>=', Carbon::now()->subMonths(2))
-            ->where('created_at', '<', Carbon::now()->subMonth())
+        $this->last30DaysFoundItems = LostItem::where('item_type', LostItem::TYPE_FOUND)
+            ->where('created_at', '>=', $last30DaysStart)
             ->count();
 
-        $currentMonthMatches = LostItem::whereNotNull('matched_found_item_id')
-            ->where('created_at', '>=', Carbon::now()->subMonth())
-            ->count();
+        // Calculate successful matches (where similarity score is >= 0.7)
+        $this->successfulMatches = ItemMatch::where('similarity_score', '>=', 0.7)->count();
 
-        $trend = 'Stable';
-        if ($previousMonthMatches > 0) {
-            $changePercent = (($currentMonthMatches - $previousMonthMatches) / $previousMonthMatches) * 100;
-            if ($changePercent > 5) {
-                $trend = 'Increasing';
-            } elseif ($changePercent < -5) {
-                $trend = 'Decreasing';
-            }
-        }
-
-        $this->stats = [
-            'totalLostItems' => $totalLostItems,
-            'totalFoundItems' => $totalFoundItems,
-            'lastMonthLostItems' => $lastMonthLostItems,
-            'lastMonthFoundItems' => $lastMonthFoundItems,
-            'successfulMatches' => $successfulMatches,
-            'matchRate' => $matchRate . '%',
-            'recoveryRate' => round(($successfulMatches / ($totalLostItems ?: 1)) * 100, 1) . '%',
-            'recoveryTrend' => $trend
-        ];
+        // Calculate recovery rate
+        $this->recoveryRate = $this->totalLostItems > 0
+            ? ($this->successfulMatches / $this->totalLostItems) * 100
+            : 0;
     }
 
     public function getListeners()
@@ -70,12 +50,21 @@ class DashboardStats extends Component
         return [
             'refresh-stats' => 'loadStats',
             'echo:items,ItemMatched' => 'loadStats',
-            'echo:items,ItemCreated' => 'loadStats'
+            'echo:items,ItemCreated' => 'loadStats',
+            'echo:items,ItemUpdated' => 'loadStats',
+            'echo:items,ItemDeleted' => 'loadStats'
         ];
     }
 
     public function render()
     {
-        return view('livewire.dashboard-stats');
+        return view('livewire.dashboard-stats', [
+            'totalLostItems' => $this->totalLostItems,
+            'totalFoundItems' => $this->totalFoundItems,
+            'last30DaysLostItems' => $this->last30DaysLostItems,
+            'last30DaysFoundItems' => $this->last30DaysFoundItems,
+            'successfulMatches' => $this->successfulMatches,
+            'recoveryRate' => $this->recoveryRate
+        ]);
     }
 }

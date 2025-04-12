@@ -23,10 +23,12 @@ use App\Http\Controllers\PageController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ItemExportController;
+use Illuminate\Support\Facades\File;
 
 Route::post('/chatbot', [ChatbotController::class, 'handle']);
 Route::get('/create-assistant', [OpenAIAssistantController::class, 'createAssistant']);
-Route::get('/lost-items/{hashedId}', [LostItemController::class, 'show'])->name('lost-items.show');
+Route::get('/lost-items/{hashedId}', [LostItemController::class, 'show'])->name('lost-items.show.public');
 Route::post('/send-sms', [TwilioController::class, 'sendSMS']);
 Route::post('/send-whatsapp', [TwilioController::class, 'sendWhatsAppMessage']);
 Route::post('/twilio/webhook', [TwilioWebhookController::class, 'handleIncomingMessage']);
@@ -51,7 +53,7 @@ Route::get('/login/{provider}', [SocialiteController::class, 'redirectToProvider
 Route::get('/login/{provider}/callback', [SocialiteController::class, 'handleProviderCallback']);
 Route::get('/barcode/print/{barcode}', [BarcodeController::class, 'print'])->name('barcode.print');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::get('/products/report-item/{mode?}', function ($mode = null) {
         return view('products.report-item', ['mode' => $mode]);
     })->name('products.report-item');
@@ -84,6 +86,38 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('lost-items.show');
     Route::get('/lost-items/{id}/details', [LostItemController::class, 'details'])
         ->name('lost-items.details');
+
+    Route::get('/items/claim/{foundItemId}/{lostItemId}', \App\Livewire\ItemClaimForm::class)->name('items.claim');
+
+    // PDF Export Routes
+    Route::get('/items/export/pdf', [ItemExportController::class, 'exportPdf'])
+        ->name('items.export.pdf');
+
+    // Word Export Routes
+    Route::get('/items/export/word', [ItemExportController::class, 'exportWord'])
+        ->name('items.export.word');
+
+    // Excel Export Routes
+    Route::get('/items/export/excel', [ItemExportController::class, 'exportExcel'])
+        ->name('items.export.excel');
+
+    // Print Routes
+    Route::get('/items/print', [ItemExportController::class, 'printItems'])
+        ->name('items.print');
+
+    // User-specific exports
+    Route::get('/my-items/export/{format?}', [ItemExportController::class, 'exportMyItems'])
+        ->name('my-items.export');
+
+    // Admin export all items
+    Route::middleware(['role:admin|superadmin|moderator'])->group(function () {
+        Route::get('/admin/items/export/{format?}', [ItemExportController::class, 'exportAllItems'])
+            ->name('admin.items.export');
+    });
+
+    // Test route for PhpWord
+    Route::get('/test-phpword', [ItemExportController::class, 'testPhpWord'])
+        ->name('test.phpword');
 });
 
 Route::get('/matched-items', function () {
@@ -107,6 +141,13 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/admin/users', ManageUsers::class)->name('admin.manage-users');
     Route::get('/admin/settings', Settings::class)->name('settings');
+});
+
+// Move the admin items route out of the previous group to fix its registration
+Route::middleware(['auth', 'role:admin|superadmin|moderator'])->group(function () {
+    Route::get('/admin/items', function () {
+        return view('admin.items-management');
+    })->name('admin.items');
 });
 
 // Moderator routes
@@ -160,6 +201,15 @@ Route::get('/how-it-works', [PageController::class, 'howItWorks'])->name('how-it
 Route::get('/success-stories', [PageController::class, 'successStories'])->name('success-stories');
 Route::get('/faqs', [PageController::class, 'faqs'])->name('faqs');
 Route::get('/report-item', [PageController::class, 'reportItem'])->name('report-item');
+
+// API Documentation Routes
+Route::get('/api-docs', function () {
+    return File::get(public_path('docs/Final_Report.html'));
+})->name('api-docs');
+
+// Swagger UI API Documentation
+Route::get('/api/documentation', [App\Http\Controllers\ApiDocumentationController::class, 'index'])->name('api.documentation');
+Route::get('/api/openapi-spec', [App\Http\Controllers\ApiDocumentationController::class, 'openApiSpec'])->name('api.openapi-spec');
 
 Route::middleware('guest')->group(function () {
     Route::post('login', [\Laravel\Fortify\Http\Controllers\AuthenticatedSessionController::class, 'store'])

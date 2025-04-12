@@ -65,11 +65,27 @@ return [
 
         'redis' => [
             'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'connection' => 'default',
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 90),
+            'retry_after' => 90,
             'block_for' => null,
-            'after_commit' => false,
+            'after_commit' => true,
+
+            // Configure specific queues with their own settings
+            'queues' => [
+                'notifications' => [
+                    'retry_after' => 180, // 3 minutes
+                    'block_for' => 5,
+                ],
+                'notifications-mail' => [
+                    'retry_after' => 300, // 5 minutes
+                    'block_for' => 5,
+                ],
+                'notifications-database' => [
+                    'retry_after' => 60, // 1 minute
+                    'block_for' => 5,
+                ],
+            ],
         ],
 
     ],
@@ -105,7 +121,7 @@ return [
 
     'failed' => [
         'driver' => env('QUEUE_FAILED_DRIVER', 'database-uuids'),
-        'database' => env('DB_CONNECTION', 'sqlite'),
+        'database' => env('DB_CONNECTION', 'mysql'),
         'table' => 'failed_jobs',
     ],
 

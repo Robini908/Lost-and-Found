@@ -1,6 +1,8 @@
 <!-- resources/views/layouts/app.blade.php -->
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
+      x-data
+      :class="{ 'dark': $store.darkMode.on }">
 
 <head>
     <meta charset="utf-8">
@@ -9,94 +11,68 @@
 
     <title>{{ config('app.name', 'Laravel') }}</title>
 
-    <!-- Enhanced Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Font Awesome -->
+    <!-- Font Awesome Pro Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-    <!-- Your existing scripts and styles -->
+    <!-- Your existing scripts -->
     <script type="text/javascript" src="../node_modules/tw-elements/dist/js/tw-elements.umd.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="app.css" />
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-    <script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"></script>
 
     <!-- reCAPTCHA Script -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
+    @filepondScripts
 
     @livewireChartsScripts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 
-    <!-- Custom Font Styles -->
-    <style>
-        :root {
-            --font-primary: 'Poppins', sans-serif;
-            --font-secondary: 'Inter', sans-serif;
-            --font-accent: 'Montserrat', sans-serif;
-        }
-
-        body {
-            font-family: var(--font-primary);
-        }
-
-        h1, h2, h3, h4, h5, h6 {
-            font-family: var(--font-accent);
-        }
-
-        .font-secondary {
-            font-family: var(--font-secondary);
-        }
-
-        .font-accent {
-            font-family: var(--font-accent);
-        }
-
-        [x-cloak] { display: none !important; }
-    </style>
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
-
     <!-- Flag Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@6.6.6/css/flag-icons.min.css"/>
 </head>
 
-<body class="font-sans antialiased">
+<body class="font-sans antialiased alpine-initializing"
+      x-data
+      x-init="() => {
+          document.body.classList.remove('alpine-initializing');
+          document.body.classList.add('alpine-ready');
+      }">
 
     <livewire:toasts />
     <x-banner />
 
-    <div class="min-h-screen bg-gray-50">
-        @livewire('navigation-menu')
+    <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        <!-- Navigation Menu with x-cloak -->
+        <div x-cloak>
+            @livewire('navigation-menu')
+        </div>
+
         @if (isset($header))
-            <header class="bg-gray-100 shadow">
-                <div class="max-w-7xl mx-auto py-2 px-4 sm:px-3 lg:px-8 flex justify-between items-center">
-                    {{ $header }}
-                    <nav>
+            <header class="bg-white shadow-sm glass-effect" x-cloak>
+                <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                    <div class="gradient-text">
+                        {{ $header }}
+                    </div>
+                    <nav class="flex items-center space-x-2">
                         @php
                             $segments = request()->segments();
                             $url = '';
                         @endphp
                         @foreach ($segments as $segment)
                             @php
-                                // Hash the segment if it is numeric (assuming it's an ID)
                                 if (is_numeric($segment)) {
-                                    $segment = substr(md5($segment), 0, 8); // Short hash
+                                    $segment = substr(md5($segment), 0, 8);
                                 }
                                 $url .= '/' . $segment;
                             @endphp
-                            <a href="{{ url($url) }}" class="ml-4 text-gray-700 hover:text-gray-900">
+                            <a href="{{ url($url) }}"
+                               class="btn-hover-effect text-sm text-gray-600 hover:text-gray-900 transition-colors duration-200">
                                 {{ ucfirst($segment) }}
                             </a>
                             @if (!$loop->last)
-                                <span class="mx-2 text-gray-500">></span>
+                                <span class="text-gray-400">
+                                    <i class="fas fa-chevron-right text-xs"></i>
+                                </span>
                             @endif
                         @endforeach
                     </nav>
@@ -104,24 +80,26 @@
             </header>
         @endif
 
-        <!-- Include Sidebar with User and RoleService -->
-        @php
-            use App\Services\RoleService;
-            $roleService = app(RoleService::class);
-        @endphp
-        @include('partials.sidebar', ['user' => auth()->user(), 'roleService' => $roleService])
+        <!-- Sidebar with x-cloak -->
+        <div x-cloak>
+            @php
+                use App\Services\RoleService;
+                $roleService = app(RoleService::class);
+            @endphp
+            @include('partials.sidebar', ['user' => auth()->user(), 'roleService' => $roleService])
+        </div>
 
         <!-- Page Content -->
-        <main>
-            {{ $slot }}
+        <main class="py-6">
+            <div data-aos="fade-up" data-aos-duration="800">
+                {{ $slot }}
+            </div>
         </main>
     </div>
 
     @stack('modals')
-    @filepondScripts
     @livewireScripts
     @stack('scripts')
-
 </body>
 
 </html>

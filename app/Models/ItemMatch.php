@@ -15,11 +15,13 @@ class ItemMatch extends Model
         'found_item_id',
         'similarity_score',
         'matched_at',
+        'processing_time_ms'
     ];
 
     protected $casts = [
         'similarity_score' => 'float',
         'matched_at' => 'datetime',
+        'processing_time_ms' => 'float'
     ];
 
     /**

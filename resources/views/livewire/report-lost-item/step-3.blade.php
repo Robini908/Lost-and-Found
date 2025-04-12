@@ -56,13 +56,29 @@
         </div>
 
         <!-- Date Field -->
-        <div class="relative">
+        <div class="relative" x-data="{ picker: null }" x-init="
+            picker = flatpickr($refs.datepicker, {
+                dateFormat: 'Y-m-d',
+                maxDate: 'today',
+                defaultDate: @entangle('date'),
+                onChange: function(selectedDates) {
+                    $wire.set('date', selectedDates[0] ? selectedDates[0].toISOString().split('T')[0] : null)
+                }
+            })
+        ">
             <label for="date" class="block text-sm font-medium text-gray-700 mb-2">
-                {{ $reportType === 'found' ? 'Date Found' : 'Date Lost' }}
+                {{ $reportType === 'found' ? 'Date Found' : 'Date Lost' }} <span class="text-red-500">*</span>
             </label>
             <div class="mt-1 relative rounded-md shadow-sm">
-                <input type="date" wire:model="date" id="date"
-                    class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                <input type="text"
+                       x-ref="datepicker"
+                       placeholder="Select date"
+                       class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm pr-10">
+                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+                    </svg>
+                </div>
             </div>
             @error('date')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -70,12 +86,12 @@
         </div>
 
         <!-- Notes Field -->
-        <div class="relative col-span-2">
+        <div class="col-span-full">
             <label for="notes" class="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
             <div class="mt-1 relative rounded-md shadow-sm">
-                <textarea wire:model="notes" id="notes" rows="3"
+                <textarea wire:model="notes" id="notes" rows="4"
                     class="block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-                    placeholder="Any additional details that might help identify the item..."></textarea>
+                    placeholder="Any additional information that might help identify the item..."></textarea>
             </div>
             @error('notes')
                 <p class="mt-1 text-sm text-red-600">{{ $message }}</p>

@@ -1,60 +1,37 @@
-<div class="bg-white p-6 rounded-lg shadow-sm">
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-        <h3 class="text-lg font-medium text-gray-900">{{ $lineChartModel->getTitle() }}</h3>
+<div>
+    <div class="flex justify-between items-center mb-6">
+        <h3 class="text-lg font-semibold text-gray-900">Items by Status Over Time</h3>
         <div class="flex items-center space-x-4">
-            <select wire:model="chartType" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                <option value="status">Status Distribution</option>
-                <option value="verification">Verification Status</option>
-                <option value="claims">Claims & Matches</option>
-            </select>
-            <select wire:model="days" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                <option value="7">Last 7 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="90">Last 90 days</option>
+            <select wire:model="timeRange" class="form-select rounded-lg text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <option value="last_7_days">Last 7 Days</option>
+                <option value="last_30_days">Last 30 Days</option>
+                <option value="last_90_days">Last 90 Days</option>
+                <option value="last_year">Last Year</option>
             </select>
         </div>
     </div>
 
-    <div class="mt-4">
-        <div wire:ignore>
+    <div class="bg-white rounded-xl p-6 border border-gray-100">
+        <div class="h-[400px]">
             <livewire:livewire-line-chart
                 :line-chart-model="$lineChartModel"
             />
         </div>
-    </div>
 
-    <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        @if($chartType === 'status')
-            <div class="flex items-center space-x-2">
-                <span class="w-3 h-3 rounded-full bg-red-500"></span>
-                <span class="text-sm text-gray-600">Reported Items</span>
+        <!-- Legend -->
+        <div class="flex justify-center items-center space-x-6 mt-6">
+            <div class="flex items-center">
+                <span class="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+                <span class="text-sm text-gray-600">Reported</span>
             </div>
-            <div class="flex items-center space-x-2">
-                <span class="w-3 h-3 rounded-full bg-blue-500"></span>
-                <span class="text-sm text-gray-600">Searched Items</span>
+            <div class="flex items-center">
+                <span class="w-3 h-3 rounded-full bg-blue-500 mr-2"></span>
+                <span class="text-sm text-gray-600">Searched</span>
             </div>
-            <div class="flex items-center space-x-2">
-                <span class="w-3 h-3 rounded-full bg-green-500"></span>
-                <span class="text-sm text-gray-600">Found Items</span>
+            <div class="flex items-center">
+                <span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                <span class="text-sm text-gray-600">Found</span>
             </div>
-        @elseif($chartType === 'verification')
-            <div class="flex items-center space-x-2">
-                <span class="w-3 h-3 rounded-full bg-green-500"></span>
-                <span class="text-sm text-gray-600">Verified Items</span>
-            </div>
-            <div class="flex items-center space-x-2">
-                <span class="w-3 h-3 rounded-full bg-red-500"></span>
-                <span class="text-sm text-gray-600">Unverified Items</span>
-            </div>
-        @else
-            <div class="flex items-center space-x-2">
-                <span class="w-3 h-3 rounded-full bg-purple-500"></span>
-                <span class="text-sm text-gray-600">Claimed Items</span>
-            </div>
-            <div class="flex items-center space-x-2">
-                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
-                <span class="text-sm text-gray-600">Matched Items</span>
-            </div>
-        @endif
+        </div>
     </div>
 </div>

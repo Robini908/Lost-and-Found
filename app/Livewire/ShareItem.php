@@ -4,10 +4,11 @@ namespace App\Livewire;
 
 use Livewire\Component;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use App\Models\LostItem;
 
 class ShareItem extends Component
 {
-    public $item;
+    public $itemId;
     public $showModal = false;
     public $activeTab = 'social';
     public $qrCode;
@@ -15,9 +16,15 @@ class ShareItem extends Component
     public $shareTitle;
     public $embedCode;
 
-    public function mount($item)
+    public function mount($itemId)
     {
-        $this->item = $item;
+        $this->itemId = $itemId;
+        $this->generateShareData();
+    }
+
+    protected function generateShareData()
+    {
+        $item = $this->getItem();
         $this->shareUrl = route('lost-items.show', $item);
         $this->shareTitle = $item->title;
 
@@ -31,6 +38,11 @@ class ShareItem extends Component
 
         // Generate embed code
         $this->embedCode = '<iframe src="' . $this->shareUrl . '/embed" width="100%" height="400" frameborder="0"></iframe>';
+    }
+
+    public function getItem()
+    {
+        return LostItem::findOrFail($this->itemId);
     }
 
     public function openModal()
@@ -59,7 +71,7 @@ class ShareItem extends Component
 
     public function downloadQrCode()
     {
-        $filename = 'qr-code-' . $this->item->id . '.svg';
+        $filename = 'qr-code-' . $this->itemId . '.svg';
         $qrCodeSvg = base64_decode($this->qrCode);
 
         return response()->streamDownload(function () use ($qrCodeSvg) {
